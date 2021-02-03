@@ -636,12 +636,10 @@ Proof. intros n c A B.
        rewrite map_app.
        reflexivity.
 Qed. 
-
 Lemma scale_sing : forall (n : nat) (c : C) (a : Square n),
     c · [a] = [c .* a].
 Proof. reflexivity.
 Qed.
-
 Lemma sing_scale_dist_l : forall (n : nat) (c : C) (a : Square n) (B : vecType n),
     (c · [a]) *' B = c · ([a] *' B).
 Proof. intros n c a B. induction B as [|b].
@@ -657,7 +655,6 @@ Proof. intros n c a B. induction B as [|b].
          rewrite Mscale_mult_dist_l.
          reflexivity.
 Qed.
-
  
 Lemma scale_dist_l : forall (n : nat) (c : C) (A B : vecType n), (c · A) *' B = c · (A *' B).
 Proof. intros n c A B. induction A as [|a].
@@ -668,8 +665,6 @@ Proof. intros n c A B. induction A as [|a].
          rewrite IHA. rewrite sing_scale_dist_l.
          reflexivity.
 Qed.
-
-
 (* note that this is slightly different than what we would expect. *)
 (* scaling is on right, but singleton is still left list *)
 Lemma sing_scale_dist_r : forall (n : nat) (c : C) (a : Square n) (B : vecType n),
@@ -687,7 +682,6 @@ Proof. intros n c a B. induction B as [| b].
          rewrite Mscale_mult_dist_r.
          reflexivity.
 Qed.
-
 Lemma scale_dist_r : forall (n : nat) (c : C) (A B : vecType n), A *' (c · B) = c · (A *' B).
 Proof. intros n c A B. induction A as [|a].
        - reflexivity.
@@ -698,8 +692,6 @@ Proof. intros n c A B. induction A as [|a].
          rewrite sing_scale_dist_r.
          reflexivity.
 Qed.
-
-
 Lemma neg_dist_l : forall (n : nat) (A B : vecType n), -A *' B = - (A *' B).
 Proof. intros n A B.
        unfold neg.
@@ -711,7 +703,6 @@ Proof. intros n A B.
        unfold neg.
        rewrite scale_dist_r. reflexivity.
 Qed.
-
 Lemma i_sqr : forall (n : nat) (A : vecType n), i (i A) = -A.
 Proof. intros n A. unfold neg. unfold i.
        rewrite scale_assoc.
@@ -719,53 +710,42 @@ Proof. intros n A. unfold neg. unfold i.
        rewrite H. 
        reflexivity.
 Qed. 
-
-
 Lemma i_dist_l : forall (n : nat) (A B : vecType n), i A *' B = i (A *' B).
 Proof. intros n A B.
        unfold i.
        rewrite scale_dist_l. reflexivity.
 Qed.
-
 Lemma i_dist_r : forall (n : nat) (A B : vecType n), A *' i B = i (A *' B).
 Proof. intros n A B.
        unfold i.
        rewrite scale_dist_r. reflexivity.
 Qed.
-
 Lemma i_neg_comm : forall (n : nat) (A : vecType n), i (-A) = -i A.
 Proof. intros n A. unfold neg; unfold i.
        do 2 (rewrite scale_assoc).
        assert (H: Ci * -1 = -1 * Ci). 
        { lca. } rewrite H. reflexivity.
 Qed.
-
 Hint Rewrite  mul_sing mul_nil_r mul_I_l mul_I_r Xsqr Zsqr ZmulX neg_inv scale_dist_l scale_dist_r neg_dist_l neg_dist_r i_sqr i_dist_l i_dist_r i_neg_comm : mul_db.
 *)
 
 
 (*
-
 (***************)
 (* Tensor Laws *)
 (***************)
-
-
 (* basically, we need the same helper lemmas for tensoring *)
 (* should all WF conditions, but I will assume all gates are well formed *)
 Lemma tensor_sing : forall (m n : nat) (a : Square n) (b : Square m),
     [a] ⊗' [b] = [a ⊗ b].
 Proof. reflexivity.
 Qed.
-
-
 Lemma cons_into_tensor_l : forall (m n : nat) (a : Square n) (A : vecType n) (B : vecType m),
     (a :: A) ⊗' B = ([a] ⊗' B) ++ (A ⊗' B). 
 Proof. intros m n a A B. simpl.
        rewrite <- app_nil_end.
        reflexivity.
 Qed.       
-
 Lemma concat_into_tensor_l : forall (m n : nat) (A B : vecType n) (C : vecType m),
     (A ++ B) ⊗' C = (A ⊗' C) ++ (B ⊗' C). 
 Proof. intros m n A B C. induction A as [| a].
@@ -777,8 +757,6 @@ Proof. intros m n A B C. induction A as [| a].
          rewrite IHA. rewrite app_ass.
          reflexivity.
 Qed.
-
-
 Lemma sing_concat_into_tensor_r : forall (m n : nat) (a : Square m) (B C : vecType n),
     [a] ⊗' (B ++ C) = ([a] ⊗' B) ++ ([a] ⊗' C).
 Proof. intros m n a B C. simpl.
@@ -786,8 +764,6 @@ Proof. intros m n a B C. simpl.
        rewrite map_app.
        reflexivity.
 Qed.
-
-
 Lemma sing_tensor_assoc : forall (m n o : nat) (a : Square m) (b : Square n) (C : vecType o),
     ([a] ⊗' [b]) ⊗' C = [a] ⊗' ([b] ⊗' C). 
 Proof. intros m n o a b C. induction C as [| c].
@@ -802,7 +778,6 @@ Proof. intros m n o a b C. induction C as [| c].
          rewrite kron_assoc.
          reflexivity.
 Qed.
-
 Lemma sing_tensor_assoc2 : forall (m n o: nat) (a : Square m) (B : vecType n) (C : vecType o),
     ([a] ⊗' B) ⊗' C = [a] ⊗' (B ⊗' C). 
 Proof. intros m n o a B C. induction B as [| b].
@@ -815,8 +790,6 @@ Proof. intros m n o a B C. induction B as [| b].
          rewrite IHB.
          reflexivity.
 Qed.         
-
-
 Theorem tensor_assoc : forall (m n o: nat) (A : vecType n) (B : vecType n) (C : vecType n),  
   A ⊗' (B ⊗' C) = (A ⊗' B) ⊗' C. 
 Proof. intros m n o A B C. induction A as [| a].
@@ -827,9 +800,6 @@ Proof. intros m n o A B C. induction A as [| a].
          rewrite sing_tensor_assoc2.
          reflexivity.
 Qed.
-
-
-
 Lemma sing_scale_tensor_dist_l : forall (n m : nat) (c : C) (a : Square n) (B : vecType m),
     (c · [a]) ⊗' B = c · ([a] ⊗' B).
 Proof. intros n m c a B. induction B as [|b].
@@ -845,7 +815,6 @@ Proof. intros n m c a B. induction B as [|b].
          rewrite Mscale_kron_dist_l.
          reflexivity.
 Qed.
-
  
 Lemma scale_tensor_dist_l : forall (n m : nat) (c : C) (A : vecType n) (B : vecType m),
     (c · A) ⊗' B = c · (A ⊗' B).
@@ -857,8 +826,6 @@ Proof. intros n m c A B. induction A as [|a].
          rewrite IHA. rewrite sing_scale_tensor_dist_l.
          reflexivity.
 Qed.
-
-
 (* note that this is slightly different than what we would expect. *)
 (* scaling is on right, but singleton is still left list *)
 Lemma sing_scale_tensor_dist_r : forall (m n : nat) (c : C) (a : Square n) (B : vecType m),
@@ -876,7 +843,6 @@ Proof. intros m n c a B. induction B as [| b].
          rewrite Mscale_kron_dist_r.
          reflexivity.
 Qed.
-
 Lemma scale_tensor_dist_r : forall (m n : nat) (c : C) (A : vecType n) (B : vecType m),
     A ⊗' (c · B) = c · (A ⊗' B).
 Proof. intros m n c A B. induction A as [|a].
@@ -888,45 +854,34 @@ Proof. intros m n c A B. induction A as [|a].
          rewrite sing_scale_tensor_dist_r.
          reflexivity.
 Qed.
-
-
-
 Lemma neg_tensor_dist_l : forall (m n : nat) (A : vecType n) (B : vecType m),
   -A ⊗' B = - (A ⊗' B).
 Proof. intros m n A B. unfold neg.
        rewrite scale_tensor_dist_l.
        reflexivity.
 Qed.
-
 Lemma neg_tensor_dist_r : forall (m n : nat) (A : vecType n) (B : vecType m),
   A ⊗' -B = - (A ⊗' B).
 Proof. intros m n A B. unfold neg.
        rewrite scale_tensor_dist_r.
        reflexivity.
 Qed.
-
 Lemma i_tensor_dist_l : forall (m n : nat) (A : vecType n) (B : vecType m),
   i A ⊗' B = i (A ⊗' B).
 Proof. intros m n A B. unfold i.
        rewrite scale_tensor_dist_l.
        reflexivity.
 Qed.
-
 Lemma i_tensor_dist_r : forall (m n : nat) (A : vecType n) (B : vecType m), 
   A ⊗' i B = i (A ⊗' B).
 Proof. intros m n A B. unfold i.
        rewrite scale_tensor_dist_r.
        reflexivity.
 Qed.
-
-
 Hint Rewrite concat_into_tensor_l scale_tensor_dist_r scale_tensor_dist_l  neg_tensor_dist_l neg_tensor_dist_r i_tensor_dist_l i_tensor_dist_r : tensor_db.
-
-
 (********************************)
 (* Multiplication & Tensor Laws *)
 (********************************)
-
 Lemma mul_tensor_dist_sing : forall (m n : nat) 
   (a : Square m) (b : Square n) (c : Square m) (D : vecType n),
     ([a] ⊗' [b]) *' ([c] ⊗' D) = ([a] *' [c]) ⊗' ([b] *' D).
@@ -943,8 +898,6 @@ Proof. intros m n a b c D. induction D as [| d].
          rewrite H, IHD.
          reflexivity. 
 Qed.         
-
-
 Lemma mul_tensor_dist_sing2 : forall (m n : nat) 
   (a : Square m) (B : vecType n) (c : Square m) (D : vecType n),
     ([a] ⊗' B) *' ([c] ⊗' D) = ([a] *' [c]) ⊗' (B *' D).
@@ -960,9 +913,7 @@ Proof. intros m n a B c D. induction B as [| b].
          rewrite IHB, mul_tensor_dist_sing.
          reflexivity.
 Qed.
-
          
-
 Lemma mul_tensor_dist : forall (m n : nat) 
   (A : vecType m) (B : vecType n) (C : vecType m) (D : vecType n),
     Singleton A ->
@@ -975,8 +926,6 @@ Proof. intros m n A B C D H1 H2.
        rewrite mul_tensor_dist_sing2.
        reflexivity. 
 Qed.
-
-
 Lemma decompose_tensor : forall (A B : vecType 2),
     Singleton A ->
     Singleton B ->
@@ -987,7 +936,6 @@ Proof.
   rewrite mul_I_l, mul_I_r. 
   easy.
 Qed.
-
 Lemma decompose_tensor_mult_l : forall (A B : vecType 2),
     Singleton A ->
     Singleton B ->
@@ -998,7 +946,6 @@ Proof.
   rewrite mul_I_l.
   easy.
 Qed.
-
 Lemma decompose_tensor_mult_r : forall (A B : vecType 2),
     I' ⊗' (A *' B) = (I' ⊗' A) *' (I' ⊗' B).
 Proof.
@@ -1007,7 +954,6 @@ Proof.
   rewrite mul_I_l.
   easy.
 Qed.
-
 *)
 
 (**********************)
@@ -1166,7 +1112,6 @@ Proof. intros n v A B.
 Qed.
          
 (*
-
 (* first test of the new paradigm *)
 Ltac normalize_mul :=
   repeat match goal with
@@ -1178,7 +1123,6 @@ Ltac normalize_mul :=
       try rewrite <- (mul_assoc _ X' Z' _);
       autorewrite with mul_db tensor_db;
       try rewrite mul_assoc).
-
 Lemma Ysqr : Y' *' Y' = I'. Proof. normalize_mul; auto with sing_db. Qed.
 Lemma XmulZ : X' *' Z' = - Z' *' X'. Proof. normalize_mul; auto with sing_db. Qed.
 Lemma XmulY : X' *' Y' = i Z'. Proof. normalize_mul; auto with sing_db. Qed.
