@@ -9,5 +9,5 @@ Monoid.v
 Prelim.v
 Quantum.v
 RealAux.v
+SingVecType.v
 Types.v
-

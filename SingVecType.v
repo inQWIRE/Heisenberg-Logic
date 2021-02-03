@@ -117,6 +117,8 @@ Open Scope heisenberg_scope.
 
 
 Definition singVecType' := (list (Square 2)).
+
+
 Definition singVecType (n : nat) := (list (Square 2)).
 
 Definition WF_svt {n : nat} (m : singVecType n) := length m = n.
@@ -215,8 +217,6 @@ Proof. induction A as [| a].
              rewrite Mmult_assoc.
              reflexivity.
 Qed.
-
-Lemma duh : 1 + 1 = 2. Proof. nia. Qed. 
 
 Lemma mul_I_l_helper : forall (A : singVecType') (n m : nat), 
   n <= length A ->  @sing_mul m (I_n n) A = A.
@@ -355,6 +355,63 @@ Proof. intros n c A B Ha Hb. destruct A as [|a].
 Qed.
 
 
+Lemma sing_scale_dist : forall {n} (c : C) (A : singVecType n), 
+    A <> [] -> (⨂ c · A) = c .* (⨂ A).
+Proof. intros. destruct A as [| h].
+       - easy.
+       - simpl. 
+         distribute_scale. 
+         reflexivity.
+Qed.
+
+Local Open Scope nat_scope.
+
+Lemma pow_pos2 : forall (n : nat), 2 * (2^n) = 2^n + (2^n + 0). 
+Proof. lia.  
+Qed.
+
+Lemma Mmult_to_sing_mult_helper : forall (n m : nat) (A B : singVecType'),
+  length A = m -> length B = m -> ⨂ (@sing_mul n A B) = @Mmult (2^m) (2^m) (2^m) (⨂ A) (⨂ B).
+Proof. induction m as [| m'].
+       destruct A. destruct B.
+       simpl. intros.
+       lma'.
+       easy. easy.
+       destruct A. destruct B.
+       easy. easy. 
+       destruct B.
+       easy. 
+       intros. simpl in *.
+       apply eq_add_S in H.
+       apply eq_add_S in H0.
+       rewrite H, H0. 
+       assert (H' : forall (n : nat), 2 * (2^n) = 2^n + (2^n + 0)). { lia. } 
+       do 2 (rewrite <- H').
+       rewrite (kron_mixed_product m _ m0 _).
+       rewrite IHm'.
+       rewrite (WF_svt_mul_helper _ m' _ _).
+       reflexivity.
+       assumption. assumption. 
+       assumption. assumption. 
+Qed.
+
+Lemma Mmult_to_sing_mult : forall {n} (A B : singVecType n),
+  WF_svt A -> WF_svt B -> ⨂ (@sing_mul n A B) = @Mmult (2^n) (2^n) (2^n) (⨂ A) (⨂ B).
+Proof. intros. 
+       apply Mmult_to_sing_mult_helper.
+       assumption. assumption. 
+Qed.
+
+       
+Lemma Mkron_to_sing_tensor : forall (A B : singVecType') (a : Square 2),
+  (⨂ (a :: A)) ⊗ (⨂ B) = ⨂ ((a :: A) ++ B).
+Proof. induction A as [| h].
+       - simpl. intros. rewrite kron_1_r.
+         reflexivity.
+       - intros. simpl in *. 
+         rewrite <- IHA.
+         Admitted.
+
 
 
 (*
@@ -379,7 +436,6 @@ Hint Resolve all_hastype_I p_hastype_X m_hastype_X O_hastype_Z i_hastype_Z B_has
 *)
 
 
-(*
 
 (***************************)
 (* Writing actual programs *)
@@ -417,5 +473,5 @@ Definition prog_to_sqr (prg_len : nat) (prg : sing_prog) : Square (2^prg_len) :=
   end.
 
 
-Notation gateType := (singVecType * singVecType). *)
+Notation gateType := (singVecType * singVecType). 
 

@@ -1518,6 +1518,8 @@ Proof.
   reflexivity.
 Qed.
 
+
+
 Lemma id_kron : forall (m n : nat),  I m ⊗ I n = I (m * n).
 Proof.
   intros.

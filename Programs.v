@@ -206,6 +206,27 @@ Ltac is_prog2 A :=
   | CNOT => idtac
   end.
 
+
+
+
+Definition Z' n : prog := S' n ; S' n.
+Definition X' n : prog := H' n ; Z' n; H' n.
+Definition Y' n : prog := S' n; X' n; Z' n; S' n.
+Definition I' n : prog := H' n; H' n.
+
+(* Other common gates *)
+Definition CZ m n : prog := H' n ; CNOT m n ; H' n.
+Definition SWAP m n : prog := CNOT m n; CNOT n m; CNOT m n.
+
+ 
+Definition bell00 : prog := H' 2; CNOT 2 3.
+
+Definition encode : prog := CZ 0 2; CNOT 1 2.
+
+Definition decode : prog := CNOT 2 3; H' 2.
+
+Definition superdense := bell00 ; encode; decode.
+
 (* Reduces to sequence of H, S and CNOT *)
 Ltac type_check_base :=
   repeat apply cap_intro;
@@ -240,3 +261,18 @@ Ltac type_check_base :=
             try reflexivity
          end.
 
+Lemma superdenseTypesQPL : superdense :: (Z ⊗ Z ⊗ Z ⊗ Z → I ⊗ I ⊗ Z ⊗ Z).
+Proof. repeat eapply SeqTypes.
+       apply tensor_inc. auto with sing_db.
+       apply tensor_inc. auto with sing_db.
+       apply tensor_base. auto with sing_db.
+       solve [eauto with base_types_db].
+
+
+
+
+
+dsadsad.
+
+dsadadas.
+dsadsads.

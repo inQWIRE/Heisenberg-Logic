@@ -204,6 +204,7 @@ Proof.
     lra.
 Qed.
 
+
 Lemma sin_upper_bound : forall x : R, Rabs (sin x) <= Rabs x.
 Proof.
   intros x.  
