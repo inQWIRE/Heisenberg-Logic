@@ -1,8 +1,11 @@
 Require Import Psatz.
 Require Import String.
 Require Import Program.
-Require Export Complex.
+Require Export Prelim.
+Require Export RealAux.
+Require Export CoRN.complex.CComplex.
 Require Import List.
+
 
 
 (* TODO: Use matrix equality everywhere, declare equivalence relation *)
@@ -14,26 +17,39 @@ Local Open Scope nat_scope.
 Lemma easy_sub : forall (n : nat), S n - 1 = n. Proof. lia. Qed.
 
 
-Lemma Csum_simplify : forall (a b c d : C), a = b -> c = d -> (a + c = b + d)%C.
+
+Lemma Csum_simplify : forall (a b c d : CC), a = b -> c = d -> (a [+] c = b [+] d).
 Proof. intros. 
        rewrite H, H0; easy.
+
 Qed.
 
 
-Lemma Cmult_simplify : forall (a b c d : C), a = b -> c = d -> (a * c = b * d)%C.
+Locate Build_CSetoid.
+
+
+
+Lemma Cmult_simplify : forall (a b c d : CC), a = b -> c = d -> (a [*] c = b [*] d).
 Proof. intros. 
        rewrite H, H0; easy.
-Qed.
+Qed. 
+
 
 
 Lemma sqrt_1_unique : forall x, √ x = 1%R -> x = 1%R.
-Proof. intros. assert (H' := H). unfold sqrt in H. destruct (Rcase_abs x).
+Proof. intros. assert (H' := H). unfold R_sqrt.sqrt in H. destruct (Rcase_abs x).
        - assert (H0: 1%R <> 0%R). { apply R1_neq_R0. }
          rewrite H in H0. easy.
        - rewrite <- (sqrt_def x). rewrite H'. lra. 
          apply Rge_le. easy.
 Qed.
 
+Definition C0 : CC := cc_set_CC [0] [0].
+Definition C1 : CC := cc_set_CC [1] [0].
+Definition C2 : CC := cc_set_CC Two [0].
+Definition Ci : CC := cc_set_CC [0] [1].
+
+Notation "a ^*" := (CC_conj a) (at level 10).
 
 (*******************************************)
 (** Matrix Definitions and Infrastructure **)
@@ -45,7 +61,7 @@ Open Scope matrix_scope.
 
 Local Open Scope nat_scope.
 
-Definition Matrix (m n : nat) := nat -> nat -> C.
+Definition Matrix (m n : nat) := nat -> nat -> CC.
 
 (* Definition Vector (n : nat) := Matrix n 1. *)
 
@@ -91,7 +107,7 @@ Qed.
 
 (* Printing *)
 
-Parameter print_C : C -> string.
+Parameter print_C : CC -> string.
 Fixpoint print_row {m n} i j (A : Matrix m n) : string :=
   match j with
   | 0   => "\n"
@@ -107,10 +123,12 @@ Definition print_matrix {m n} (A : Matrix m n) : string :=
 
 (* 2D List Representation *)
     
-Definition list2D_to_matrix (l : list (list C)) : 
+Definition list2D_to_matrix (l : list (list CC)) : 
   Matrix (length l) (length (hd [] l)) :=
-  (fun x y => nth y (nth x l []) 0%R).
+  (fun x y => nth y (nth x l []) cc_zero).
 
+
+(*
 Lemma WF_list2D_to_matrix : forall m n li, 
     length li = m ->
     (forall li', In li' li -> length li' = n)  ->
@@ -122,10 +140,11 @@ Proof.
     destruct y; easy.
     rewrite L. apply l.
   - unfold list2D_to_matrix. 
-    rewrite (nth_overflow _ C0).
+    rewrite (nth_overflow _ cc_zero).
     easy.
     destruct (nth_in_or_default x li []) as [IN | DEF].
     apply F in IN.
+    Set Printing All.
     rewrite IN. apply r.
     rewrite DEF.
     simpl; lia.
@@ -157,11 +176,14 @@ Proof.
   do 4 (try destruct x; try destruct y; simpl; trivial).
 Qed.
 
+*)
+
 (*****************************)
 (** Operands and Operations **)
 (*****************************)
 
-Definition Zero {m n : nat} : Matrix m n := fun x y => 0%R.
+Definition Zero {m n : nat} : Matrix m n := fun x y => C0.
+
 
 Definition I (n : nat) : Square n := 
   (fun x y => if (x =? y) && (x <? n) then C1 else C0).
@@ -184,31 +206,31 @@ Definition I__inf := fun x y => if x =? y then C1 else C0.
 Notation "I∞" := I__inf : matrix_scope.
 
 (* sum to n exclusive *)
-Fixpoint Csum (f : nat -> C) (n : nat) : C := 
+Fixpoint Csum (f : nat -> CC) (n : nat) : CC := 
   match n with
   | 0 => C0
-  | S n' => (Csum f n' +  f n')%C
+  | S n' => (Csum f n' [+]  f n')
   end.
 
 Definition trace {n : nat} (A : Square n) := 
   Csum (fun x => A x x) n.
 
-Definition scale {m n : nat} (r : C) (A : Matrix m n) : Matrix m n := 
-  fun x y => (r * A x y)%C.
+Definition scale {m n : nat} (r : CC) (A : Matrix m n) : Matrix m n := 
+  fun x y => (r [*] A x y).
 
-Definition dot {n : nat} (A : Vector n) (B : Vector n) : C :=
-  Csum (fun x => A x 0  * B x 0)%C n.
+Definition dot {n : nat} (A : Vector n) (B : Vector n) : CC :=
+  Csum (fun x => A x 0 [*] B x 0) n.
 
 Definition Mplus {m n : nat} (A B : Matrix m n) : Matrix m n :=
-  fun x y => (A x y + B x y)%C.
+  fun x y => (A x y [+] B x y).
 
 Definition Mmult {m n o : nat} (A : Matrix m n) (B : Matrix n o) : Matrix m o := 
-  fun x z => Csum (fun y => A x y * B y z)%C n.
+  fun x z => Csum (fun y => A x y [*] B y z) n.
 
 (* Only well-defined when o and p are non-zero *)
 Definition kron {m n o p : nat} (A : Matrix m n) (B : Matrix o p) : 
   Matrix (m*o) (n*p) :=
-  fun x y => Cmult (A (x / o) (y / p)) (B (x mod o) (y mod p)).
+  fun x y => (A (x / o) (y / p)) [*] (B (x mod o) (y mod p)).
 
 Definition transpose {m n} (A : Matrix m n) : Matrix n m := 
   fun x y => A y x.
@@ -216,7 +238,7 @@ Definition transpose {m n} (A : Matrix m n) : Matrix n m :=
 Definition adjoint {m n} (A : Matrix m n) : Matrix n m := 
   fun x y => (A y x)^*.
 
-Definition inner_product {n} (u v : Vector n) : C := 
+Definition inner_product {n} (u v : Vector n) : CC := 
   Mmult (adjoint u) (v) 0 0.
 
 Definition outer_product {n} (u v : Vector n) : Square n := 
@@ -279,7 +301,7 @@ Ltac lma :=
   autounfold with U_db;
   prep_matrix_equality;
   destruct_m_eq; 
-  lca.
+  algebra.
 
 
 
@@ -304,7 +326,7 @@ Ltac lma' :=
   apply mat_equiv_eq;
   repeat match goal with
   | [ |- WF_Matrix (?A) ]  => auto with wf_db (* (try show_wf) *)
-  | [ |- mat_equiv (?A) (?B) ] => by_cell; try lca                 
+  | [ |- mat_equiv (?A) (?B) ] => by_cell; try algebra                 
   end.
 
 
@@ -316,14 +338,22 @@ Ltac lma' :=
 
 Local Close Scope nat_scope.
 
-Lemma Csum_0 : forall f n, (forall x, f x = C0) -> Csum f n = 0. 
+
+Lemma eq_cceq : forall c1 c2 : CC, c1 = c2 <-> c1 [=] c2. 
+Proof. intros; split.  
+       - intros. rewrite H; easy. 
+       - Admitted. 
+
+       
+Lemma Csum_0 : forall f n, (forall x, f x = C0) -> Csum f n = C0. 
 Proof.
   intros.
   induction n.
   - reflexivity.
   - simpl.
     rewrite IHn, H. 
-    lca.
+    apply eq_cceq.
+    unfold cc_plus, C0. simpl. split; simpl; rational. 
 Qed.
 
 Lemma Csum_1 : forall f n, (forall x, f x = C1) -> Csum f n = INR n. 
