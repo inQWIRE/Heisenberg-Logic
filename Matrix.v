@@ -4877,7 +4877,7 @@ Proof.
   intros. bdestruct (y =? 0). subst. simpl.
   bdestruct (z =? 0). subst. easy.
   apply Nat.mod_0_l. easy.
-  bdestruct (z =? 0). subst. rewrite Nat.mul_0_r. simpl. rewrite Nat.div_0_l; easy.
+  bdestruct (z =? 0). subst. rewrite Nat.mul_0_r. simpl.  easy.
   pattern x at 1. rewrite (Nat.div_mod x (y * z)) by nia.
   replace (y * z * (x / (y * z))) with ((z * (x / (y * z))) * y) by lia.
   rewrite Nat.div_add_l with (b := y) by easy.
@@ -4893,7 +4893,7 @@ Lemma sub_mul_mod :
     y * z <= x ->
     (x - y * z) mod z = x mod z.
 Proof.
-  intros. bdestruct (z =? 0). subst. easy.
+  intros. bdestruct (z =? 0). subst. rewrite Nat.mul_0_r. rewrite Nat.sub_0_r.  easy.
   specialize (le_plus_minus_r (y * z) x H) as G.
   remember (x - (y * z)) as r.
   rewrite <- G. rewrite <- Nat.add_mod_idemp_l by easy. rewrite Nat.mod_mul by easy.
@@ -4902,7 +4902,7 @@ Qed.
 
 Lemma mod_product : forall x y z, y <> 0 -> x mod (y * z) mod z = x mod z.
 Proof.
-  intros x y z H. bdestruct (z =? 0). subst. easy.
+  intros x y z H. bdestruct (z =? 0). subst. rewrite Nat.mul_0_r. easy.
   pattern x at 2. rewrite Nat.mod_eq with (b := y * z) by nia.
   replace (y * z * (x / (y * z))) with (y * (x / (y * z)) * z) by lia.
   rewrite sub_mul_mod. easy.
