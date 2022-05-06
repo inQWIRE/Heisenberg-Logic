@@ -2500,7 +2500,27 @@ Proof. intros; subst.
        apply kron_rearrange2; auto with wf_db.
 Qed.
 
-
+Lemma notc_conv_inc : forall {n} (a a' b b' : Square 2) (C C' : Square (2^n)),
+  WF_Matrix a -> WF_Matrix a' -> WF_Matrix b -> WF_Matrix b' ->  WF_Matrix C -> 
+  notc × (a ⊗ b) = (a' ⊗ b') × notc -> C = C' ->
+  @Mmult (2 * 2^n * 2) (2 * 2^n * 2) (2 * 2^n * 2) 
+         ( Matrix.I (2 * 2 ^ n)  ⊗  ∣0⟩⟨0∣ .+ σx  ⊗ Matrix.I (2 ^ n) ⊗ ∣1⟩⟨1∣) (a ⊗ C ⊗ b) =
+  (a' ⊗ C' ⊗ b') × (Matrix.I (2 * 2 ^ n) ⊗  ∣0⟩⟨0∣  .+ σx ⊗ Matrix.I (2 ^ n) ⊗ ∣1⟩⟨1∣).
+Proof. intros; subst.
+       do 2 replace (2 * (2 * 2^n)) with (2 * 2^n * 2) by lia.
+       rewrite Mmult_plus_distr_r, Mmult_plus_distr_l.
+       rewrite <- id_kron.
+       repeat rewrite kron_mixed_product.
+       Msimpl.
+       assert (H' : notc = Matrix.I 2  ⊗  ∣0⟩⟨0∣ .+ σx ⊗  ∣1⟩⟨1∣).
+       { lma'. }
+       rewrite H' in H4.
+       rewrite Mmult_plus_distr_r, Mmult_plus_distr_l in H4.
+       repeat rewrite kron_mixed_product in H4.
+       apply kron_rearrange2; auto with wf_db.
+       rewrite Mmult_1_l, Mmult_1_r in H4; try auto.
+Qed.
+  
 
 Ltac solve_gate_type :=
   repeat match goal with
