@@ -1579,28 +1579,37 @@ Lemma YmulZ : Y' *' Z' = i X'. Proof. normalize_mul. Qed.
 
 
 Ltac pauli_matrix_computation :=
-  unfold Matrix.scale, Mplus, Mmult, Csum, adjoint, Cconj;
-  unfold σx, σy, σz;
-  simpl;
-  unfold RtoC, Ci;
-  simpl;
-  C_field_simplify;
-  autorewrite with Cexp_db trig_db C_db R_db;
-  Csimpl; try lca; try nonzero;
-  unfold Cmult, Cplus;
-  repeat (simpl; autorewrite with R_db; try lca);
-  repeat (try (rewrite <- ! Rmult_assoc); autorewrite with R_db; try easy).
-  
+  repeat
+    (try apply mat_equiv_eq;
+     match goal with
+     | |- WF_Unitary ?A => unfold WF_Unitary
+    | |- WF_Matrix ?A /\ _ => split
+    | |- WF_Matrix ?A => auto 10 with wf_db;
+                                        try (unfold WF_Matrix;
+                                        (let x := fresh "x" in
+                                         let y := fresh "y" in
+                                         let H := fresh "H" in
+                                         intros x y [H| H];
+                                         apply le_plus_minus in H;
+                                         rewrite H; compute; destruct_m_eq))
+    | |- (?A ≡ ?B)%M => by_cell
+    | |- _ => autounfold with U_db;
+                  simpl;
+                  autorewrite with Cexp_db C_db;
+                  try (eapply c_proj_eq);
+                  simpl;
+                  repeat (autorewrite with R_db; field_simplify_eq; simpl);
+                  try easy
+    end).
+
 
 Ltac pauli_matrix_addition_unitary :=
   unfold uni_vecType;
   intros A H; simpl in H;
   destruct H; try(exfalso; assumption);
   rewrite <- H;
-  unfold WF_Unitary;
-  split;try(auto 10 with wf_db);
-  lma';try(auto 10 with wf_db);
-  try(pauli_matrix_computation).
+  pauli_matrix_computation.
+
   
 Lemma XplusY :  uni_vecType ((1/√2) · (X' +' Y') ).
 Proof. pauli_matrix_addition_unitary. Qed.
@@ -1612,7 +1621,7 @@ Lemma YplusZ :  uni_vecType ((1/√2) · (Y' +' Z') ).
 Proof. pauli_matrix_addition_unitary. Qed.
 
 Lemma XplusYplusZ :  uni_vecType ( (1/√3) · (X' +'  Y' +' Z' )).
-Proof. pauli_matrix_addition_unitary. Qed.
+Proof.  pauli_matrix_addition_unitary. Qed.
 
 
 (* some more lemmas about specific vectors *)
@@ -2974,12 +2983,12 @@ Qed.
 
 Ltac solve_gate_type :=
   repeat match goal with
-         | |- singGateType' ?U ?g /\ _ => split
-         | |- ?g <> [] => easy
-         | |- singGateType' ?U ?g => apply sgt_implies_sgt' 
-         | |- singGateType ?U ?g => simpl; apply singleton_simplify2; lma'
-         | |- _ => try easy
-         end.
+    | |- singGateType' ?U ?g /\ _ => split
+    | |- ?g <> [] => easy
+    | |- singGateType' ?U ?g => apply sgt_implies_sgt' 
+    | |- singGateType ?U ?g => simpl; apply singleton_simplify2; pauli_matrix_computation
+    | |- _ => try easy
+    end.
 
 
 Lemma HTypes : H' ::' (Z' → X') ∩ (X' → Z').
@@ -3029,53 +3038,41 @@ Qed.
 
 Lemma TTypes' : T' ::' (Z' → Z') ∩ (X' → (C1/√2) · (X' +' Y')) ∩ (Y' → (C1/√2) · (Y' +' - X')).
 Proof. simpl. unfold T', Z'. 
-       solve_gate_type; auto 10 with wf_db; pauli_matrix_computation.
+       solve_gate_type.
 Qed.
 
 Lemma TdaggerTypes : T'dagger ::' (Z' → Z') ∩ (X' → (C1/√2) · (X' +' - Y')).
 Proof. simpl; unfold T'dagger, Z', X'.
-       solve_gate_type; auto 10 with wf_db; pauli_matrix_computation.
+       solve_gate_type.
 Qed.
 
 
-(*
-Definition TOFFOLI a b c :=
-Hc;CNOTbc;T† c;CNOTac;Tc;CNOTbc;T† c; CNOTac;Tb;Tc;Hc;CNOTab;Ta;T† b;CNOTab. *)
-
-Definition cnot_ac : Matrix (2*2*2) (2*2*2) :=
+Definition Toffoli : Matrix (2*2*2) (2*2*2) :=
   fun x y => match x, y with 
           | 0, 0 => C1
           | 1, 1 => C1
           | 2, 2 => C1
           | 3, 3 => C1
-          | 4, 5 => C1
-          | 5, 4 => C1
+          | 4, 4 => C1
+          | 5, 5 => C1
           | 6, 7 => C1
           | 7, 6 => C1
           | _, _ => C0
-          end.          
+          end.
 
-Definition Toffoli :=
-  ((I 2) ⊗ (I 2) ⊗ H') ;
-  ((I 2) ⊗ cnot) ;
-  ((I 2) ⊗ (I 2) ⊗ T'dagger) ;
-  (cnot_ac) ;
-  ((I 2) ⊗ (I 2) ⊗ T') ;
-  ((I 2) ⊗ cnot) ;
-  ((I 2) ⊗ (I 2) ⊗ T'dagger) ;
-  (cnot_ac) ;
-  ((I 2) ⊗ T' ⊗ (I 2)) ;
-  ((I 2) ⊗ (I 2) ⊗ T') ;
-  ((I 2) ⊗ (I 2) ⊗ H') ;
-  (cnot ⊗ (I 2)) ;
-  (T' ⊗ (I 2) ⊗ (I 2)) ;
-  ((I 2) ⊗ T'dagger ⊗ (I 2)) ;
-  (cnot ⊗ (I 2)).
+Lemma WF_Toffoli : WF_Matrix Toffoli.
+Proof. unfold Toffoli.
+  show_wf.
+Qed.
 
-(*
-Lemma ToffoliTypes : Toffoli ::' (Z' ⊗' I' ⊗' I' → Z' ⊗' I' ⊗' I') ∩ (I' ⊗' Z' ⊗' I' → I' ⊗' Z' ⊗' I' ) ∩
-                          (I' ⊗' I' ⊗' Z' → I' ⊗' I' ⊗' Z' ) ∩ (I' ⊗' I' ⊗' X' → I' ⊗' I' ⊗' X' ).
-Proof.*)
+Hint Resolve WF_Toffoli : wf_db.
+
+Lemma ToffoliTypes :
+  Toffoli ::' (Z' ⊗' I' ⊗' I' → Z' ⊗' I' ⊗' I') ∩
+    (I' ⊗' Z' ⊗' I' → I' ⊗' Z' ⊗' I' ) ∩
+    (I' ⊗' I' ⊗' Z' → (C1/ C2) · ( I' ⊗' I' ⊗' Z' +' Z' ⊗' I' ⊗' Z' +' I' ⊗' Z' ⊗' Z' +' Z' ⊗' Z' ⊗' (- Z' ) )) ∩
+    (I' ⊗' I' ⊗' X' → I' ⊗' I' ⊗' X' ).
+Proof. simpl. solve_gate_type. Qed.
 
 
 Hint Resolve HTypes HTypes' STypes TTypes CNOTTypes CNOTTypes' CZTypes' : base_types_db.
