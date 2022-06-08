@@ -381,12 +381,17 @@ Definition translate_P (g : Pauli) : Square 2 :=
   end. 
 
 
+<<<<<<< HEAD
 
 Lemma WF_Pauli : forall (g : Pauli), WF_Matrix (translate_P g).
+=======
+Lemma WF_Unitary_Pauli : forall (g : Pauli), WF_Unitary (translate_P g).
+>>>>>>> 6b87bb0ea8b147a8fbe6302467e9ee857064c66d
 Proof. intros. 
-       destruct g; simpl; auto with wf_db.
+       destruct g; simpl; auto with unit_db.
 Qed.
 
+<<<<<<< HEAD
 Hint Resolve WF_Pauli : wf_db.
 
 
@@ -397,6 +402,9 @@ Proof. intros.
 Qed.
 
 Hint Resolve unitary_Pauli : unit_db.
+=======
+Hint Resolve WF_Unitary_Pauli : U_db.
+>>>>>>> 6b87bb0ea8b147a8fbe6302467e9ee857064c66d
 
 (* Here we define a gMul to give Coef followed by a gMul to give the actual type *)
 (* this allows for an easy zip in gMulT *)
@@ -793,6 +801,16 @@ Proof. rewrite Y_is_iXZ. auto with wfvt_db. Qed.
 (******************)
 
 
+<<<<<<< HEAD
+=======
+
+Lemma unitary_Pauli : forall (p : Pauli), WF_Unitary (translate_P p).
+Proof. intros. 
+       destruct p; simpl; auto with unit_db.
+Qed.
+
+
+>>>>>>> 6b87bb0ea8b147a8fbe6302467e9ee857064c66d
 Lemma unitary_TType : forall {n} (A : TType n), WF_TType A -> WF_Unitary (translate A). 
 Proof. intros. destruct A.
        unfold translate; simpl. 
@@ -805,6 +823,10 @@ Proof. intros. destruct A.
        apply in_map_iff in H2.
        destruct H2 as [x [H2 H3]].
        rewrite <- H2; auto with unit_db.
+<<<<<<< HEAD
+=======
+       apply unitary_Pauli.
+>>>>>>> 6b87bb0ea8b147a8fbe6302467e9ee857064c66d
        destruct c; try lca.
 Qed.       
        
@@ -892,7 +914,11 @@ Proof. intros. unfold translate.
            + apply (nth_In _ (@Zero 2 2)) in H3.
              apply in_map_iff in H3.
              destruct H3 as [x [H3 H4]].
+<<<<<<< HEAD
              rewrite <- H3; apply unitary_Pauli.
+=======
+             rewrite <- H3; apply WF_Unitary_Pauli.
+>>>>>>> 6b87bb0ea8b147a8fbe6302467e9ee857064c66d
            + rewrite nth_overflow; try lia. 
              auto with wf_db. }
          rewrite big_kron_app; auto.
@@ -1457,6 +1483,7 @@ Inductive progHasType {prg_len : nat} : prog -> pType prg_len -> Prop :=
   
 
 Notation "p :' T" := (progHasType p T) (at level 62, no associativity).
+<<<<<<< HEAD
 
 
 Lemma Hsem_implies_Esem : forall prg_len prog tt1 tt2, 
@@ -1495,6 +1522,46 @@ Qed.
 
 
 
+=======
+
+
+Lemma Hsem_implies_Esem : forall prg_len prog tt1 tt2, 
+  translate_prog prg_len prog × translate tt1 = translate tt2 × translate_prog prg_len prog ->
+  prog :' (G tt1 → G tt2).
+Proof. intros. 
+       apply PHST; intros. 
+       apply VHST; inversion H0; subst.
+       unfold pairHasType in *. 
+       split; destruct H3; destruct vp; simpl in *.
+       apply WF_mult; auto.
+       apply unitary_prog.
+       unfold Eigenpair in *; simpl in *.
+       rewrite <- Mmult_assoc, <- H, Mmult_assoc, H2.
+       distribute_scale.
+       easy. 
+Qed.
+
+
+Lemma Esem_implies_Hsem : forall prg_len prog tt1 tt2, 
+  WF_TType tt1 -> WF_TType tt2 ->
+  prog :' (G tt1 → G tt2) ->  
+  translate_prog prg_len prog × translate tt1 = translate tt2 × translate_prog prg_len prog.
+Proof. intros. 
+       replace (translate tt1) with (fst (translate tt1, translate tt2)) by easy.
+       replace (translate tt2) with (snd (translate tt1, translate tt2)) by easy.
+       apply Heisenberg.Esem_implies_Hsem; simpl; auto with unit_db.
+       inversion H1.
+       unfold progHasType_E; intros.
+       assert (H' : (v, c) ;' G tt1).
+       { apply VHST; apply H6. }
+       apply H4 in H'.
+       inversion H'; subst.
+       easy. 
+Qed.
+
+
+
+>>>>>>> 6b87bb0ea8b147a8fbe6302467e9ee857064c66d
 (* 
 Inductive progHasType_H {prg_len : nat} : prog -> pType prg_len -> Prop :=
 | PHST_H : forall p tt tt, (forall vp, vp ;' vt1 -> 
@@ -1897,10 +1964,17 @@ Proof. Admitted.
          replace (targ + (((ctrl - targ) + 1) + (prg_len - ctrl - 1))) with prg_len by lia;
          easy. 
 Qed. *)
+<<<<<<< HEAD
 
 
 
 Lemma WF_helper1 : forall (l : list Pauli) (i : nat),
+=======
+
+
+(*
+Lemma WF_helper : forall (l : list Pauli) (i : nat),
+>>>>>>> 6b87bb0ea8b147a8fbe6302467e9ee857064c66d
   WF_Matrix (nth i (map translate_P l) Zero).
 Proof. intros. 
        destruct (nth_in_or_default i0 (map translate_P l) Zero).
@@ -1921,6 +1995,7 @@ Proof. intros; subst.
 Qed.
 
 
+<<<<<<< HEAD
 Hint Resolve WF_helper1 WF_helper2 : wf_db.
 
 
@@ -1955,6 +2030,10 @@ Proof. intros.
        rewrite skipn_length'; subst; easy.
 Qed.
 
+=======
+Hint Resolve WF_helper WF_helper2 : wf_db.
+*)
+>>>>>>> 6b87bb0ea8b147a8fbe6302467e9ee857064c66d
 
 
 Lemma tensor_smpl_ground : forall (prg_len bit : nat) (p : nat -> prog)
@@ -1969,6 +2048,29 @@ Proof. intros.
        rewrite switch_inc; try (subst; easy).
        replace (c1, l) with (c1, (firstn bit l) ++ [nth bit l gI] ++ (skipn (S bit) l))
          by (rewrite <- nth_inc; subst; easy).
+<<<<<<< HEAD
+=======
+       rewrite prog_smpl_inc_reduce; auto.
+       unfold translate; simpl in *.
+       repeat rewrite map_app; simpl. 
+       repeat rewrite big_kron_app. 
+       simpl. 
+       unfold translate in H2; simpl in H2.
+       rewrite prog_smpl_inc_reduce in H2; auto.
+       replace (1 - 0 - 1) with 0 in H2 by lia.
+       rewrite Mscale_1_l, kron_1_l in H2; auto with wf_db.
+       do 3 rewrite kron_1_r in H2.
+       Admitted. 
+
+
+
+(*
+       repeat rewrite app_length.
+       repeat rewrite map_length.
+       rewrite firstn_length_le, skipn_length; try lia.
+       do 4 rewrite Nat.pow_add_r.
+       do 2 rewrite <- Mscale_kron_dist_r, <- Mscale_kron_dist_l. 
+>>>>>>> 6b87bb0ea8b147a8fbe6302467e9ee857064c66d
        rewrite prog_smpl_inc_reduce; auto.
        repeat rewrite translate_app_to_kron_smpl; auto. 
        rewrite Mscale_mult_dist_r, Mscale_mult_dist_l.
@@ -1990,7 +2092,7 @@ Proof. intros.
        all : apply WF_helper2; try apply firstn_length_le; try rewrite skipn_length'.
        all : subst; lia.
 Qed.
-
+ *)
 
 
 

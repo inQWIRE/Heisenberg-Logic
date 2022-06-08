@@ -20,6 +20,7 @@ Open Scope heisenberg_scope.
 
 (* some helpers *)
 
+<<<<<<< HEAD
 Lemma in_simplify : forall {X} (x x1 : X),
   In x1 [x] -> x1 = x.
 Proof. intros. simpl in H.
@@ -374,6 +375,228 @@ Qed.
 (* not actually true... 
 Lemma valid_base_gate_has_plus1_eig : forall (a : Square 2),
   valid_base_gate a -> exists v, v :' a.
+=======
+(*
+Inductive singVecType (n : nat) : Type :=
+  | Sing : Square n -> singVecType n.
+
+Arguments Sing {n}.
+*)
+
+
+Definition vecHasSingVecType {n : nat} (v : Vector n) (U : Square n) : Prop :=
+  WF_Matrix v /\ exists λ, Eigenpair U (v, λ).
+
+                        
+
+(*
+Inductive vecType (n : nat) : Type :=
+  | Sng : Square n -> vecType n
+  | Cap : Square n -> vecType n -> vecType n
+  | Err : vecType n.
+
+Arguments Sng {n}.
+Arguments Cap {n}.
+Arguments Err {n}.
+
+Fixpoint vecHasType {n : nat} (v : Vector n) (ts: vecType n) : Prop := 
+  match ts with
+  | Sng U => vecHasSingVecType v U
+  | Cap U ts' => vecHasSingVecType v U /\ vecHasType v ts'
+  | Err => False
+  end.
+
+
+Fixpoint intersect {n : nat} (ts1 : vecType n) (ts2 : vecType n) : vecType n :=
+  match ts1 with
+  | Sng U => Cap U ts2
+  | Cap U ts2' => Cap U (intersect ts2' ts2)
+  | Err => Err
+  end.
+*)
+
+Notation "v :' T" := (vecHasSingVecType v T) (at level 62) : heisenberg_scope. 
+
+(*
+Infix "∩" := Cap (at level 60, no associativity) : heisenberg_scope.
+Infix "⩀" := intersect (at level 60, no associativity) : heisenberg_scope.
+*)
+
+(*****************************)
+(* Basic vectType operations *)
+(*****************************)
+
+(*
+(* Singleton says if a vectType is able to be multiplied, scaled, or kronned  *)
+Definition Singleton {n : nat} (A : vecType n) :=
+  match A with
+  | Sng _ => True
+  | _ => False
+  end. 
+
+
+(* helper lemma to immediatly turn singleton vecType into [a] form *)
+Lemma singleton_simplify : forall {n} (A : vecType n),
+  Singleton A -> exists (a : Square n), A = Sng a.
+Proof. intros; destruct A; try easy.
+       exists m. 
+       reflexivity. 
+Qed.
+
+*)
+
+
+
+(********************************)
+(* Multiplication & Tensor Laws *)
+(********************************)
+
+Lemma decompose_tensor : forall (A B : Square 2),
+    WF_Matrix A -> WF_Matrix B -> 
+    A ⊗ B = (A ⊗ (I 2)) × ((I 2) ⊗ B).
+Proof.
+  intros.
+  rewrite kron_mixed_product, Mmult_1_l, Mmult_1_r; auto.
+Qed.
+
+Lemma decompose_tensor_mult_l : forall (A B : Square 2),
+    (A × B) ⊗ (I 2) = (A ⊗ (I 2)) × (B ⊗ (I 2)).
+Proof.
+  intros.
+  rewrite kron_mixed_product, Mmult_1_l; auto with wf_db.
+Qed.
+
+Lemma decompose_tensor_mult_r : forall (A B : Square 2),
+    (I 2) ⊗ (A × B) = ((I 2) ⊗ A) × ((I 2) ⊗ B).
+Proof.
+  intros.
+  rewrite kron_mixed_product, Mmult_1_l; auto with wf_db.
+Qed.
+
+(*********************)
+(* Intersection Laws *)
+(*********************)
+
+
+
+Definition eq_vecType {n} (T1 T2 : Square n) := 
+  (forall v, WF_Matrix v -> (v :' T1 <-> v :' T2)).
+
+
+
+Infix "≡" := eq_vecType (at level 70, no associativity) : heisenberg_scope.
+
+
+
+(*
+Lemma eq_vt_un_eq : forall {n} (U1 U2 : Square n), 
+  WF_Unitary U1 -> WF_Unitary U2 -> U1 ≡ U2 -> U1 = U2.
+Proof. intros. 
+       apply eq_eigs_implies_eq_unit; auto.
+       unfold eq_eigs, eq_vecType in *.
+       intros. 
+       destruct p; simpl in *.
+       assert (H' : m :' U2).
+       { apply H1; auto.
+         split; auto.
+         exists c; easy. }
+       unfold vecHasSingVecType in H'.
+*)
+
+(*
+(* will now show this is an equivalence relation *)
+Lemma eq_vecType_refl : forall {n} (A : vecType n), A ≡ A.
+Proof. intros n A. 
+       unfold eq_vecType. easy.
+Qed.
+
+Lemma eq_vecType_sym : forall {n} (A B : vecType n), A ≡ B -> B ≡ A.
+Proof. intros n A B H. 
+       unfold eq_vecType in *; intros v.
+       split. 
+       all : apply H; easy. 
+Qed.
+
+Lemma eq_vecType_trans : forall {n} (A B C : vecType n),
+    A ≡ B -> B ≡ C -> A ≡ C.
+Proof.
+  intros n A B C HAB HBC.
+  unfold eq_vecType in *.
+  split. 
+  - intros. apply HBC; auto; apply HAB; auto; apply H.
+  - intros. apply HAB; auto; apply HBC; auto; apply H.
+Qed.
+
+
+Add Parametric Relation n : (vecType n) (@eq_vecType n)
+  reflexivity proved by eq_vecType_refl
+  symmetry proved by eq_vecType_sym
+  transitivity proved by eq_vecType_trans
+    as eq_vecType_rel.
+*)
+
+
+
+(* 
+(* converse of this is true as well since matrices are unitary? *)
+(* probably hard to prove on coq *) 
+Lemma eq_types_same_type : forall (n : nat) (T1 T2 : vecType n),
+  (T1 ⊆ T2 /\ T2 ⊆ T1) -> T1 ≡ T2.
+Proof. intros n T1 T2 [S12 S21]. 
+       unfold eq_vecType. 
+       intros v; split.
+       - apply has_type_subset. apply S21.
+       - apply has_type_subset. apply S12. 
+Qed.
+
+
+
+
+Lemma cap_idem : forall (n : nat) (A : vecType n), A ∩ A ≡ A.
+Proof. intros n A.
+       apply eq_types_same_type.
+       split. 
+       - auto with sub_db.
+       - auto with sub_db.
+Qed. 
+
+Lemma cap_comm : forall (n : nat) (A B : vecType n), A ∩ B ≡ B ∩ A.
+Proof. intros n A B.
+       apply eq_types_same_type.
+       split.
+       - auto with sub_db.
+       - auto with sub_db.
+Qed.
+
+Lemma cap_assoc_eq : forall (n : nat) (A B C : vecType n), A ∩ (B ∩ C) = (A ∩ B) ∩ C.
+Proof. intros n A B C. rewrite app_ass. reflexivity.
+Qed.
+
+
+
+Lemma cap_I_l : forall {n} (A : vecType n),
+  (I_n n) ∩ A ≡ A.
+Proof. intros n A.
+       unfold eq_vecType.
+       intros v; split.
+       - apply has_type_subset.
+         auto with sub_db.
+       - intros H0.
+         unfold vecHasType; intros A0.
+         simpl.
+         intros [H1 | H1'].
+         + rewrite <- H1.
+           unfold singVecType in *.
+           split; auto.
+           exists C1.
+           auto with eig_db.
+         + apply H0; apply H1'.
+Qed.
+
+       
+Lemma cap_I_r : forall {n} A,
+  A ∩ (I_n n) ≡ A.
+>>>>>>> 6b87bb0ea8b147a8fbe6302467e9ee857064c66d
 Proof. intros.
        induction H. 
        - exists ∣0⟩; apply all_hastype_I; auto with wf_db.
@@ -408,6 +631,72 @@ Proof. intros; split; intros.
          + 
 
 *)
+
+
+
+<<<<<<< HEAD
+
+=======
+(* another important lemma about ∩ *)
+Lemma types_add : forall (n : nat) (v : Vector n) (A B : vecType n),
+  v :' A -> v :' B -> v :' (A ∩ B).
+Proof. intros n v A B.
+       unfold vecHasType; intros H1 H2.
+       intros A0 H.
+       apply in_app_or in H.
+       destruct H as [HA | HB].
+       - apply H1; apply HA.
+       - apply H2; apply HB.
+Qed.
+         
+(* first test of the new paradigm *)
+Ltac normalize_mul :=
+  repeat match goal with
+  | |- context[(?A ⊗ ?B) ⊗ ?C] => rewrite <- (tensor_assoc A B C)
+  end;
+  repeat (rewrite mul_tensor_dist by auto with sing_db);
+  repeat rewrite mul_assoc;
+  repeat (
+      try rewrite <- (mul_assoc _ X' Z' _);
+      autorewrite with mul_db tensor_db;
+      try rewrite mul_assoc); auto with sing_db; auto with univ_db.
+
+Lemma Ysqr : Y' *' Y' = I'. Proof. normalize_mul. Qed.
+Lemma XmulZ : X' *' Z' = - Z' *' X'. Proof. normalize_mul. Qed.
+Lemma XmulY : X' *' Y' = i Z'. Proof. normalize_mul. Qed.
+Lemma YmulX : Y' *' X' = -i Z'. Proof. normalize_mul. Qed.
+Lemma ZmulY : Z' *' Y' = -i X'. Proof. normalize_mul. Qed.
+Lemma YmulZ : Y' *' Z' = i X'. Proof. normalize_mul. Qed.
+
+*)
+(* some more lemmas about specific vectors *)
+
+
+(* note that vecHasType_is_vecHasType' makes this nice since       *)
+(* vecHasType' works well with singletons as opposed to vecHasType *)
+
+
+Ltac solveType := simpl; unfold vecHasSingVecType; split; auto with wf_db; 
+                  try (exists C1; auto with eig_db; easy);
+                  try (exists (Copp C1); auto with eig_db).
+
+
+
+Lemma all_hastype_I : forall (v : Vector 2), WF_Matrix v -> v :' (I 2).
+Proof. solveType.
+Qed.
+  
+Lemma p_hastype_X : ∣+⟩ :' σx. Proof. solveType. Qed. 
+Lemma m_hastype_X : ∣-⟩ :' σx. Proof. solveType. Qed.
+Lemma O_hastype_Z : ∣0⟩ :' σz. Proof. solveType. Qed.
+Lemma i_hastype_Z : ∣1⟩ :' σz. Proof. solveType. Qed.
+
+Lemma B_hastype_XX : ∣Φ+⟩ :' σx ⊗ σx. Proof. solveType. Qed.
+
+
+Hint Resolve all_hastype_I p_hastype_X m_hastype_X O_hastype_Z i_hastype_Z B_hastype_XX : vht_db.
+>>>>>>> 6b87bb0ea8b147a8fbe6302467e9ee857064c66d
+
 
 
 
@@ -752,8 +1041,12 @@ Notation "A →' B" := (formGateTypeT A B) (at level 60, no associativity) : hei
 Definition WF_vtt {len : nat} (vt : vecTypeT len) := length vt = len.
 
 
+<<<<<<< HEAD
 (* very similar to def's in pad.v but its a lot nicer to have the out of bounds case be the
    identity instead of the zero matrix *)
+=======
+
+>>>>>>> 6b87bb0ea8b147a8fbe6302467e9ee857064c66d
 Definition prog_smpl_app (prg_len : nat) (bit : nat) (U : Square 2) : Square (2^prg_len) :=
   match bit <? prg_len with
   | true => pad_u prg_len bit U
