@@ -1,3 +1,0 @@
-[submodule "QuantumLib"]
-	path = QuantumLib
-	url = https://github.com/inQWIRE/QuantumLib.git
