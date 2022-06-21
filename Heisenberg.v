@@ -176,7 +176,7 @@ Fixpoint tensor_n n {m} (A : vecType m) :=
 
 Notation "- T" := (neg T) : heisenberg_scope. 
 Infix "*'" := mul (at level 40, left associativity) : heisenberg_scope. 
-Infix "+'" := add (at level 55, left associativity) : heisenberg_scope. 
+Infix "+'" := add (at level 56, left associativity) : heisenberg_scope. 
 Infix "⊗'" := tensor (at level 51, right associativity) : heisenberg_scope. 
 Infix "·" := scale (at level 45, left associativity) : heisenberg_scope. 
 Notation "n ⨂' A" := (tensor_n n A) (at level 30, no associativity) : heisenberg_scope.

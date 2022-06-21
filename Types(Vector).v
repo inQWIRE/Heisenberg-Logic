@@ -1,9 +1,7 @@
 Require Import Psatz.
 Require Import Reals.
-(*
 Require Import Vector.
 Require Import MSets.
-*)
 
 Require Export Complex.
 Require Export Matrix.
@@ -239,6 +237,8 @@ Definition gMul_base (g1 g2 : Pauli) : Pauli :=
 
 
 (*
+
+
 (* scaling, multiplication, and tensoring done at this level *)
 Definition TType (len : nat) := (Coef * (list Pauli))%type.
 
@@ -275,72 +275,12 @@ Definition gScaleT {n} (c : Coef) (A : TType n) : TType n :=
 
 Definition translate {n} (A : TType n) : Square (2^n) := 
   (translate_coef (fst A)) .* ⨂ (map translate_P (snd A)).
+
 *)
 
 
 
 
-
-
-(* scaling, multiplication, and tensoring done at this level *)
-Definition TType (len : nat) := (Coef * (list Pauli))%type.
-
-
-(* we define an error TType for when things go wrong *)
-Definition ErrT : TType 0 := (C1, []).
-
-
-Definition gMulT {n} (A B : TType n) : TType n :=
-  match A with
-  | (c1, g1) =>
-    match B with
-    | (c2, g2) =>(c1 * c2 * (cBigMul (zipWith gMul_Coef g1 g2)), 
-                       zipWith gMul_base g1 g2)
-    end
-  end.
-(*
-Definition gMulT {n} (A B : TType n) : TType n :=
-  match A with
-  | (c1, g1) =>
-    match B with
-    | (c2, g2) => if length g1 =? length g2 
-                 then (c1 * c2 * (cBigMul (zipWith gMul_Coef g1 g2)), 
-                       zipWith gMul_base g1 g2)
-                 else ErrT
-    end
-  end.
-*)
-Definition gTensorT {n m} (A : TType n) (B : TType m) : TType (n + m) :=
-  match A with
-  | (c1, g1) =>
-    match B with
-    | (c2, g2) => (c1 * c2, g1 ++ g2)
-    end
-  end.
-(*
-Definition gTensorT {n m} (A : TType n) (B : TType m) : TType (n + m) :=
-  match A with
-  | (c1, g1) =>
-    match B with
-    | (c2, g2) => if (length g1 =? n) && (length g2 =? m) 
-                 then (c1 * c2, g1 ++ g2)
-                 else ErrT
-    end
-  end.
-*)
-Definition gScaleT {n} (c : Coef) (A : TType n) : TType n :=
-  match A with
-  | (c1, g1) => (c * c1, g1)
-  end.
-
-
-Definition translate {n} (A : TType n) : Square (2^n) := 
-  (fst A) .* ⨂ (map translate_P (snd A)).
-
-
-
-
-(*
 Declare Scope vector_scope.
 Delimit Scope vector_scope with vector.
 Notation "[ ]" := (Vector.nil _) : vector_scope.
@@ -354,7 +294,6 @@ Arguments Vector.nil {A}.
 Arguments Vector.cons {A}.
 Open Scope vector_scope.
 Open Scope list_scope.
-
 
 (* scaling, multiplication, and tensoring done at this level *)
 (* using vectors instead of lists *)
@@ -403,7 +342,7 @@ Definition translate {n} (A : TType n) : Square (2^n) :=
 *)
  Definition translate {n} (A : TType n) : Square (2^n) := 
   (fst A) .* ⨂ (to_list (Vector.map translate_P (snd A))).
-*)
+
 
 
 
@@ -412,108 +351,28 @@ Definition translate {n} (A : TType n) : Square (2^n) :=
 (* len is the number of qubits (= number of tensoring elements) *)
 Definition ArithPauli (len : nat) := list (TType len).
 
-(* we define an error ArithPauli for when things go wrong *)
-Definition ErrA : ArithPauli 0 := [].
-
-Lemma list_prod_l_nil : forall {A B : Type} (l : list A), list_prod l (@nil B) = @nil (A*B).
-Proof. induction l; try easy. Qed. 
-
-
-(*
-Fixpoint error_wrap {n} (res test: ArithPauli n) {struct test} : ArithPauli n :=
-    match test with
-    | nil => res
-    | h :: t => match h with
-              | (_, nil) => error_wrap ErrA t 
-              | _ => error_wrap res t
-              end
-    end.
-*)
-(*
-Definition error_wrap {n : nat} (a : ArithPauli n) : ArithPauli n :=
-  let error_wrap :=
-    fix error_wrap (res test : ArithPauli n) {struct test} : ArithPauli n :=
-      match test with
-      | nil => res
-      | h :: t => match h with
-                | (_, nil) => error_wrap ErrA t 
-                | _ => error_wrap res t
-                end
-      end
-  in error_wrap a a.
-*)
-
-Fixpoint gTensorA  {n m : nat} (a : ArithPauli n) (b : ArithPauli m): ArithPauli (n+m) :=
-  match a with
-  | [] => []
-  | h :: t => map (fun x : TType n => gTensorT h x) b ++ gTensorA t b
-  end.
-(*
 Definition gTensorA  {n m : nat} (a : ArithPauli n) (b : ArithPauli m): ArithPauli (n+m) :=
   map (uncurry gTensorT) (list_prod a b).
-*)
-(*
-Definition gTensorA  {n m : nat} (a : ArithPauli n) (b : ArithPauli m): ArithPauli (n+m) :=
-  let result := map (uncurry gTensorT) (list_prod a b) in
-  error_wrap result.
-*)
 
-
-Fixpoint gMulA {n : nat} (a b : ArithPauli n) : ArithPauli n :=
-  match a with
-  | [] => []
-  | h :: t => map (fun x : TType n => gMulT h x) b ++ gMulA t b
-  end.
-(*
 Definition gMulA {n : nat} (a b : ArithPauli n) : ArithPauli n :=
   map (uncurry gMulT) (list_prod a b).
-*)
-(*
-Definition gMulA {n : nat} (a b : ArithPauli n) : ArithPauli n :=
-  let result := map (uncurry gMulT) (list_prod a b) in
-  error_wrap  result.
-*)
 
 Definition gScaleA {n : nat} (c : Coef) (a : ArithPauli n) :=
-  map (fun a' => gScaleT c a') a .
-(*
-Definition gScaleA {n : nat} (c : Coef) (a : ArithPauli n) :=
-  let result := map (fun a' => gScaleT c a') a in
-  error_wrap result.
-*)
-      
-Definition list_eqb := fun {A : Type} (A_beq : A -> A -> bool) =>
-                        fix list_eqb'  (l1 l2 : list A) {struct l1} : bool :=
-    match l1, l2 with
-    | [], [] => true
-    | [], h::t => false
-    | h::t, [] => false
-    | h1::t1, h2::t2 => if (A_beq h1 h2) then list_eqb'  t1 t2 else false
-    end.
+  map (fun a' => gScaleT c a') a.
 
 
 
-
-
-(*
-(*
 Definition gAddOneEach {n : nat} (a b : TType n) : list (TType n) :=
   if (Vector.eqb Pauli beq_Pauli (snd a) (snd b)) then [((fst a) + (fst b), snd a)] else cons a (cons b nil).
-*)
-Definition gAddOneEach {n : nat} (a b : TType n) : list (TType n) :=
-  if (list_eqb beq_Pauli (snd a) (snd b)) then [((fst a) + (fst b), snd a)] else cons a (cons b nil).
 
 Fixpoint InBool {A : Type} (eqbA : A -> A -> bool)  (a : A) (l : list A) {struct l} : bool :=
   match l with
   | [] => false
   | b :: m => orb (eqbA a b) (InBool eqbA a m)
   end.
-(*
+
 Definition gAddContains {n : nat} (a : list (TType n)) (b : TType n) : bool :=
   if InBool (Vector.eqb Pauli beq_Pauli) (snd b) (map snd a) then true else false.
- *)
-Definition gAddContains {n : nat} (a : list (TType n)) (b : TType n) : bool :=
-  if InBool (list_eqb  beq_Pauli) (snd b) (map snd a) then true else false.
 
 Definition isemptylist {A : Type} (l : list A) : bool := if (Nat.eqb (length l) 0) then true else false.
 
@@ -536,40 +395,20 @@ Definition gAddOne {n : nat} (a : list (TType n)) (b : TType n) : list (TType n)
     in (fst (result n nil a b) ++ snd (result n nil a b))
   else b :: a.
 
+Compute gAddOne ((C1,[gX,gZ]) :: (Ci+C1,[gY,gZ]) :: []) (Ci, [gY,gZ]).
+Compute gAddOne nil (Ci, [gY,gZ]). 
+
 
 Fixpoint gAddA {n : nat} (a b : ArithPauli n) : ArithPauli n :=
   match b with
   | [] => a
   | h :: t => gAddA (gAddOne a h) t
   end.
-(*
-Definition gAddA {n : nat} (a b : ArithPauli n) : ArithPauli n :=
-let result := (fix gAddA {n : nat} (a b :ArithPauli n) {struct b} : ArithPauli n :=
-    match b with
-    | [] => a
-    | h :: t => gAddA (gAddOne a h) t
-    end) in
- error_wrap (result a b).
-*)
-*)
-Definition gAddA {n : nat} (a b : ArithPauli n) : ArithPauli n :=  a ++ b.
 
-
-
-
-(*
-(* testing *)
-Compute gAddOne ((C1,gX::gZ::[]) :: (Ci+C1,gY::gZ::[]) :: []) (Ci, gY::gZ::[]).
-Compute gAddOne nil (Ci, gY::gZ::[]). 
-Definition A : ArithPauli 2 :=   ((C1,gY::gX::[]) :: (Ci+C1,gY::gZ::[]) :: []).
-Definition B : ArithPauli 2 :=    ((C1,gZ::gZ::[]) :: (C2+C1,gY::gZ::[]) :: []).
-Compute gTensorA A B.
-Compute gMulA
-  ((C1,gZ::gX::[]) :: (Ci+C1,gY::gZ::[]) :: [])
-  ((C1,gZ::gZ::[]) :: (C2+C1,gY::gZ::[]) :: []). 
-Compute gAddA A  ((C1,gI::gZ::[]) :: (C2+C1,gY::gZ::[]) :: []).
-*)
-
+Compute gAddA
+  ((C1,[gX,gZ]) :: (Ci+C1,[gY,gZ]) :: [])
+  ((C1,[gZ,gZ]) :: (C2+C1,[gY,gZ]) :: []). 
+Compute gAddA nil  ((C1,[gZ,gZ]) :: (C2+C1,[gY,gZ]) :: []).
 
 Definition translateA {n} (a : ArithPauli n) : Square (2^n) :=
   fold_left Mplus (map translate a) Zero.
@@ -636,26 +475,10 @@ Definition i {n} (A : vType n) := scale Ci A.
 Notation "- A" := (scale (Copp C1) A).
 Infix ".*" := mul (at level 40, left associativity).
 Infix ".⊗" := tensor (at level 51, right associativity).
-Infix ".+" := add (at level 50, left associativity).
+
 
 Notation "A → B" := (Arrow A B) (at level 60, no associativity).
 Notation "A ∩ B" := (Cap A B) (at level 60, no associativity).
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 (******************************************************************************)
 (* Defining different types of vTypes to ensure WF and Singleton translations *)
@@ -672,10 +495,10 @@ Inductive Cap_vt {n} : vType n -> Prop :=
 *)
 
 Inductive Arith_vt {n} : vType n -> Prop :=
-| G_avt : forall a : ArithPauli n, Arith_vt (G a). 
+| G_svt : forall tt : ArithPauli n, Arith_vt (G tt). 
 
 Inductive Cap_vt {n} : vType n -> Prop :=
-| G_cvt : forall a : ArithPauli n, Cap_vt (G a)
+| G_cvt : forall tt : ArithPauli n, Cap_vt (G tt)
 | Cap_cvt : forall T1 T2 : vType n, Cap_vt T1 -> Cap_vt T2 -> Cap_vt (Cap T1 T2). 
 
 Lemma sing_implies_cap : forall {n} (T : vType n),
@@ -692,39 +515,29 @@ Fixpoint Cap_vt_bool {n} (A : vType n) : bool :=
 
 Lemma Cap_vt_conv : forall {n} (A : vType n),
   Cap_vt A <-> Cap_vt_bool A = true.
-Proof. intros n A0.  split. 
-  + intros H. 
-    induction A0; try easy.
-    inversion H; subst.
-    apply IHA0_1 in H2.
-    apply IHA0_2 in H3.
-    unfold Cap_vt_bool in *.
-    rewrite H2, H3. easy.
-  + intros H.  induction A0 ; try easy.
-  - constructor.
-  - simpl in H.
-    apply andb_true_iff in H.
-    destruct H.
-    apply IHA0_1 in H.
-    apply IHA0_2 in H0.
-    constructor; assumption.
-Qed.
+Proof. intros. split. 
+       + induction A as [| | |]; try easy.
+         - intros.
+           inversion H.
+           simpl; rewrite IHA1, IHA2; try easy.
+       + induction A as [| | |]; try easy.
+         - intros.
+           apply G_cvt. 
+         - intros. 
+           simpl in *. 
+           apply andb_true_iff in H.
+           destruct H.
+           apply Cap_cvt; 
+           try (apply IHA1); 
+           try (apply IHA2); 
+           assumption.
+Qed.         
 
-(*
 Inductive Sing_gt {n} : vType n -> Prop :=
 | Arrow_sgt : forall T1 T2 : vType n, Cap_vt T1 -> Cap_vt T2 -> Sing_gt (Arrow T1 T2). 
 
 Inductive Cap_gt {n} : vType n -> Prop :=
 | Arrow_cgt : forall T : vType n, Sing_gt T -> Cap_gt T
-| Cap_cgt : forall T1 T2 : vType n, Cap_gt T1 -> Cap_gt T2 -> Cap_gt (Cap T1 T2).
-*)
-
-
-Inductive ArrowSing_gt {n} : vType n -> Prop :=
-| Arrow_sgt : forall T1 T2 : vType n, Cap_vt T1 -> Cap_vt T2 -> ArrowSing_gt (Arrow T1 T2). 
-
-Inductive Cap_gt {n} : vType n -> Prop :=
-| Arrow_cgt : forall T : vType n, ArrowSing_gt T -> Cap_gt T
 | Cap_cgt : forall T1 T2 : vType n, Cap_gt T1 -> Cap_gt T2 -> Cap_gt (Cap T1 T2).
 
 
@@ -757,17 +570,11 @@ Definition I : vType 1 := G (p_1, [gI]).
 Definition X : vType 1 := G (p_1, [gX]).
 Definition Y : vType 1 := G (p_1, [gY]).
 Definition Z : vType 1 := G (p_1, [gZ]).
-*)
-(*
+ *)
 Definition I : vType 1 := G (cons (C1, [gI])%vector nil).
 Definition X : vType 1 := G (cons (C1, [gX])%vector nil).
 Definition Y : vType 1 := G (cons (C1, [gY])%vector nil).
 Definition Z : vType 1 := G (cons (C1, [gZ])%vector nil).
-*)
-Definition I : vType 1 := G (cons (C1, [gI]) nil).
-Definition X : vType 1 := G (cons (C1, [gX]) nil).
-Definition Y : vType 1 := G (cons (C1, [gY]) nil).
-Definition Z : vType 1 := G (cons (C1, [gZ]) nil).
 
 
 Lemma Itrans : translate_vecType I = I'.
@@ -849,280 +656,90 @@ Proof. rewrite Y_is_iXZ. auto with wfvt_db. Qed.
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 (**************************)
 (* Well Formedness Lemmas *)
 (**************************)
 
-(*
-Definition WF_TType (n : nat) (a : TType n) : Prop :=  length (snd a) = n.
-*)
-
-Definition WF_TType (n : nat) (a : TType n) : Prop := n <> O /\ length (snd a) = n.
-
-(*
-Definition WF_TType_bool (n : nat) (a : TType n) : bool := (andb (negb (Nat.eqb n O)) (Nat.eqb (length (snd a)) n)).
-
-Lemma WF_TType_reflect (n : nat) (a : TType n) : WF_TType n a <-> WF_TType_bool n a = true.
-Proof. split.
-  - intros H. unfold WF_TType in H. unfold WF_TType_bool.
-    destruct H. rewrite andb_true_iff. split.
-    + rewrite negb_true_iff. rewrite Nat.eqb_neq. assumption.
-    + rewrite Nat.eqb_eq. assumption.
-  - intros H. unfold WF_TType. unfold WF_TType_bool in H.
-    + rewrite andb_true_iff in H. destruct H. split.
-      *  rewrite negb_true_iff in H. rewrite Nat.eqb_neq in H. assumption.
-      * rewrite Nat.eqb_eq in H0. assumption. 
-Qed.
-*)
-
-Lemma WF_ErrT : ~ WF_TType 0 ErrT.
-Proof. intros H. unfold WF_TType in H. destruct H. contradiction.
-Qed.
-Lemma WF_ErrT_n : forall n : nat, ~ WF_TType n ErrT.
-Proof. intros n H. unfold WF_TType in H. destruct H. unfold ErrT in H0.
-  simpl in H0. rewrite <- H0 in H. contradiction.
-Qed.
-
-
-(*
-Inductive WF_ArithPauli (n : nat) : ArithPauli n -> Prop :=
-| WF_AP_Err : WF_ArithPauli n nil
-| WF_AP_Cons (a : TType n) (b : ArithPauli n) : WF_TType n a -> WF_ArithPauli n b -> WF_ArithPauli n (a :: b).
-*)
-
-Inductive WF_ArithPauli (n : nat) : ArithPauli n -> Prop :=
-| WF_AP_Sing (a : TType n) : WF_TType n a -> WF_ArithPauli n (cons a nil)
-| WF_AP_Cons (a : TType n) (b : ArithPauli n) : WF_TType n a -> WF_ArithPauli n b -> WF_ArithPauli n (a :: b).
-
-(*
-Fixpoint WF_ArithPauli_bool (n : nat) (a : ArithPauli n) : bool :=
-  match a with
-    | [h] => if WF_TType_bool n h then true else false
-    | h :: t => if WF_TType_bool n h && WF_ArithPauli_bool n t then true else false
-    | _ => false
-  end.
-
-*)
-(*
-Definition WF_ArithPauli_reflect (n : nat) (a : ArithPauli n) : WF_ArithPauli n a <-> WF_ArithPauli_bool n a = true.
-Proof. split.
-  - intros H. induction H.
-    + simpl. rewrite WF_TType_reflect in H. rewrite H. reflexivity.
-    + simpl. rewrite WF_TType_reflect in H. rewrite H. rewrite IHWF_ArithPauli. simpl. destruct b; easy.
-  - intros H. induction a.
-    + simpl in H. discriminate.
-    + constructor.
-      * simpl in H.
-        destruct (WF_TType_bool n a) eqn:E.
-        -- rewrite <- WF_TType_reflect in E. assumption.
-        -- destruct a0 eqn:E1.
-           ++ discriminate.
-           ++  simpl in H. discriminate.
-      * 
-        apply IHa.
-        simpl in H.
-        destruct a0.
-Admitted.
- *)     
-
-(*
-(* compatability between lengths when adding *)
-Inductive Compatible_ArithPauli (n : nat) : ArithPauli n -> ArithPauli n -> Prop :=
-| Compat_AP : forall a b : ArithPauli n, WF_ArithPauli n a -> WF_ArithPauli n b -> Compatible_ArithPauli n a b.
-*)
-
-
-
-
-  (*
+ (*
 Inductive WF_TType {len : nat} : TType len -> Prop :=
 | WF_tt : forall tt : TType len, length (snd tt) = len -> WF_TType tt.
   *)
 (*
 Inductive WF_TType {len : nat} : TType len -> Prop :=
 | WF_tt : forall tt : TType len,  WF_TType tt.*)
-(*
+
 Inductive WF_ArithPauli {len : nat} : ArithPauli len -> Prop :=
-| WF_AP : forall tt : ArithPauli len,  WF_ArithPauli tt. *)
+| WF_AP : forall tt : ArithPauli len,  WF_ArithPauli tt.
 
 Inductive WF_vType {n} : vType n -> Prop :=
-| WF_G : forall a : ArithPauli n, WF_ArithPauli n a -> WF_vType (G a)
+| WF_G : forall tt : ArithPauli n, WF_ArithPauli tt -> WF_vType (G tt)
 | WF_Cap : forall T1 T2 : vType n, WF_vType T1 -> WF_vType T2 -> WF_vType (Cap T1 T2)
 | WF_Arrow : forall T1 T2 : vType n, WF_vType T1 -> WF_vType T2 -> WF_vType (Arrow T1 T2).
 
 
-Lemma WF_I : WF_vType I. Proof. do 3 constructor; easy. Qed. 
-Lemma WF_X : WF_vType X. Proof. do 3 constructor; easy. Qed.
-Lemma WF_Z : WF_vType Z. Proof. do 3 constructor; easy. Qed.
-
-
-
-Lemma WF_TType_scale : forall {n} (a : TType n) (c : Coef),
-    WF_TType n a -> WF_TType n (gScaleT c a).
-Proof. intros n a c H. unfold WF_TType in *. destruct a. simpl in *. easy.
-Qed.
-
-Lemma WF_ArithPauli_scale : forall {n} (A : ArithPauli n) (c : Coef),
-    WF_ArithPauli n A -> WF_ArithPauli n (gScaleA c A).
-Proof. intros n A c H. induction H.
-  - constructor. apply WF_TType_scale; easy.
-  - unfold gScaleA in *. simpl in *. constructor; try assumption.
-    apply WF_TType_scale; easy.
-Qed.
+Lemma WF_I : WF_vType I. Proof. apply WF_G; easy. Qed.
+Lemma WF_X : WF_vType X. Proof. apply WF_G; easy. Qed.
+Lemma WF_Z : WF_vType Z. Proof. apply WF_G; easy. Qed.
 
 Lemma WF_scale : forall {n} (A : vType n) (c : Coef), 
-    Arith_vt A -> 
-    WF_vType A -> (WF_vType (scale c A)).  
-Proof. intros n A c H H0. 
-  induction H; simpl. constructor. inversion H0; subst.
-  apply WF_ArithPauli_scale; easy.
-Qed.
-
-
-Lemma WF_ArithPauli_App : forall {n} (a b : ArithPauli n), WF_ArithPauli n a -> WF_ArithPauli n b -> WF_ArithPauli n (a ++ b).
-Proof. intros n a b H H0.
-  induction H.
-  - simpl. constructor; easy.
-  - simpl. constructor; easy.
-Qed.
-
-
-Lemma WF_TType_mul : forall {n} (a b : TType n), WF_TType n a -> WF_TType n b -> WF_TType n (gMulT a b).
-Proof. intros n a b H H0.
-  unfold gMulT. unfold WF_TType. destruct a, b. simpl.
-  rewrite zipWith_len_pres with (n:=n).
-  inversion H. split; easy.
-  inversion H. simpl in H2. easy.
-  inversion H0. simpl in H2. easy.
-Qed.
-
-Lemma WF_ArithPauli_map_gMulT : forall {n} (a : TType n) (B : ArithPauli n),
-    WF_TType n a -> WF_ArithPauli n B -> WF_ArithPauli n (map (fun x : TType n => gMulT a x) B).
-Proof. intros n a B0 H H0.
-  induction H0; simpl; constructor; try apply WF_TType_mul; easy.
-Qed.
-
-Lemma WF_ArithPauli_mul : forall {n} (A B : ArithPauli n),
-    WF_ArithPauli n A -> WF_ArithPauli n B -> WF_ArithPauli n (gMulA A B).
-Proof.  intros n A0 B0 H H0.
-   induction H.
-   - simpl. rewrite <- app_nil_end.
-     apply WF_ArithPauli_map_gMulT; easy.
-   - simpl. apply WF_ArithPauli_App; try easy.
-     apply WF_ArithPauli_map_gMulT; easy.
+  Arith_vt A -> WF_vType A ->
+  (WF_vType (scale c A)).  
+Proof. intros. 
+       destruct A; try easy.
+       apply WF_G.
+       apply WF_AP.
 Qed.
 
 Lemma WF_mul : forall {n} (A B : vType n),
-    Arith_vt A -> Arith_vt B -> 
+  Arith_vt A -> Arith_vt B ->
   WF_vType A -> WF_vType B ->
   WF_vType (A .* B). 
-Proof. intros n A B H H0 H1 H2.
-  induction H, H0. inversion H1; inversion H2; subst.
-  constructor. apply WF_ArithPauli_mul; easy.
+Proof. intros.
+       destruct A;
+       destruct B; try easy.
+       destruct a;
+         destruct a0; simpl; try easy;
+       inversion H1; inversion H2; subst; inversion H4; inversion H6; subst;
+       inversion H; inversion H0; subst;
+       apply WF_G; apply WF_AP;
+       simpl.
 Qed.
 
-
-Lemma n_plus_m_zero_n_zero : forall (n m : nat), (n + m = 0 -> n = 0)%nat.
-  intros n m H. induction m.
-  - rewrite Nat.add_0_r in H. assumption.
-  - rewrite Nat.add_comm in H. simpl in H. discriminate.
-Qed.
-
-Lemma WF_TType_tensor : forall {n m} (a : TType n) (b : TType m), WF_TType n a -> WF_TType m b -> WF_TType (n+m) (gTensorT a b).
-Proof. intros n m a b H H0.
-  unfold WF_TType. unfold gTensorT. destruct a, b. simpl.
-  inversion H. inversion H0. simpl in *. split.
-  - intros H5. apply n_plus_m_zero_n_zero in H5. contradiction.
-  - rewrite app_length. rewrite H2, H4. reflexivity.
-Qed.
-
-Lemma WF_ArithPauli_map_gTensorT : forall {n m} (a : TType n) (B : ArithPauli m),
-    WF_TType n a -> WF_ArithPauli m B -> WF_ArithPauli (n+m) (map (fun x : TType n => gTensorT a x) B).
-Proof. intros n m a B0 H H0. 
-  induction H0; simpl.
-  - apply (WF_AP_Sing (n+m)).
-    apply (WF_TType_tensor a a0); easy.
-  - apply (WF_AP_Cons (n+m)).
-    + apply (WF_TType_tensor a a0); easy.
-    + assumption.
-Qed.
-
-Lemma WF_ArithPauli_tensor : forall {n m} (A : ArithPauli n) (B : ArithPauli m),
-    WF_ArithPauli n A -> WF_ArithPauli m B -> WF_ArithPauli (n+m) (gTensorA A B).
-Proof. intros n m A0 B0 H H0.
-  induction H.
-  - unfold gTensorA. rewrite <- app_nil_end. apply WF_ArithPauli_map_gTensorT; easy.
-  - simpl. apply (@WF_ArithPauli_App (n+m)).
-    + apply WF_ArithPauli_map_gTensorT; easy.
-    + easy.
-Qed.
 
 Lemma WF_tensor : forall {n m} (A : vType n) (B : vType m),
-  Arith_vt A -> Arith_vt B -> 
+  Arith_vt A -> Arith_vt B ->
   WF_vType A -> WF_vType B ->
   WF_vType (A .⊗ B). 
-Proof. intros n m A B H H0 H1 H2. 
-  induction H, H0. inversion H1; inversion H2; subst.
-  constructor. apply WF_ArithPauli_tensor; easy.
+Proof. intros. 
+       destruct A;
+       destruct B; try easy;
+       destruct a;
+       destruct a0; 
+       simpl in *;  try easy;
+       inversion H1; inversion H2; inversion H4; inversion H6; subst;
+       simpl in *;
+       apply WF_G; apply WF_AP.
 Qed.
 
-
-Lemma WF_ArithPauli_add : forall {n} (A B : ArithPauli n),
-    WF_ArithPauli n A -> WF_ArithPauli n B -> WF_ArithPauli n (gAddA A B).
-Proof. intros n A B H H0.
-  unfold gAddA. apply WF_ArithPauli_App; easy.
-Qed. 
-
-Lemma WF_add : forall {n} (A : vType n) (B : vType n),
-  Arith_vt A -> Arith_vt B -> 
-  WF_vType A -> WF_vType B ->
-  WF_vType (A .+ B). 
-Proof. intros n A B H H0 H1 H2.
-  induction H, H0. inversion H1; inversion H2; subst.
-  constructor. apply WF_ArithPauli_add; easy.
-Qed.
-      
-
-Lemma WF_ArithPauli_neg : forall {n} (A : ArithPauli n),
-    WF_ArithPauli n A -> WF_ArithPauli n (gScaleA (Copp C1) A).
-Proof. intros n A H.  apply WF_ArithPauli_scale; easy. Qed.
 
 Lemma WF_neg : forall {n} (A : vType n),
-    Arith_vt A -> 
-    WF_vType A ->  WF_vType (- A). 
-Proof. intros n A H H0.
-  induction H. inversion H0; subst.
-  constructor. apply WF_ArithPauli_neg; easy.
+  Arith_vt A -> WF_vType A ->  WF_vType (- A). 
+Proof. intros. 
+       destruct A; try easy.
+       inversion H0; inversion H2.
+       apply WF_G; apply WF_AP.
 Qed.
-
-
-Lemma WF_ArithPauli_i : forall {n} (A : ArithPauli n),
-    WF_ArithPauli n A -> WF_ArithPauli n (gScaleA Ci A).
-Proof. intros n A H.  apply WF_ArithPauli_scale; easy. Qed.
 
 Lemma WF_i : forall {n} (A : vType n),
-    Arith_vt A -> 
-    WF_vType A ->  WF_vType (i A). 
-Proof. intros n A H H0.
-  induction H. inversion H0; subst.
-  constructor. apply WF_ArithPauli_i; easy.
+  Arith_vt A -> WF_vType A ->  WF_vType (i A). 
+Proof. intros. 
+       destruct A; try easy.
+       inversion H0; inversion H2.
+       apply WF_G; apply WF_AP.
 Qed.
 
 
-Hint Resolve SI SX SZ WF_I WF_X WF_Z WF_ArithPauli_mul WF_mul WF_ArithPauli_scale WF_scale WF_ArithPauli_tensor WF_tensor WF_ArithPauli_neg WF_neg WF_ArithPauli_i WF_i : wfvt_db.
+Hint Resolve SI SX SZ WF_I WF_X WF_Z WF_mul WF_scale WF_tensor WF_neg WF_i : wfvt_db.
 
 
 Lemma WF_Y : WF_vType Y.
@@ -1140,7 +757,7 @@ Qed.
 *)
 
 Lemma general_fold_left_WF_Matrix_ArithPauli' : forall {n} (a : Square n) (A : list (Square n)),  
-    fold_left Mplus (a::A) (Zero) =  (fold_left Mplus A (Zero) .+  a)%M.
+    fold_left Mplus (a::A) (Zero) =  fold_left Mplus A (Zero) .+  a.
 Proof. intros n a A. generalize dependent a. simpl. induction A.
   - simpl. reflexivity.
   - simpl. intros a0. rewrite (Mplus_assoc _ _ Zero a0 a).
@@ -1150,39 +767,55 @@ Qed.
 
 
 Lemma fold_left_WF_Matrix_ArithPauli : forall {n} (a : TType n) (A : list (TType n)),  
-    fold_left Mplus (map translate A) (Zero .+ translate a)%M
-    =  (fold_left Mplus (map translate A) (Zero) .+  translate a)%M.
+    fold_left Mplus (map translate A) (Zero .+ translate a) 
+    =  fold_left Mplus (map translate A) (Zero) .+  translate a.
 Proof. intros n a A. apply (general_fold_left_WF_Matrix_ArithPauli' (translate a) (map translate A)).
 Qed.
 
-Lemma WF_Matrix_ArithPauli : forall {n} (A : ArithPauli n), WF_ArithPauli n A -> WF_Matrix (translateA A). 
-Proof. intros. induction H.
-  - unfold translateA; simpl. rewrite Mplus_0_l. induction a. induction b.
-    + inversion H. simpl in H1. symmetry in H1. contradiction.
-    + unfold translate. simpl. apply (@Matrix.WF_scale (2^n) (2^n) a _).
-      apply (Matrix.WF_kron _ _).
-      * inversion H. simpl in H1. rewrite <- H1. simpl. clear H IHb H1. induction b.
-        -- simpl. reflexivity.
-        -- simpl. rewrite IHb. reflexivity.
-      * inversion H. simpl in H1. rewrite <- H1. simpl. clear H IHb H1. induction b.
-        -- simpl. reflexivity.
-        -- simpl. rewrite IHb. reflexivity.
-      * induction a0; auto with wf_db.
-      * apply (@Matrix.WF_big_kron 2 2 _ (translate_P gI)).
-        intros i0.
-        rewrite map_nth.
-        apply WF_Matrix_Pauli.
-  - unfold translateA in *. simpl. rewrite fold_left_WF_Matrix_ArithPauli.
-    apply Matrix.WF_plus; try assumption.
-    unfold translate. induction a. simpl. apply (@Matrix.WF_scale (2^n) (2^n) a _).
-    pose (@Matrix.WF_big_kron 2 2 (map translate_P b0) (translate_P gI)) as w.
-    pose (@length (Square 2) (@map Pauli (Square 2) translate_P b0)) as l.
-    rewrite map_length in *. inversion H; subst.
-    apply w. intros i0. rewrite (map_nth translate_P b0 _ i0). apply WF_Matrix_Pauli.
+Lemma WF_Matrix_ArithPauli : forall {n} (A : ArithPauli n), WF_ArithPauli A -> WF_Matrix (translateA A). 
+Proof. intros. induction A.
+  - unfold translateA; simpl; try auto with wf_db.
+  - pose (WF_AP A) as w. apply IHA in w. unfold translateA in *. simpl.
+    rewrite  (fold_left_WF_Matrix_ArithPauli a A).
+    apply WF_plus.
+    + assumption.
+    + unfold translate.
+      destruct a. simpl.
+      apply (@Matrix.WF_scale (2^n) (2^n) c _) .
+      pose (length_to_list (Square 2) n (Vector.map translate_P t)).
+      pose (@WF_big_kron 2 2 (to_list (Vector.map translate_P t)) (translate_P gI)).
+      rewrite e in w0.
+      apply w0.
+      intros i0.
+
+      unfold to_list.
+      Locate "<".
+      rewrite <- to_list_nth_order .
+      
+nth i0 (to_list (Vector.map translate_P t))
+  
+
+  destruct A; unfold translateA; simpl.
+  - auto with wf_db.
+  - rewrite Mplus_0_l.
+    
+    inversion H.
+       unfold translate; simpl. 
+       assert (H2 := (WF_big_kron _ _ (map translate_P l) (translate_P gI))).
+       rewrite map_length.
+       inversion H; simpl in *
+  - unfold translateA. simpl. auto with wf_db.
+  - unfold translateA. simpl. 
+       rewrite map_length, <- H0.
+       apply Matrix.WF_scale.
+       assert (H2 := ).
+       rewrite map_length in *; apply H2. 
+       intros. 
+       rewrite map_nth.
+       apply WF_Matrix_Pauli. 
 Qed.
 
-Hint Resolve WF_Matrix_ArithPauli : wf_db.
-
+Hint Resolve WF_Matrix_TType : wf_db.
 
 (*************)
 (* WFS types *)
