@@ -7,7 +7,7 @@ Require Export Quantum.
 Require Export Eigenvectors.
 Require Export Heisenberg.
 Require Import Setoid.
-
+Require Export Permutation.
 
 (*
 (************************)
@@ -182,14 +182,27 @@ Definition translate_P (g : Pauli) : Square 2 :=
   | gX => σx
   | gY => σy
   | gZ => σz
-  end. 
+  end.
 
 Lemma WF_Matrix_Pauli : forall (g : Pauli), WF_Matrix (translate_P g).
 Proof. intros. 
-       destruct g; simpl; auto with wf_db.
+  destruct g; simpl; auto with wf_db.
 Qed.
 
-Hint Resolve WF_Matrix_Pauli : wf_db.
+Lemma WF_Unitary_Pauli : forall (g : Pauli), WF_Unitary (translate_P g).
+Proof. intros.
+       destruct g; simpl; auto with unit_db.
+Qed.
+
+Lemma WF_Matrix_Big_Pauli : forall (l : list Pauli), WF_Matrix (⨂ map translate_P l).
+Proof. intros.
+  induction l; simpl; auto with wf_db.
+  apply Matrix.WF_kron; try lia; try apply IHl.
+  apply WF_Matrix_Pauli.
+Qed.
+
+Hint Resolve WF_Matrix_Pauli WF_Matrix_Big_Pauli : wf_db.
+Hint Resolve WF_Unitary_Pauli : unit_db.
 
 
 (* Here we define a gMul to give Coef followed by a gMul to give the actual type *)
@@ -333,16 +346,28 @@ Definition ArithPauli (len : nat) := list (TType len).
 (* we define an error ArithPauli for when things go wrong *)
 Definition ErrA : ArithPauli 0 := [].
 
-Fixpoint gTensorA  {n m : nat} (a : ArithPauli n) (b : ArithPauli m): ArithPauli (n+m) :=
+Fixpoint gTensorA  {n m : nat} (a : ArithPauli n) (b : ArithPauli m) {struct a}: ArithPauli (n+m) :=
   match a with
   | [] => []
   | h :: t => map (fun x : TType n => gTensorT h x) b ++ gTensorA t b
   end.
 
-Fixpoint gMulA {n : nat} (a b : ArithPauli n) : ArithPauli n :=
+Fixpoint gTensorA'  {n m : nat} (a : ArithPauli n) (b : ArithPauli m) {struct b}: ArithPauli (n+m) :=
+  match b with
+  | [] => []
+  | h :: t => map (fun x : TType n => gTensorT x h) a ++ gTensorA a t
+  end.
+
+Fixpoint gMulA {n : nat} (a b : ArithPauli n) {struct a} : ArithPauli n :=
   match a with
   | [] => []
   | h :: t => map (fun x : TType n => gMulT h x) b ++ gMulA t b
+  end.
+
+Fixpoint gMulA' {n : nat} (a b : ArithPauli n) {struct b} : ArithPauli n :=
+  match b with
+  | [] => []
+  | h :: t => map (fun x : TType n => gMulT x h) a ++ gMulA a t
   end.
 
 Definition gScaleA {n : nat} (c : Coef) (a : ArithPauli n) :=
@@ -389,16 +414,50 @@ Definition add {n} (A B : vType n) : vType n :=
   end.
 
 
-Definition tensor {n m} (A : vType n) (B : vType m) : vType (n + m) :=
+Fixpoint tensor_l {n m} (A : vType n) (B : vType m): vType (n + m) :=
   match A with
   | G a =>
-    match B with
-    | G b => G (gTensorA a b)
-    | _ => Err 
-    end
+      match B with
+      | G b => G (gTensorA a b)
+      | Cap g1 g2 => Cap (tensor_l (G a) g1) (tensor_l (G a) g2)
+      | Arrow g1 g2  => Arrow (tensor_l (G a) g1) (tensor_l (G a) g2)
+      | Err => Err
+      end
   | _ => Err
   end.
 
+Fixpoint tensor_r {n m} (A : vType n) (B : vType m): vType (n + m) :=
+  match A with
+  | G a =>
+      match B with
+      | G b => G (gTensorA a b)
+      | _ => Err
+      end
+  | Cap g1 g2 =>
+      match B with
+      | G b => Cap (tensor_r g1 (G b)) (tensor_r g2 (G b))
+      | _ => Err
+      end
+  | Arrow g1 g2  =>
+      match B with
+      | G b => Arrow (tensor_r g1 (G b)) (tensor_r g2 (G b))
+      | _ => Err
+      end
+  | Err => Err
+  end.
+
+Definition tensor {n m} (A : vType n) (B : vType m): vType (n + m) :=
+  match A with
+  | G a =>
+      match B with
+      | G b => G (gTensorA a b)
+      | _ => tensor_l A B
+      end
+  | _ => tensor_r A B
+  end.
+
+
+(*
 (* since scaling intersections makes sense, we allow this *)
 Fixpoint scale {n} (c : Coef) (A : vType n) : vType n :=
   match A with
@@ -406,6 +465,32 @@ Fixpoint scale {n} (c : Coef) (A : vType n) : vType n :=
   | Cap g1 g2 => Cap (scale c g1) (scale c g2)
   | _ => Err
   end.
+*)
+
+Fixpoint scale {n} (c : Coef) (A : vType n) : vType n :=
+  match A with
+  | G a => G (gScaleA c a)
+  | Cap g1 g2 => Cap (scale c g1) (scale c g2)
+  | Arrow g1 g2  => Arrow (scale c g1) (scale c g2)
+  | Err => Err
+  end.
+
+Lemma gScaleT_1 : forall n (A : TType n), gScaleT C1 A = A.
+Proof. intros n A. destruct A. simpl. rewrite Cmult_1_l. reflexivity. Qed.
+
+Lemma gScaleA_1 : forall n (A : ArithPauli n), gScaleA C1 A = A.
+Proof. intros n A. induction A; simpl; try easy. rewrite gScaleT_1. rewrite IHA. reflexivity. Qed. 
+
+Lemma scale_1 : forall n (A : vType n), scale C1 A = A.
+Proof. intros n A. induction A; simpl; try easy.
+       - rewrite gScaleA_1. reflexivity.
+       - rewrite IHA1, IHA2. reflexivity.
+       - rewrite IHA1, IHA2. reflexivity.
+Qed. 
+
+Hint Rewrite gScaleT_1 gScaleA_1 scale_1 : typing_db.
+
+
 
 (*
 Definition i {n} (A : vType n) := scale p_i A.
@@ -797,6 +882,10 @@ Qed.
 
 Hint Resolve SI SX SZ WF_I WF_X WF_Z WF_ArithPauli_mul WF_mul WF_ArithPauli_scale WF_scale WF_ArithPauli_tensor WF_tensor WF_ArithPauli_neg WF_neg WF_ArithPauli_i WF_i : wfvt_db.
 
+(*
+Hint Resolve SI SX SZ WF_I WF_X WF_Z WF_ArithPauli_mul WF_mul WF_ArithPauli_scale WF_scale WF_ArithPauli_tensor WF_tensor WF_ArithPauli_neg WF_neg WF_ArithPauli_i WF_i : typing_db.
+*)
+
 
 Lemma WF_Y : WF_vType Y.
 Proof. rewrite Y_is_iXZ. auto with wfvt_db. Qed.
@@ -898,7 +987,40 @@ Proof. intros n A H.
        apply WFA_scale; easy. 
 Qed.
 
-Hint Resolve WFA_I WFA_X WFA_Z WFA_scale WFA_mul WFA_tensor WFA_neg WFA_i : wfvt_db.
+
+Lemma WFA_G_sing : forall {n} (a : TType n) (A : ArithPauli n),
+    WFA_vType (G (a :: A)) -> WFA_vType (G ([a])).
+Proof. intros n a A H.
+       inversion H; subst.
+       inversion H1; subst.
+       do 3 constructor.
+       inversion H3; subst; easy.
+Qed.
+
+Lemma WFA_G_cons : forall {n} (a : TType n) (A : ArithPauli n),
+    A <> [] -> WFA_vType (G (a :: A)) -> WFA_vType (G (A)).
+Proof. intros n a A G H. 
+       inversion H; subst.
+       inversion H1; subst.
+       do 2 constructor.
+       inversion H3; subst; easy.
+Qed.
+
+Lemma WFA_G_cons' : forall {n} (a : TType n) (A : ArithPauli n),
+    WF_ArithPauli n A -> WFA_vType (G (a :: A)) -> WFA_vType (G (A)).
+Proof. intros n a A G H. 
+       inversion H; subst.
+       inversion H1; subst.
+       do 2 constructor.
+       inversion H3; subst; easy.
+Qed.
+
+
+Hint Resolve WFA_I WFA_X WFA_Z WFA_scale WFA_mul WFA_tensor WFA_neg WFA_i WFA_G_sing WFA_G_cons WFA_G_cons' : wfvt_db.
+
+(*
+Hint Resolve WFA_I WFA_X WFA_Z WFA_scale WFA_mul WFA_tensor WFA_neg WFA_i WFA_G_sing WFA_G_cons WFA_G_cons' : typing_db.
+*)
 
 (******************)
 (* unitary lemmas *)
@@ -909,6 +1031,19 @@ Lemma unit_Pauli : forall (p : Pauli), WF_Unitary (translate_P p).
 Proof. intros. 
        destruct p; simpl; auto with unit_db.
 Qed.
+
+Lemma unit_list_Pauli : forall (l : list Pauli), WF_Unitary (⨂ map translate_P l).
+Proof. intros.
+  apply unit_big_kron.
+  intros a H.
+  rewrite in_map_iff in H.
+  do 2 destruct H.
+  rewrite <- H.
+  apply unit_Pauli.
+Qed.
+
+Hint Resolve unit_Pauli unit_list_Pauli : unit_db.
+
 
 (* norm of coeff = 1, precondition *)
 Lemma unit_TType : forall {n} (A : TType n), fst A * fst A ^* = C1 -> WF_TType n A -> WF_Unitary (translate A). 
@@ -942,13 +1077,298 @@ Proof. intros.
 Qed.
 
 
+Lemma unitary_two_pauli : forall (p1 p2 : Pauli),
+    p1 <> p2 -> p1 <> gI -> p2 <> gI -> WF_Unitary (@translateA 1 ((1/√2, p1::nil) :: (1/√2, p2::nil) :: nil)).
+Proof. intros. unfold translateA, translate, translate_P, WF_Unitary.
+  induction p1, p2; simpl; split; try contradiction; auto with wf_db;
+    lma'; auto 15 with wf_db;
+    autounfold with U_db; simpl;
+    C_field_simplify; try nonzero;
+    autorewrite with Cexp_db C_db;
+    eapply c_proj_eq; simpl;
+    repeat (autorewrite with R_db; field_simplify_eq; simpl);
+    try easy.
+Qed.
+
+Lemma C_inj_l : forall (c x y : C), x = y -> (c * x = c * y)%C.
+Proof. intros. rewrite H. easy. Qed.
+
+Lemma C_inv_l : forall (c x y : C), c <> 0 -> (c * x = c * y)%C -> x = y.
+Proof. intros. apply C_inj_l with (c:=/c) in H0. rewrite ! Cmult_assoc in H0.
+  rewrite Cinv_l in H0; try assumption. rewrite ! Cmult_1_l in H0; assumption.
+Qed.
+Lemma C_inj_r : forall (c x y : C), x = y -> (x * c = y * c)%C.
+Proof. intros. rewrite H. easy. Qed.
+
+Lemma C_inv_r : forall (c x y : C), c <> 0 -> (x * c = y * c)%C -> x = y.
+Proof. intros. apply C_inj_r with (c:=/c) in H0. rewrite <- ! Cmult_assoc in H0.
+  rewrite Cinv_r in H0; try assumption. rewrite ! Cmult_1_r in H0; assumption.
+Qed.
+
+(* any set of length of paulis commutes or anti commutes *)
+Lemma Pauli_comm_anticomm : forall (p p0 : Pauli) (l l0 : list Pauli), length l = length l0 ->
+  cBigMul (zipWith gMul_Coef (p :: l) (p0 :: l0)) =
+    (- cBigMul (zipWith gMul_Coef (p0 :: l0) (p :: l)))%C ->
+  (gMul_Coef p p0 = (- gMul_Coef p0 p)%C ->
+  cBigMul (zipWith gMul_Coef l l0) =
+    cBigMul (zipWith gMul_Coef l0 l)) /\
+    (gMul_Coef p p0 = gMul_Coef p0 p ->
+  cBigMul (zipWith gMul_Coef l l0) =
+    (- cBigMul (zipWith gMul_Coef l0 l))%C).
+Proof. intros p p0 l l0 H H0. split.
+  - intros H1. destruct p, p0; simpl in H1; inversion H1; try (contradict H1; lra);
+      unfold cBigMul, gMul_Coef, zipWith, uncurry in *; simpl in *;
+      rewrite ! fold_left_Cmult in H0; rewrite Copp_mult_distr_l in *;
+      try rewrite ! Copp_involutive in H0; apply C_inv_l in H0; try nonzero; try easy; apply C0_snd_neq; simpl; lra.
+  - intros H1.  destruct p, p0; simpl in H1; inversion H1; try (contradict H1; lra);
+      unfold cBigMul, gMul_Coef, zipWith, uncurry in *; simpl in *;
+      rewrite ! fold_left_Cmult in H0; rewrite ! Cmult_1_l in H0; easy.
+Qed.
 
 
+Inductive Anticommutative {n} : TType n -> TType n -> Prop :=
+| AC : forall t1 t2 : TType n, cBigMul (zipWith gMul_Coef (snd t1) (snd t2)) = Copp (cBigMul (zipWith gMul_Coef (snd t2) (snd t1))) -> Anticommutative t1 t2.
 
-(* (*
-Lemma univ_ArithPauli : forall {n} (a : ArithPauli n), 
-    (* Forall (fun tt : TType n => fst tt * (fst tt) ^* = C1) a -> *)
-    (forall tt : TType n, In tt a -> fst tt * (fst tt) ^* = C1) ->
+
+Lemma Mmult_eq_l : forall {m n o : nat} (A A' : Matrix m n) (B : Matrix n o), A = A' -> A × B = A' × B.
+Proof. intros. rewrite H. easy. Qed.
+
+Lemma Mmult_eq_r : forall {m n o : nat} (A : Matrix m n) (B B' : Matrix n o), B = B' -> A × B = A × B'.
+Proof. intros. rewrite H. easy. Qed.
+
+Lemma Mscale_inj : forall {m n} (A B : Matrix m n) (c : C), A = B -> (c .* A = c .* B)%M.
+Proof. intros m n A B c H. rewrite H. easy. Qed. 
+
+Lemma Mscale_inv : forall {m n} (A B : Matrix m n) (c : C), c <> 0 -> (c .* A = c .* B)%M ->  A = B.
+Proof. intros m n A B c H H0. apply Mscale_inj with (c:= /c) in H0.
+  rewrite ! Mscale_assoc in H0. rewrite Cinv_l in H0; try easy.
+  rewrite ! Mscale_1_l in H0. easy.
+Qed.
+
+Lemma kron_2_l : forall {n} ,
+      Matrix.I 2 ⊗ Matrix.I (2 ^ n + (2 ^ n + 0)) =
+        Matrix.I (2 ^ n + (2 ^ n + 0) + (2 ^ n + (2 ^ n + 0) + 0)).
+Proof. intros n.
+        replace (2 ^ n + (2 ^ n + 0) + (2 ^ n + (2 ^ n + 0) + 0))%nat with (2 ^ (S (S n)))%nat.
+        2:{ simpl; easy. }
+        replace (2 ^ n + (2 ^ n + 0))%nat with (2 ^ (S n))%nat.
+        2:{ simpl; easy. }
+        rewrite <- ! kron_n_I. rewrite <- kron_n_assoc; auto with wf_db.
+Qed.
+
+Lemma big_kron_adj : forall {n} (l : list (Square n)), (⨂ l)† = (⨂ (map adjoint l)).
+Proof. intros n l. induction l; simpl. lma'. rewrite kron_adjoint. rewrite IHl. rewrite ! map_length. reflexivity. Qed.
+
+
+Lemma list_Pauli_hermitian : forall (l : list Pauli),  (⨂ map translate_P l) † = ⨂ map translate_P l.
+Proof. intros l. induction l.
+  - simpl. lma'.
+  - simpl. setoid_rewrite kron_adjoint. rewrite IHl.
+    destruct a; simpl.
+    + replace  (Matrix.I 2) †  with  (Matrix.I 2) by lma'. reflexivity.
+    + replace (σx) † with  (σx) by lma'. reflexivity.
+    + replace (σy) † with  (σy) by lma'. reflexivity.
+    + replace (σz) † with  (σz) by lma'. reflexivity.
+Qed.
+  
+
+Lemma unitary_hermitian_anticommute_hermitian : forall {n} (A B : Square n), WF_Unitary A -> WF_Unitary B -> A † = A -> B † = B -> (A × B = -1 .* (B × A))%M -> (((1/√2) .* (A .+ B)) † = ((1/√2) .* (A .+ B)))%M.
+Proof. intros n A B UA UB HA HB AC. 
+    rewrite Mscale_adj.
+    replace ((C1 / √ 2) ^* ) with (C1 / √ 2) by lca.
+    rewrite Mplus_adjoint.
+    rewrite HA, HB.
+    reflexivity.
+Qed.
+
+
+Lemma unitary_hermitian_anticommute_unitary : forall {n} (A B : Square n), WF_Unitary A -> WF_Unitary B -> A † = A -> B † = B -> (A × B = - 1 .* (B × A))%M -> WF_Unitary ((1/√2) .* (A .+ B))%M.
+Proof. intros n A B UA UB HA HB AC.
+    inversion UA. inversion UB.
+    constructor; auto with wf_db.
+    rewrite Mscale_adj.
+    replace ((C1 / √ 2) ^* ) with (C1 / √ 2) by lca.
+    rewrite Mplus_adjoint.
+    rewrite HA, HB.
+    rewrite Mscale_mult_dist_l, Mscale_mult_dist_r.
+    rewrite Mscale_assoc.
+    replace (C1 / √ 2 * (C1 / √ 2)) with (C1/C2) by C_field.
+    rewrite Mmult_plus_distr_l.
+    rewrite ! Mmult_plus_distr_r.
+    rewrite Mplus_assoc.
+    replace (B × A .+ (A × B .+ B × B))%M with ((B × A .+ A × B) .+ B × B)%M by lma'.
+    rewrite AC.
+    replace (B × A .+ -1 .* (B × A))%M with (@Zero n n) by lma'.
+    rewrite Mplus_0_l.
+    rewrite <- HA at 1.
+    rewrite <- HB at 1.
+    rewrite H0, H2.
+    lma'.
+Qed.
+
+Lemma zipWith_gMul_base_symmetric : forall (l l0 : list Pauli), length l = length l0 -> zipWith gMul_base l l0 = zipWith gMul_base l0 l.
+Proof. intros l. unfold zipWith, gMul_base, uncurry. induction l.
+  - intros. rewrite combine_nil. simpl. easy.
+  - intros. destruct l0; try discriminate. simpl. f_equal. destruct a, p; simpl; try easy. apply IHl. inversion H. easy.
+Qed.
+
+
+Lemma translate_gMulT: forall (l l0 : list Pauli) (a b : Coef), length l0 = length l -> (translate (gMulT (a, l) (b, l0)) = a * b .* ((⨂ map translate_P l) × (⨂ map translate_P l0)))%M.
+Proof. induction l.
+    - intros. simpl in *. rewrite length_zero_iff_nil in H. rewrite H. simpl. unfold translate, cBigMul, gMul_Coef, zipWith. simpl. lma'.
+    - intros. simpl in *. destruct l0; try discriminate.
+      simpl in *. inversion H.
+      rewrite ! map_length. 
+      assert (2 ^ length l + (2 ^ length l + 0) = 2 ^ (S (length l)))%nat. { simpl. easy. }
+      rewrite H0.
+      assert (@Mmult (2 ^ S (length l)) (2 ^ S (length l)) (2 ^ S (length l)) (translate_P a ⊗ (⨂ map translate_P l)) (translate_P p ⊗ (⨂ map translate_P l0)) =  (@Mmult 2 2 2 (translate_P a) (translate_P p)) ⊗ (@Mmult (2 ^ length l) (2 ^ length l) (2 ^ length l) (⨂ map translate_P l) (⨂ map translate_P l0))).
+      { rewrite ! map_length. rewrite ! H1.
+        apply kron_mixed_product' with (A:= translate_P a) (B:= big_kron (map translate_P l)) (C:= translate_P p) (D:= big_kron (map translate_P l0)); easy. }
+      rewrite ! map_length in H2.
+      rewrite H2.
+      rewrite ! map_length in IHl.
+      setoid_rewrite <- Mscale_kron_dist_r with (x:= a0 * b) at 1.
+      rewrite <- IHl; try easy.
+      unfold translate, cBigMul, zipWith, gMul_Coef, uncurry. simpl. rewrite ! fold_left_Cmult.
+
+      setoid_rewrite <- Mscale_kron_dist_r.
+      rewrite <- Mscale_assoc.
+      setoid_rewrite Mscale_kron_dist_r.
+      setoid_rewrite <- Mscale_kron_dist_l.
+      setoid_rewrite Mscale_kron_dist_r.
+      rewrite <- Mscale_assoc.
+      setoid_rewrite <- Mscale_kron_dist_r.
+      setoid_rewrite Mscale_kron_dist_l.
+      setoid_rewrite Mscale_assoc.
+      setoid_rewrite <- Mscale_kron_dist_l.
+      symmetry.
+      rewrite <- Mscale_assoc.
+
+assert (translate_P a × translate_P p
+  ⊗ (a0 * b
+     .* (fold_left Cmult
+           (map
+              (fun p0 : Pauli * Pauli =>
+               match fst p0 with
+               | gI => C1
+               | gX => match snd p0 with
+                       | gY => Ci
+                       | gZ => (- Ci)%C
+                       | _ => C1
+                       end
+               | gY => match snd p0 with
+                       | gX => (- Ci)%C
+                       | gZ => Ci
+                       | _ => C1
+                       end
+               | gZ => match snd p0 with
+                       | gX => Ci
+                       | gY => (- Ci)%C
+                       | _ => C1
+                       end
+               end) (combine l l0)) C1
+         .* (⨂ map translate_P
+                 (map (fun p0 : Pauli * Pauli => gMul_base (fst p0) (snd p0))
+                    (combine l l0)))))%M
+        =
+          ((a0 * b) .* (translate_P a × translate_P p)
+  ⊗ ((fold_left Cmult
+           (map
+              (fun p0 : Pauli * Pauli =>
+               match fst p0 with
+               | gI => C1
+               | gX => match snd p0 with
+                       | gY => Ci
+                       | gZ => (- Ci)%C
+                       | _ => C1
+                       end
+               | gY => match snd p0 with
+                       | gX => (- Ci)%C
+                       | gZ => Ci
+                       | _ => C1
+                       end
+               | gZ => match snd p0 with
+                       | gX => Ci
+                       | gY => (- Ci)%C
+                       | _ => C1
+                       end
+               end) (combine l l0)) C1
+         .* (⨂ map translate_P
+                 (map (fun p0 : Pauli * Pauli => gMul_base (fst p0) (snd p0))
+                    (combine l l0))))))%M).
+{ 
+  rewrite Mscale_kron_dist_r.
+  rewrite <- Mscale_kron_dist_l.
+  easy.
+}
+rewrite ! map_length in H3.
+rewrite ! combine_length in H3.
+rewrite H1 in H3.
+replace (Init.Nat.min (length l) (length l)) with (length l) in H3 by lia.
+setoid_rewrite H3.
+rewrite ! map_length.
+rewrite ! combine_length.
+rewrite H1.
+replace (Init.Nat.min (length l) (length l)) with (length l) by lia.
+f_equal.
+destruct a, p; simpl; try lma'.
+Qed.
+
+
+Lemma unitary_two_tensored_paulis : forall {n} (t1 t2 : TType n), 
+    WF_TType n t1 -> WF_TType n t2 -> (fst t1 = 1/√2) -> (fst t2 = 1/√2) ->
+    Anticommutative t1 t2 ->
+    WF_Unitary (@translateA n (t1 :: t2 :: nil)). 
+Proof. intros. destruct t1, t2. simpl in H1, H2, H3.
+  destruct H, H0. simpl in H4, H5.
+  rewrite H1, H2 in *. clear H1. clear H2.
+  inversion H3; subst.
+  unfold translateA.
+  simpl. rewrite Mplus_0_l.
+  unfold translate. simpl  in *.
+  setoid_rewrite <- Mscale_plus_distr_r with (x:=C1 / √ 2) (A:=⨂ map translate_P l) (B:=⨂ map translate_P l0).
+  
+  rewrite map_length.
+  apply unitary_hermitian_anticommute_unitary.
+  rewrite <- map_length with (f:=translate_P).
+  apply unit_list_Pauli.
+  rewrite <- H5.
+  rewrite <- map_length with (f:=translate_P).
+  apply unit_list_Pauli.
+  apply list_Pauli_hermitian.
+  apply list_Pauli_hermitian.
+
+  apply Mscale_inv with (c:=C1/C2).
+  - intros G. apply C_inj_r with (c:=C2) in G. unfold Cdiv in G. rewrite <- Cmult_assoc in G. rewrite Cinv_l in G; try nonzero. rewrite Cmult_0_l in G. rewrite Cmult_1_l in G. contradict G. nonzero.
+  - rewrite Mscale_assoc. rewrite Cmult_comm. rewrite <- Mscale_assoc.
+    replace (C1 / C2) with ((C1/√2) * (C1/√2)) by C_field.
+    rewrite Mscale_assoc. rewrite Cmult_assoc. symmetry. rewrite Cmult_comm. symmetry.
+    assert ((C1 / √ 2 * (C1 / √ 2) .* ((⨂ map translate_P l) × (⨂ map translate_P l0)))%M
+            = (translate (gMulT  (C1 / √ 2, l) (C1 / √ 2, l0)))%M).
+    { rewrite <- translate_gMulT; easy. }
+      rewrite <- map_length with (f:=translate_P).
+    rewrite H2.
+    assert ((C1 / √ 2 * (-1 * (C1 / √ 2)) .* ((⨂ map translate_P l0) × (⨂ map translate_P l)))%M
+            = (translate (gMulT  (C1 / √ 2, l0) (-1 * (C1 / √ 2), l)))%M).
+    { rewrite <- translate_gMulT; easy. }
+    show_dimensions.
+    rewrite map_length.
+    rewrite <- H5.
+    rewrite <- map_length with (f:=translate_P).
+    rewrite H4.
+    simpl. rewrite H1.
+    assert (C1 / √ 2 * (C1 / √ 2) * - cBigMul (zipWith gMul_Coef l0 l)
+            = C1 / √ 2 * (-1 * (C1 / √ 2)) * cBigMul (zipWith gMul_Coef l0 l)).
+    { rewrite <- ! Cmult_assoc. apply C_inj_l. symmetry. 
+      rewrite Cmult_comm. rewrite <- ! Cmult_assoc. apply C_inj_l.
+      lca. }
+    rewrite H6.
+    rewrite zipWith_gMul_base_symmetric; easy.
+Qed.
+      
+
+(*
+Lemma univ_ArithPauli : forall {n} (a : ArithPauli n),
     WF_ArithPauli n a -> uni_vecType ([translateA a]).
 Proof. intros.
   induction H0.
@@ -984,6 +1404,9 @@ Proof. intros.
        assumption.
 Qed.
 *)
+
+
+(*
 Lemma unit_vType : forall {n} (A : vType n), 
   WF_vType A -> uni_vecType (translate_vecType A).
 Proof. intros. 
@@ -996,9 +1419,6 @@ Proof. intros.
       intros A H2. unfold translateA in H2.
       destruct a. simpl in H2. rewrite Mplus_0_l in H2. destruct H2; try easy.
       rewrite <- H2. apply unit_TType; simpl.
-
-
-
 
     apply (univ_TType t). 
          inversion H;
@@ -1018,6 +1438,31 @@ Qed.
  *)
 
 
+Lemma uni_vec_I : uni_vecType (translate_vecType I).
+Proof. unfold uni_vecType, translate_vecType; simpl. unfold translateA, translate, translate_P.
+  intros. simpl in H. destruct H; try contradiction. rewrite Mplus_0_l, Mscale_1_l, kron_1_r in H. rewrite <- H. unfold WF_Unitary. split. auto with wf_db. lma'.
+Qed.
+  
+Lemma uni_vec_X : uni_vecType (translate_vecType X).
+Proof. unfold uni_vecType, translate_vecType; simpl. unfold translateA, translate, translate_P.
+  intros. simpl in H. destruct H; try contradiction. rewrite Mplus_0_l, Mscale_1_l, kron_1_r in H. rewrite <- H. unfold WF_Unitary. split. auto with wf_db. lma'.
+Qed.
+
+Lemma uni_vec_Y : uni_vecType (translate_vecType Y).
+Proof. unfold uni_vecType, translate_vecType; simpl. unfold translateA, translate, translate_P.
+  intros. simpl in H. destruct H; try contradiction. rewrite Mplus_0_l, Mscale_1_l, kron_1_r in H. rewrite <- H. unfold WF_Unitary. split. auto with wf_db. lma'.
+Qed.
+
+  Lemma uni_vec_Z : uni_vecType (translate_vecType Z).
+Proof. unfold uni_vecType, translate_vecType; simpl. unfold translateA, translate, translate_P.
+  intros. simpl in H. destruct H; try contradiction. rewrite Mplus_0_l, Mscale_1_l, kron_1_r in H. rewrite <- H. unfold WF_Unitary. split. auto with wf_db. lma'.
+Qed.
+
+
+Hint Resolve unit_Pauli uni_vec_I uni_vec_X uni_vec_Y uni_vec_Z : wfvt_db.
+(*
+Hint Resolve unit_Pauli uni_vec_I uni_vec_X uni_vec_Y uni_vec_Z : typing_db.
+*)
 
 
 (******************************************************)
@@ -1336,29 +1781,339 @@ Qed.
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(*  
+additive types are not lists but are (multi) sets.
+add an axiom that a+b ≡ b+a => show consistency with the interpretation(translation function) of this.
+ *)
+
+(* predicate EQ type *)
+(* EQ on translationA ? *)
+(* add an axiom that a+b = b+a *)
+
+(* Axiom additive_types_is_set : forall n (A A' : ArithPauli n),
+    Permutation A A' -> A = A'. *)
+
+Declare Scope ArithPauli_scope.
+Delimit Scope ArithPauli_scope with A.
+Open Scope ArithPauli_scope.
+Bind Scope ArithPauli_scope with ArithPauli.
+
+Definition eq_ArithPauli {n} (A1 A2 : ArithPauli n) := translateA A1 = translateA A2.
+Infix "≡" := eq_ArithPauli (at level 70, no associativity): ArithPauli_scope.
+
+
+(* will now show this is an equivalence relation *)
+Lemma eq_ArithPauli_refl : forall {n} (A : ArithPauli n), A ≡ A.
+Proof. intros n A. 
+       unfold eq_ArithPauli. easy.
+Qed.
+
+Lemma eq_ArithPauli_sym : forall {n} (A B : ArithPauli n), A ≡ B -> B ≡ A.
+Proof. intros n A B H. 
+       unfold eq_ArithPauli in *.
+       symmetry. easy. 
+Qed.
+
+Lemma eq_ArithPauli_trans : forall {n} (A B C : ArithPauli n),
+    A ≡ B -> B ≡ C -> A ≡ C.
+Proof.
+  intros n A B C HAB HBC.
+  unfold eq_ArithPauli in *.
+  transitivity (translateA B); easy.
+Qed.
+
+
+Add Parametric Relation n : (ArithPauli n) (@eq_ArithPauli n)
+  reflexivity proved by eq_ArithPauli_refl
+  symmetry proved by eq_ArithPauli_sym
+  transitivity proved by eq_ArithPauli_trans
+    as eq_ArithPauli_rel.
+
+
+Lemma permutation_preserves_additive_types :
+  forall {n} (A A' : ArithPauli n),
+    Permutation A A' -> A ≡ A'.
+Proof. intros n A A' H.
+       unfold "≡".
+  induction H; simpl; try easy;
+    unfold translateA in *; simpl in *;
+    try (rewrite IHPermutation1, IHPermutation2; easy);
+    rewrite ! fold_left_Mplus.
+  - rewrite IHPermutation; easy.
+  - rewrite Mplus_assoc. symmetry. rewrite Mplus_assoc.
+    assert (translate x .+ translate y = translate y .+ translate x)%M.
+    { rewrite Mplus_comm; easy. }
+    rewrite H; easy.
+Qed.
+
+Lemma ArithPauli_comm : forall {n} (a b : ArithPauli n) c, gScaleA c (a ++ b) ≡ gScaleA c (b ++ a).
+Proof. intros n a b c.
+       unfold "≡".
+  induction a; simpl; try rewrite app_nil_r; try easy.
+  unfold translateA in *; simpl.
+  rewrite fold_left_Mplus. 
+  rewrite IHa. clear IHa.
+  induction b; simpl; rewrite fold_left_Mplus; try easy.
+  rewrite fold_left_Mplus.
+  rewrite <- IHb. clear IHb.
+  rewrite ! Mplus_assoc.
+  assert (translate (gScaleT c a1) .+ translate (gScaleT c a) = translate (gScaleT c a) .+ translate (gScaleT c a1))%M.
+  { rewrite Mplus_comm. easy. }
+  rewrite H.
+  easy.
+Qed.
+
+Lemma translateA_app : forall {n} (a b c : ArithPauli n),
+    a ++ b ≡ c <-> ((translateA a) .+ (translateA b))%M = translateA c.
+Proof. intros n a b c. unfold "≡", translateA in *.
+       split; intros H;
+         [rewrite map_app in H | rewrite map_app];
+         [rewrite fold_left_Mplus_app_Zero in H | rewrite fold_left_Mplus_app_Zero];
+         assumption. 
+Qed.
+
+Lemma gAddA_comm : forall {n} (a b : ArithPauli n) c, gScaleA c (gAddA a b) ≡ gScaleA c (gAddA b a).
+Proof. intros n a b.
+       unfold gAddA.
+       apply ArithPauli_comm.
+Qed.
+
+Lemma gMulA_is_gMulA' : forall {n} (a b : ArithPauli n), gMulA a b ≡ gMulA' a b.
+  intros n a b. unfold gMulA, gMulA'.
+  induction a.
+  - induction b.
+    + reflexivity.
+    + simpl. reflexivity.
+  - rewrite translateA_app.
+    rewrite IHa. clear IHa.
+    induction b.
+    + compute. autorewrite with R_db. reflexivity.
+    + simpl.
+      unfold translateA. simpl. rewrite ! map_app. rewrite ! map_map.
+      rewrite ! fold_left_Mplus. rewrite Mplus_assoc.
+      assert ((translate (gMulT a a1)
+                 .+ fold_left Mplus
+                 (map (fun x : TType n => translate (gMulT x a1)) a0
+                    ∩ map translate (gMulA a0 b))%H Zero)
+              =
+                (fold_left Mplus
+                  (map (fun x : TType n => translate (gMulT x a1)) a0
+                     ∩ map translate (gMulA a0 b))%H Zero) .+  translate (gMulT a a1) )%M.
+      { rewrite Mplus_comm. easy. }
+      rewrite H.
+      rewrite ! fold_left_Mplus_app_Zero.
+      rewrite <- ! Mplus_assoc.
+      assert (fold_left Mplus (map (fun x : TType n => translate (gMulT a x)) b) Zero
+                .+ fold_left Mplus (map (fun x : TType n => translate (gMulT x a1)) a0) Zero
+              =
+                fold_left Mplus (map (fun x : TType n => translate (gMulT x a1)) a0) Zero
+                  .+ fold_left Mplus (map (fun x : TType n => translate (gMulT a x)) b) Zero)%M.
+      { rewrite Mplus_comm. easy. }
+      rewrite H0. reflexivity.
+Qed.
+
+Lemma gTensorA_is_gTensorA' : forall {n m} (a : ArithPauli n) (b : ArithPauli m),
+    gTensorA a b ≡ gTensorA' a b.
+Proof. intros n m a b. 
+  induction a.
+  - induction b.
+    + reflexivity.
+    + simpl. reflexivity.
+  - simpl.
+    rewrite translateA_app with (a:=map (fun x : TType n => gTensorT a x) b) (b:=gTensorA a0 b) (c:=gTensorA' (a :: a0) b). unfold "≡" in IHa. rewrite IHa at 1. clear IHa.
+    induction b.
+    + compute. autorewrite with R_db. reflexivity.
+    + simpl.
+      unfold translateA. simpl. rewrite ! map_app. rewrite ! map_map.
+      rewrite ! fold_left_Mplus. rewrite Mplus_assoc.
+      assert ((translate (gTensorT a a1)
+                 .+ fold_left Mplus
+            (map (fun x : TType n => translate (gTensorT x a1)) a0
+               ∩ map translate (gTensorA a0 b))%H Zero)
+             =
+               (fold_left Mplus
+            (map (fun x : TType n => translate (gTensorT x a1)) a0
+               ∩ map translate (gTensorA a0 b))%H Zero)
+                 .+ translate (gTensorT a a1))%M.
+      { rewrite Mplus_comm. easy. }
+      rewrite H at 1.
+      rewrite ! fold_left_Mplus_app_Zero.
+      rewrite <- Mplus_assoc.
+      assert (fold_left Mplus (map (fun x : TType n => translate (gTensorT x a1)) a0) Zero
+                .+ fold_left Mplus (map (fun x : TType n => translate (gTensorT a x)) b) Zero
+              =
+                fold_left Mplus (map (fun x : TType n => translate (gTensorT a x)) b) Zero
+                  .+ fold_left Mplus (map (fun x : TType n => translate (gTensorT x a1)) a0) Zero)%M.
+      { rewrite Mplus_comm. easy. }
+      rewrite H0 at 1.
+      rewrite -> ! Mplus_assoc.
+      reflexivity.
+Qed.
+
+
+
+
+
+
+
+
+(*** eq_vType inductive definition ***)
+
+
+Inductive eq_vType {n} : vType n -> vType n -> Prop :=
+| G_eq : forall a b : ArithPauli n, translateA a = translateA b -> eq_vType (G a) (G b)
+| Cap_eq : forall T1 T'1 T2 T'2 : vType n, T1 = T'1 -> T2 = T'2 -> eq_vType (Cap T1 T2) (Cap T'1 T'2)
+| Arr_eq : forall T1 T'1 T2 T'2 : vType n, T1 = T'1 -> T2 = T'2 -> eq_vType (Arrow T1 T2) (Arrow T'1 T'2)
+| Err_eq : eq_vType Err Err.
+
+ 
+
+(** G : equivalently Cap: pointwise? permutation? **)
+Declare Scope vType_scope.
+Delimit Scope vType_scope with v.
+Open Scope vType_scope.
+Bind Scope vType_scope with vType.
+(* Definition eq_vType {n} (A1 A2 : vType n) := translate_vecType A1 = translate_vecType A2. *)
+Infix "≡" := eq_vType (at level 70, no associativity): vType_scope.
+Open Scope vType_scope.
+
+(* will now show this is an equivalence relation *)
+Lemma eq_vType_refl : forall {n} (A : vType n), A ≡ A.
+Proof. intros n A. destruct A; constructor; easy.
+Qed.
+
+Lemma eq_vType_sym : forall {n} (A B : vType n), A ≡ B -> B ≡ A.
+Proof. intros n A B H. destruct A, B; inversion H; try discriminate; try constructor; try easy.
+Qed.
+
+Lemma eq_vType_trans : forall {n} (A B C : vType n),
+    A ≡ B -> B ≡ C -> A ≡ C.
+Proof.
+  intros n A B C HAB HBC.
+  destruct A, B, C; inversion HAB; inversion HBC; subst; try discriminate; try constructor; try easy. transitivity (translateA a0); easy.
+Qed.
+
+
+Add Parametric Relation n : (vType n) (@eq_vType n)
+  reflexivity proved by eq_vType_refl
+  symmetry proved by eq_vType_sym
+  transitivity proved by eq_vType_trans
+    as eq_vType_rel.
+
+
+
+
+
+Lemma ArithPauli_vType_equiv_compat : forall{n} (A A' : ArithPauli n),
+    (A ≡ A')%A -> (G A ≡ G A')%v.
+Proof. intros n A A' H.
+       unfold "≡"%A in *. 
+       constructor. easy.
+Qed.
+       
+Add Parametric Morphism (n : nat) : G
+  with signature @eq_ArithPauli n ==> @eq_vType n as ArithPauli_vType_mor.
+Proof.
+  intros.
+  apply ArithPauli_vType_equiv_compat; easy.
+Qed.
+
+
+Lemma add_comm : forall {n} (A A' : vType n) c, c .· (A .+ A') ≡ c .· (A' .+ A).
+Proof. intros n A A' c.    
+  destruct A, A'; simpl; try easy.
+  constructor.  apply gAddA_comm.
+Qed.
+
+
+
+Hint Resolve add_comm : base_types_db.
+Hint Resolve (* additive_types_is_set *) add_comm : typing_db.
+(* Hint Rewrite add_comm : typing_db. *)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(** 
+Definition a1' : ArithPauli 2 := (Ci, gZ :: gI :: nil) :: nil.
+Definition a2' : ArithPauli 2 := (Ci, gI :: gX :: nil) ::  (Ci, gY :: gZ :: nil) :: nil.
+Definition a3' : ArithPauli 3 :=  (C1+Ci, gI :: gX :: gZ :: nil) :: (Ci, gY :: gZ :: gY :: nil) :: (Ci, gY :: gX :: gZ :: nil) :: nil.
+Definition a4' : ArithPauli 3 := (C1, gY :: gY :: gX :: nil) :: nil.
+Example test :  gMulA' (gTensorA' a1' a3') (gTensorA' a2' a4') = gTensorA (gMulA a1' a2') (gMulA a3' a4').
+Proof. compute. replace R0 with 0 by lra. autorewrite with R_db. reflexivity. Qed.
+***)
+
+
+
+       
+(*** Admitted ***)
 (*
-Definition a1 : ArithPauli 2 := (Ci, gZ :: gI :: nil) :: nil.
-Definition a2 : ArithPauli 2 := (Ci, gI :: gX :: nil) ::  (Ci, gY :: gZ :: nil) :: nil.
-Definition a3 : ArithPauli 3 :=  (Ci, gY :: gZ :: gY :: nil) :: (Ci, gY :: gX :: gZ :: nil) :: nil.
-Definition a4 : ArithPauli 3 := (C1, gY :: gY :: gX :: nil) :: nil.
-Example test :  gMulA (gTensorA a1 a3) (gTensorA a2 a4) = gTensorA (gMulA a1 a2) (gMulA a3 a4).
-Proof. compute. replace R0 with 0 by lra. autorewrite with R_db. 
-
-
-
 Lemma gMulA_gTensorA_dist : forall {n m : nat} (a1 a2 : ArithPauli n) (a3 a4 : ArithPauli m),
-  WF_ArithPauli n a1 -> WF_ArithPauli n a2 -> WF_ArithPauli m a3 -> WF_ArithPauli m a4 ->
-  gMulA (gTensorA a1 a3) (gTensorA a2 a4) = gTensorA (gMulA a1 a2) (gMulA a3 a4).
-Proof. intros n m a1 a2 a3 a4 H H0 H1 H2.  
-  induction H; induction H0; induction H1; induction H2; simpl in *.
+  WF_ArithPauli n a1 -> WF_ArithPauli n a2 -> WF_ArithPauli m a3 -> WF_ArithPauli m a4 -> 
+  (gMulA (gTensorA a1 a3) (gTensorA a2 a4) ≡ gTensorA (gMulA a1 a2) (gMulA a3 a4))%A.
+Proof. intros. unfold "≡"%A.
+
+
+  (* rewrite gMulA_is_gMulA'. rewrite 2 gTensorA_is_gTensorA'. *)
+
+  
+  (* induction a1; simpl; try easy.
+  
+  - simpl. induction a4.
+    + simpl. reflexivity.
+    + induction a3.
+      * simpl in *. rewrite <- gMulA_is_gMulA' in *. simpl. reflexivity.
+      * rewrite <- gTensorA_is_gTensorA'. rewrite <- gMulA_is_gMulA'
+      *)
+  
+
+
+  
+  induction H. (*
+  - simpl. rewrite ! app_nil_r. induction H2; simpl;  repeat (rewrite ! gMulA_is_gMulA'; rewrite ! gTensorA_is_gTensorA'; simpl); try rewrite ! app_nil_r. 
+    admit.
+  - simpl. *)
+
+    induction H0; induction H1; induction H2; simpl in *; try easy. 
+-
+  
   16 : { clear IHWF_ArithPauli2. clear IHWF_ArithPauli1. clear IHWF_ArithPauli0.
          f_equal. apply (@gMulT_gTensorT_dist n m _ _ _ _); try easy; try constructor; try easy. rewrite ! map_app, ! map_map, <- ! app_assoc in *. f_equal. clear IHWF_ArithPauli.
          induction H6. simpl. f_equal. apply (@gMulT_gTensorT_dist n m _ _ _ _); try easy; try constructor; try easy.
-         simpl. rewrite IHWF_ArithPauli. f_equal. apply (@gMulT_gTensorT_dist n m _ _ _ _); try easy; try constructor; try easy. 
+         simpl. rewrite IHWF_ArithPauli. f_equal. apply (@gMulT_gTensorT_dist n m _ _ _ _); try easy; try constructor; try easy.
+
+
+         f_equal.
          unfold gMulA.
 
          rewrite IHWF_ArithPauli. 
-         f_equal. f_equal. 
+         f_equal.  f_equal. 
 
 
 
@@ -1542,6 +2297,27 @@ Proof. simpl. do 3 f_equal.
   unfold zipWith, cBigMul, gMul_Coef, uncurry.  simpl. lca. Qed.
 
 
+
+Lemma switch_neg : forall n (A : vType n) (c : Coef), - (c .· A) = c .· (- A).
+  intros n A c.
+  induction A; simpl; try rewrite IHA1, IHA2; try easy.
+  f_equal. unfold gScaleA. rewrite 2 map_map. f_equal.
+  apply functional_extensionality. intros x. destruct x.
+  simpl. f_equal. lca.
+Qed.
+
+
+Lemma neg_inv : forall (n : nat) (A : vType n), - - A = A.
+Proof. intros n A.
+  induction A; try easy; simpl; try rewrite IHA1, IHA2; try easy.
+  destruct a; simpl; f_equal.
+  unfold gScaleA, gScaleT. 
+  destruct t. do 2 f_equal; try lca. rewrite map_map.
+  induction a; simpl; try easy; destruct a; do 2 f_equal; try lca.
+  apply IHa.
+Qed.
+
+(*
 Lemma neg_inv : forall (n : nat) (A : vType n), WFA_vType A -> - - A = A.
 Proof. intros n A H. 
        inversion H.
@@ -1555,6 +2331,9 @@ Proof. intros n A H.
   - simpl. f_equal. unfold gScaleT. destruct a. f_equal. lca.
   - simpl. rewrite IHWF_ArithPauli. f_equal. unfold gScaleT. destruct a. f_equal. lca.
 Qed.
+ *)
+
+
 
 Lemma gMulT_gScaleT_map : forall {n} (a : TType n) (b : ArithPauli n),
     WF_TType n a -> WF_ArithPauli n b ->
@@ -1624,6 +2403,12 @@ Proof. intros.
     destruct a, a0. simpl. f_equal. lca.
 Qed.
 
+Lemma neg_dist_add : forall (n : nat) (A B : vType n), - (A .+ B) = -A .+ -B.
+Proof. intros n A B.
+  induction A; induction B; simpl; try easy.
+  f_equal. unfold gScaleA, gAddA.
+  rewrite <- map_app. f_equal.
+Qed. 
 
 Lemma i_sqr : forall (n : nat) (A : vType n), i (i A) = -A.
 Proof. intros. 
@@ -1636,10 +2421,14 @@ Proof. intros.
         induction a.
         -- simpl. easy.
         -- simpl. rewrite IHa. f_equal. destruct a. simpl. f_equal. lca.
-  - simpl. unfold i in *.
-    simpl. 
-    rewrite IHA1, IHA2.
-    reflexivity. 
+  - simpl; unfold i in *;
+    simpl; 
+    rewrite IHA1, IHA2;
+      reflexivity.
+  - simpl; unfold i in *;
+    simpl; 
+    rewrite IHA1, IHA2;
+    reflexivity.
 Qed.
 
 Lemma i_dist_l : forall (n : nat) (A B : vType n), 
@@ -1697,11 +2486,54 @@ Proof. intros.
       * induction a.
         -- simpl. easy.
         -- simpl. rewrite IHa. f_equal. destruct a. simpl. f_equal. lca.
-  - simpl. unfold i in *.
-    simpl. 
-    rewrite IHA1, IHA2.
-    reflexivity. 
+  - simpl; unfold i in *;
+    simpl; 
+    rewrite IHA1, IHA2;
+      reflexivity.
+  - simpl; unfold i in *;
+    simpl; 
+    rewrite IHA1, IHA2;
+    reflexivity.
 Qed.
+
+
+Hint Resolve switch_neg neg_inv neg_dist_add i_sqr i_neg_comm : typing_db.
+Hint Rewrite switch_neg neg_inv neg_dist_add i_sqr i_neg_comm : typing_db.
+
+
+
+
+
+
+
+
+
+
+
+                         
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 (** ** Tensor Laws *)
@@ -1883,6 +2715,7 @@ Qed.
 
 Inductive prog :=
 | H' (n : nat)
+| I'' (n : nat)
 | X'' (n : nat)
 | Y'' (n : nat)
 | Z'' (n : nat)
@@ -1893,27 +2726,26 @@ Inductive prog :=
 
 Infix ";;" := seq (at level 51, right associativity).
 
-
 Fixpoint translate_prog (prg_len : nat) (p : prog) : Square (2^prg_len) :=
   match p with 
   | H' n => (prog_smpl_app prg_len hadamard n)
+  | I'' n => (prog_smpl_app prg_len (Matrix.I 2) n)
   | X'' n => (prog_smpl_app prg_len σx n)
   | Y'' n => (prog_smpl_app prg_len σy n)
   | Z'' n => (prog_smpl_app prg_len σz n)
   | S' n => (prog_smpl_app prg_len Phase n)
   | T' n => (prog_smpl_app prg_len (phase_shift (PI / 4)) n)
   | CNOT' n1 n2 => (prog_ctrl_app prg_len σx n1 n2)
-  | seq p1 p2 => (translate_prog prg_len p1) ; (translate_prog prg_len p2)
+  | seq p1 p2 => (translate_prog prg_len p2) × (translate_prog prg_len p1)
   end.
-
 
 Lemma unit_prog : forall (prg_len : nat) (p : prog), 
   WF_Unitary (translate_prog prg_len p).
-Proof. intros. induction p as [| | | | | | |];
+Proof. intros. induction p as [ | | | | | | | | ];
        try (apply unit_prog_smpl_app; auto with unit_db);
-       try (apply unit_prog_ctrl_app; auto with unit_db).
-       simpl. apply Mmult_unitary; easy. 
-Qed.      
+       try (apply unit_prog_ctrl_app; auto with unit_db);
+       simpl. apply Mmult_unitary; easy.
+Qed.
 
 
 Inductive progHasSingType {prg_len : nat} : prog -> vType prg_len -> vType prg_len -> Prop :=
@@ -1926,11 +2758,86 @@ Inductive progHasType {prg_len : nat} : prog -> vType prg_len -> Prop :=
 | Arrow_pht : forall p T1 T2, progHasSingType p T1 T2 -> progHasType p (Arrow T1 T2)
 | Cap_pht : forall p T1 T2, progHasType p T1 -> progHasType p T2 -> progHasType p (Cap T1 T2).
 
-  
-
 Notation "p :' T" := (progHasType p T).
 
 
+
+Lemma arrow_equiv : forall {n} (A A' B B' : vType n) (C : prog), A ≡ B -> A' ≡ B' -> C :' A → A' -> C :' B → B'.
+Proof. intros n A A' B B' C H H' G. 
+       inversion H; inversion H'; subst; try discriminate; try easy; inversion G; subst. 
+       - inversion H4; subst. inversion H5; subst.
+         repeat constructor. simpl in *. rewrite <- H0, <- H3. assumption.
+       - inversion H3; subst. inversion H2; subst. inversion H4; subst.
+         repeat constructor; try easy. simpl in *. rewrite <- H0. assumption.
+       - inversion H3; subst. repeat constructor; try easy.
+       - inversion H3; subst. inversion H2.
+       - inversion H2; subst. inversion H0; subst. repeat constructor; try easy.
+         simpl in *. inversion H3; subst. rewrite <- H4. assumption.
+       - inversion H2; subst. repeat constructor; try easy.
+       - inversion H3; subst. inversion H0.
+Qed.
+
+Lemma arrow_add_comm_l : forall {n} (A A' B : vType n) (c : Coef) (C : prog), C :' c .· (A .+ A') → B ->  C :' c .· (A' .+ A) → B.
+Proof. intros n A A' B c C H.
+       apply arrow_equiv with (A:=c .·(A .+ A')) (A':=B).
+       apply add_comm. apply reflexivity.
+       assumption.
+Qed.
+
+Lemma arrow_add_comm_r : forall {n} (A B B' : vType n) (c : Coef) (C : prog), C :' A → c .· (B .+ B') ->  C :' A → c .· (B' .+ B).
+Proof. intros n A B B' c C H.
+       apply arrow_equiv with (A:=A) (A':=c .· (B .+ B')).
+       apply reflexivity. apply add_comm.
+       assumption.
+Qed.
+
+Hint Resolve arrow_equiv arrow_add_comm_l arrow_add_comm_r : typing_db.
+
+
+
+Definition types_equiv {n} (A B : vType n) := forall C,  C :' A <-> C :' B.
+
+Lemma eq_types_equiv_refl : forall {n} (A : vType n), types_equiv A A.
+Proof. intros n A. 
+       easy.
+Qed.
+
+Lemma eq_types_equiv_sym : forall {n} (A B : vType n), types_equiv A B -> types_equiv B A.
+Proof. intros n A B H. 
+       easy. 
+Qed.
+
+Lemma eq_types_equiv_trans : forall {n} (A B C : vType n),
+    types_equiv A B -> types_equiv B C -> types_equiv A C.
+Proof.
+  intros n A B C HAB HBC.
+  unfold types_equiv in *.
+  intros C0.
+  split; intros.
+  - rewrite HAB in H. rewrite HBC in H. easy.
+  - rewrite HAB. rewrite HBC. easy.
+Qed.
+
+Add Parametric Relation n : (vType n) (@types_equiv n)
+    reflexivity proved by eq_types_equiv_refl
+    symmetry proved by eq_types_equiv_sym
+    transitivity proved by eq_types_equiv_trans
+    as eq_types_equiv_rel.
+
+Add Parametric Morphism (n : nat) : Arrow
+  with signature @eq_vType n ==> @eq_vType n ==> @types_equiv n as vType_Arr_mor.      Proof.
+  intros.
+  split; apply arrow_equiv; easy.
+Qed.
+
+(** rewrite H should work. **)
+Lemma test : forall n (A A' A'' B : vType n) C, A ≡ A' -> A' ≡ A'' -> C :' A'' → B -> C :' A → B.
+Proof. intros n A A' A'' B C H H0 H1. 
+       eapply arrow_equiv.
+       3:{ apply H1.}
+         rewrite H, H0; easy.
+       easy.
+Qed.
 
 
 (********************)
@@ -2005,13 +2912,13 @@ Ltac solve_ground_type :=  repeat (apply Cap_pht); try apply Arrow_pht;
                           unfold Heisenberg.seq;
                           repeat (auto 15 with wf_db;
                                   match goal with
-                                  | |- WF_Matrix (Matrix.Mmult ?A ?B) => apply WF_mult
-                                  | |- WF_Matrix (Matrix.Mplus ?A ?B) => apply WF_plus
-                                  | |- WF_Matrix (Matrix.scale ?p ?B) => apply WF_scale
-                                  | |- WF_Matrix (Matrix.kron ?A ?B) => apply WF_kron
-                                  | |- WF_Matrix (Matrix.transpose ?A) => apply WF_transpose
-                                  | |- WF_Matrix (Matrix.adjoint ?A) => apply WF_adjoint
-                                  | |- WF_Matrix (Matrix.I _) => apply WF_I
+                                  | |- WF_Matrix (Matrix.Mmult ?A ?B) => apply Matrix.WF_mult
+                                  | |- WF_Matrix (Matrix.Mplus ?A ?B) => apply Matrix.WF_plus
+                                  | |- WF_Matrix (Matrix.scale ?p ?B) => apply Matrix.WF_scale
+                                  | |- WF_Matrix (Matrix.kron ?A ?B) => apply Matrix.WF_kron
+                                  | |- WF_Matrix (Matrix.transpose ?A) => apply Matrix.WF_transpose
+                                  | |- WF_Matrix (Matrix.adjoint ?A) => apply Matrix.WF_adjoint
+                                  | |- WF_Matrix (Matrix.I _) => apply Matrix.WF_I
                                   end);
                            match goal with
                            | |- (?A ≡ ?B)%M => by_cell
@@ -2022,6 +2929,9 @@ Ltac solve_ground_type :=  repeat (apply Cap_pht); try apply Arrow_pht;
                            eapply c_proj_eq; simpl;
                            repeat (autorewrite with R_db; field_simplify_eq; simpl);
                            try easy.
+
+
+
 
 
 
@@ -2071,6 +2981,7 @@ Proof. unfold not.
        auto with univ_db.
 Qed.
 
+
 Lemma CNOTTypes : CNOT' 0 1 :' (X .⊗ I → X .⊗ X) ∩ (I .⊗ X → I .⊗ X) ∩
                              (Z .⊗ I → Z .⊗ I) ∩ (I .⊗ Z → Z .⊗ Z).
 Proof. solve_ground_type. Qed.
@@ -2086,6 +2997,168 @@ Lemma STypes : S' 0 :' (Z → Z) ∩ (X → Y) ∩ (Y → -X) .
 Proof. solve_ground_type. Qed.
 Lemma ZTypes : Z'' 0 :' (Z → Z) ∩ (X → -X) ∩ (Y → -Y) .
 Proof. solve_ground_type. Qed.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(** 
+
+Inductive prog' :=
+| H'' (n : nat)
+| I''' (n : nat)
+| X''' (n : nat)
+| Y''' (n : nat)
+| Z''' (n : nat)
+| S'' (n : nat)
+| T'' (n : nat)
+| CNOT'' (n1 n2 : nat)
+| seq' (p1 p2 : prog').
+
+Infix ";;;" := seq' (at level 51, right associativity).
+
+
+Fixpoint translate_prog' (prg_len : nat) (p : prog') : Square (2^prg_len) :=
+  match p with 
+  | H'' n => (prog_smpl_app prg_len hadamard n)
+  | I''' n => (prog_smpl_app prg_len (Matrix.I 2) n)
+  | X''' n => (prog_smpl_app prg_len σx n)
+  | Y''' n => (prog_smpl_app prg_len σy n)
+  | Z''' n => (prog_smpl_app prg_len σz n)
+  | S'' n => (prog_smpl_app prg_len Phase n)
+  | T'' n => (prog_smpl_app prg_len (phase_shift (PI / 4)) n)
+  | CNOT'' n1 n2 => (prog_ctrl_app prg_len σx n1 n2)
+  | seq' p1 p2 => (translate_prog' prg_len p2) × (translate_prog' prg_len p1)
+  end.
+
+(*** How? : translate Tensor -> Square (2^{prg_len}) ***)
+
+Inductive program :=
+| PG (p : prog')
+| Tensor (A : vType 1) (p : prog') : program.
+
+
+Infix "⨶" := Tensor (at level 52, right associativity).
+Locate "⨶".
+
+(**  "forall (A : Type) (P : A -> Type) (x : A), P x -> {x : A & P x}" 
+ **)
+(*
+Inductive pg_pg : program -> Prop :=
+| PG_pg : forall (p : prog'), pg_pg (PG p).
+
+Inductive tensor_pg : program -> Prop :=
+| Tensor_pg : forall (t : TType 1) (p : prog'), tensor_pg (Tensor (G([t])) p).
+
+Inductive unit_tensor_pg : program -> Prop :=
+| unit_Tensor_pg : forall (t : TType 1) (p : prog'), WF_Unitary (translate t) -> unit_tensor_pg (Tensor (G([t])) p).
+ *)
+
+Inductive WF_program : program -> Prop :=
+| WF_PG : forall (p : prog'), WF_program (PG p)
+| WF_Tensor :  forall (t : TType 1) (p : prog'), WF_program (Tensor (G([t])) p).
+
+Inductive WF_unit_program : program -> Prop :=
+| WF_unit_PG : forall (p : prog'), WF_unit_program (PG p)
+| WF_unit_Tensor :  forall (t : TType 1) (p : prog'), WF_Unitary (translateA ([t])) -> WF_unit_program (Tensor (G([t])) p).
+
+Definition translate_program (prg_len : nat) (pg : program) :
+   sigT (fun (prg_len : nat) => Square (2 ^ prg_len)) :=
+  match pg with
+  | PG p => @existT nat (fun (prg_len : nat) => Square (2 ^ prg_len)) prg_len
+              (translate_prog' prg_len p)
+  | Tensor A p =>
+      @existT nat (fun (prg_len : nat) => Square (2 ^ prg_len)) (S (prg_len)) 
+        ((hd (Matrix.I prg_len) (translate_vecType A)) ⊗ (translate_prog' prg_len p))
+  end.
+
+
+Lemma unit_prog' : forall (prg_len : nat) (p : prog'), 
+  WF_Unitary (translate_prog' prg_len p).
+Proof. intros. induction p as [ | | | | | | | | ];
+       try (apply unit_prog_smpl_app; auto with unit_db);
+       try (apply unit_prog_ctrl_app; auto with unit_db);
+         simpl. apply Mmult_unitary; easy.
+Qed.
+
+Lemma unit_program : forall (prg_len : nat) (pg : program),
+    WF_unit_program pg ->
+  WF_Unitary (projT2 (translate_program prg_len pg)) .
+Proof. intros. show_dimensions.
+       inversion H; subst; simpl.
+       - apply unit_prog'.
+       - unfold WF_Unitary.
+         Check (translateA ([t]) ⊗ translate_prog' prg_len p).
+         Check (translateA ([t])).
+         replace (2 ^ prg_len + (2 ^ prg_len + 0))%nat with ((2 ^ 1) * (2 ^ prg_len))%nat by (simpl;easy).
+         apply @kron_unitary with (m:=2%nat); try easy; apply unit_prog'.
+Qed.
+
+
+Inductive progHasSingType' {prg_len : nat} : program -> vType prg_len -> vType prg_len -> Prop :=
+| PHST'_p : forall p T1 T2, Cap_vt T1 -> Cap_vt T2 -> 
+  (translate_prog' prg_len p) ::' [(translate_vecType T1, translate_vecType T2)] -> 
+  progHasSingType' (PG p) T1 T2
+| PHST'_T : forall A p T1 T2, Cap_vt T1 -> Cap_vt T2 -> WF_program (Tensor A p) ->
+  ((hd (Matrix.I prg_len) (translate_vecType A)) ⊗ (translate_prog' prg_len p)) ::' [(translate_vecType (A .⊗ T1), translate_vecType (A .⊗ T2))] -> 
+  progHasSingType' (Tensor A p) T1 T2.
+(* should use two cons for PHT, one for arrow one for cap *)
+
+Inductive progHasType' {prg_len : nat} : program -> vType prg_len -> Prop :=
+| Arrow_pht' : forall p T1 T2, progHasSingType' p T1 T2 -> progHasType' p (Arrow T1 T2)
+| Cap_pht' : forall p T1 T2, progHasType' p T1 -> progHasType' p T2 -> progHasType' p (Cap T1 T2).
+
+
+Notation "p :'' T" := (progHasType' p T)  (at level 61, right associativity).
+
+**)
+
+
+
+
+
+
+
+
+
+
+(*** index into the TType list ***) 
+(** Explicit indexing TTypes list
+Lemma Tensor_rule_l : forall {n} (g : prog) (A B C : vType n),
+    g :' A → B -> (C ⨶ g) :' C .⊗ A → C .⊗ B.
+Proof.
+  Admitted.
+  **)
+(*** 
+implement Tensor rule 1&2
+***)
+
+(** 
+Lemma tensor_rule_1 : forall {n} **)
+
+
+
+
+
+
+
+
+
 
 
 (*************************)
@@ -2242,24 +3315,336 @@ Proof. intros.
 Qed.
 
 
+Hint Resolve HTypes ZTypes STypes TTypes CNOTTypes : base_types_db.
+Hint Resolve cap_intro cap_elim_l cap_elim_r : base_types_db.
+Hint Resolve SeqTypes : base_types_db.
+
+Hint Resolve HTypes ZTypes STypes TTypes CNOTTypes : typing_db.
+Hint Resolve cap_intro cap_elim_l cap_elim_r : typing_db.
+Hint Resolve SeqTypes : typing_db.
+
+
+
+(***************)
+(* Arrow rules *)
+(***************)
+
+
+Lemma arrow_mul : forall {n} g (A A' B B' : vType n),
+    uni_vecType (translate_vecType A) ->
+    uni_vecType (translate_vecType A') ->
+    uni_vecType (translate_vecType B) ->
+    uni_vecType (translate_vecType B') ->
+    WFA_vType A -> WFA_vType A' ->
+    WFA_vType B -> WFA_vType B' ->
+    g :' A → A' ->
+    g :' B → B' ->
+    g :' A .* B → A' .* B'.
+Proof. intros n g A A' B B' G G0 G1 G2 H H0 H1 H2 H3 H4;  simpl in *.       
+       inversion H3; inversion H4; inversion H7; inversion H11; 
+       inversion H; inversion H0; inversion H1; inversion H2; subst. 
+       apply Arrow_pht; apply PHST; auto with wfvt_db.
+       destruct A; destruct A'; destruct B; destruct B'; try easy. 
+       do 2 (rewrite translate_vecType_mMult; try easy).
+       rewrite fgt_conv.
+       apply Heisenberg.arrow_mul; 
+       try (apply unit_prog);
+       try (apply unit_vType); try easy.
+Qed. 
+  
+
+Lemma mul_simp : forall (a b : Pauli),
+  @G 1 ([(gMul_Coef a b, [gMul_base a b])]) = @G 1 ([(C1, [a])]) .* @G 1 ([(C1, [b])]). 
+Proof. intros. 
+       simpl. unfold cBigMul, gMul_Coef, zipWith, gMul_base, uncurry; simpl. 
+       destruct a; destruct b; simpl; do 3 f_equal; try lca. 
+Qed.
+
+
+Lemma arrow_mul_1 : forall g (a a' b b' : Pauli),
+    g :' @G 1 ([(C1, [a])]) → @G 1 ([(C1, [a'])]) ->
+    g :' @G 1 ([(C1, [b])]) → @G 1 ([(C1, [b'])]) ->
+    g :' @G 1 ([(gMul_Coef a b, [gMul_base a b])]) → @G 1 ([(gMul_Coef a' b', [gMul_base a' b'])]).
+Proof. intros. 
+       do 2 rewrite mul_simp. 
+       apply arrow_mul; try easy; try apply WFA; try apply G_avt; try apply WF_G; try apply WF_AP_Sing; unfold WF_TType; simpl; try lia;
+         unfold translate_vecType, translateA, translate, translate_P, uni_vecType; simpl; intros; try destruct H1; try contradiction; rewrite Mplus_0_l, Mscale_1_l, kron_1_r in H1; rewrite <- H1; [induction a | induction a' | induction b | induction b']; unfold WF_Unitary; split; auto with wf_db; lma'.
+Qed.
+
+
+
+Lemma arrow_scale : forall {n} (p : prog) (A A' : vType n) (c : Coef),
+  c <> C0 -> p :' A → A' -> p :' (scale c A) → (scale c A').
+Proof.  intros n p A A' c G H. 
+       inversion H; inversion H2; subst.
+       apply Cap_vt_conv in H4; apply Cap_vt_conv in H5.
+       apply Arrow_pht; apply PHST; auto with wfvt_db. 
+       all : try (apply Cap_vt_conv; rewrite Cap_vt_scale; easy).
+       rewrite fgt_conv in *.
+       do 2 (rewrite translate_vecType_scale).
+       apply Heisenberg.arrow_scale; try easy.
+Qed.
+
+
+Lemma arrow_scale_eq : forall n (p : prog) (A A' : vType n) (c : Coef),
+  c <> C0 -> p :' A → A' <-> p :' (scale c A) → (scale c A').
+Proof. intros n p A A' c G. split.
+  - apply arrow_scale; assumption.
+  - intros H. eapply arrow_scale with (c:= /c) in H;
+      try (apply nonzero_div_nonzero; assumption).
+    assert ( / c .· c .· A = A).
+    { clear H.
+      induction A; simpl; try rewrite IHA1, IHA2; try easy.
+      f_equal. unfold gScaleA. rewrite map_map.
+      unfold gScaleT. induction a; simpl; try easy.
+      f_equal; try apply IHa.
+      destruct a. f_equal. rewrite Cmult_assoc.
+      unfold Cdiv.
+      rewrite Cinv_l; try assumption; try lca. }
+    assert ( / c .· c .· A' = A').
+    { clear H. 
+      induction A'; simpl; try rewrite IHA'1, IHA'2; try easy.
+      f_equal. unfold gScaleA. rewrite map_map.
+      unfold gScaleT. induction a; simpl; try easy.
+      f_equal; try apply IHa.
+      destruct a. f_equal. rewrite Cmult_assoc.
+      unfold Cdiv.
+      rewrite Cinv_l; try assumption; try lca. }
+    rewrite H0 in H. rewrite H1 in H. assumption.
+Qed.
+
+Lemma arrow_scale_eq' : forall n (p : prog) (A A' : vType n) (c : Coef),
+  c <> C0 -> p :' (scale c A) → A' <-> p :' A → (scale (/c) A').
+Proof. intros n p A A' c G.
+       rewrite arrow_scale_eq with (c:=/c); try apply nonzero_div_nonzero; try assumption.
+       assert ( /c .· c .· A = A).
+       { induction A; simpl; try rewrite IHA1, IHA2; try easy.
+         f_equal. unfold gScaleA. rewrite map_map.
+         unfold gScaleT. induction a; simpl; try easy.
+         f_equal; try apply IHa.
+         destruct a. f_equal. rewrite Cmult_assoc.
+         rewrite Cinv_l; try assumption; try lca. }
+       rewrite H; easy.
+Qed.
+
+
+Lemma arrow_i : forall {n} (p : prog) (A A' : vType n),
+  p :' A → -i A' ->
+  p :' i A → A'.
+Proof. intros.
+         eapply arrow_scale_eq with (c:=Copp Ci).
+         try apply C0_snd_neq; simpl; try lra.
+         assert ((- Ci)%C .· i A = A).
+         { clear H. 
+           induction A; unfold i in *; simpl in *; try rewrite IHA1, IHA2; try easy.
+           f_equal. unfold gScaleA. rewrite map_map.
+           unfold gScaleT. induction a; simpl; try easy.
+           f_equal; try apply IHa.
+           destruct a. f_equal. lca. }
+         assert ((- Ci)%C .· A' = - i A').
+         { clear H. 
+           induction A'; unfold i in *; simpl in *; try rewrite IHA'1, IHA'2; try easy.
+           f_equal. unfold gScaleA. rewrite map_map.
+           unfold gScaleT. induction a; simpl; try easy.
+           f_equal; try apply IHa.
+           destruct a. f_equal. lca. }
+         rewrite H0, H1; assumption.       
+Qed.
+
+
+Lemma arrow_neg : forall n (p : prog) (A A' : vType n),
+  p :' A → - A' ->
+  p :' -A → A'.
+Proof. intros.
+  eapply arrow_scale_eq with (c:=Copp C1);
+    try apply C0_fst_neq; simpl; try lra.
+  rewrite neg_inv; assumption.       
+Qed.
+
+
+
+Lemma arrow_neg_eq : forall n (p : prog) (A A' : vType n),
+    p :' -A → A' <-> p :' A → -A'.
+Proof. intros n p A A'. split; intros;
+         rewrite arrow_scale_eq with (c := Copp C1);
+         try rewrite neg_inv;
+         try assumption;
+         try apply C0_fst_neq; simpl; lra.
+Qed.
+
+
+Lemma arrow_neg_eq' : forall n (p : prog) (A A' : vType n),
+    p :' A → A' <-> p :' -A → -A'.
+Proof. intros n p A A'. split; intros;
+    [apply arrow_scale | apply arrow_scale with (c := Copp C1) in H];
+    try rewrite 2 neg_inv in H;
+    try assumption;
+    try apply C0_fst_neq; simpl; lra.
+Qed.
+
+
+
+(* basically just eq_type_conv_output but with different order hypotheses *)
+Lemma eq_arrow_r : forall {n} (g : prog) (A B B' : vType n),
+    g :' A → B ->
+       B = B' ->
+       g :' A → B'.
+Proof. intros. subst; easy. Qed.
+
+(*
+Hint Resolve arrow_mul arrow_mul_1 arrow_scale arrow_scale_eq arrow_scale_eq' arrow_i arrow_neg arrow_neg_eq arrow_neg_eq' eq_arrow_r : typing_db.
+ *)
+Hint Resolve arrow_scale arrow_scale_eq arrow_scale_eq' arrow_i arrow_neg arrow_neg_eq arrow_neg_eq' eq_arrow_r : typing_db.
+Hint Rewrite mul_simp arrow_scale_eq' arrow_neg_eq : typing_db.
+
+
+
+
+
+
+
+
+
 
 Notation Tdagger' n := (Z'' n ;; S' n ;; T' n).
 
+
+(* Tdagger should be solvable by eauto *)
 Lemma TdaggerTypes : Tdagger' 0 :' (Z → Z) ∩ (X → ((1/√2) .· (X.+ -Y))).
-Proof. apply cap_intro.
-       - eapply SeqTypes with (B:= Z).
-         + solve_ground_type.
-         + eapply SeqTypes with (B:=Z).
-           * solve_ground_type.
-           * solve_ground_type.
-       - eapply SeqTypes with (B:= -X).
-         + solve_ground_type.
-         + eapply SeqTypes with (B:=-Y).
-           * solve_ground_type.
-           * solve_ground_type.
+Proof. constructor;
+         repeat eapply SeqTypes;
+         eauto with typing_db;
+         autorewrite with typing_db;
+         eauto with typing_db.
 Qed.
 
+Hint Rewrite neg_inv neg_dist_add i_sqr i_neg_comm : typing_db.
+
+
+
+
+(** 
+Notation Tdagger'' n := (Z''' n ;;; S'' n ;;; T'' n).
+
+Locate "⨶".
+Print Tensor.
+Locate ":''".
+Print progHasType'.
+Print tensor.
+
+
+
+Lemma cap_vt_tensor_l : forall {n m} (a : ArithPauli n) (A : vType m), Cap_vt A -> Cap_vt (tensor_l (G a) A).
+Proof. intros n m a A H. induction A; simpl.
+       - constructor.
+       - constructor; inversion H; subst.
+         + apply IHA1 in H2. assumption.
+         + apply IHA2 in H3. assumption.
+       - inversion H.
+       - inversion H.
+Qed.
+
+
+Lemma cap_vt_tensor_r : forall {n m} (a : ArithPauli n) (A : vType m), Cap_vt A -> Cap_vt (tensor_r A (G a)).
+Proof. intros n m a A H. induction A; simpl.
+       - constructor.
+       - constructor; inversion H; subst.
+         + apply IHA1 in H2. assumption.
+         + apply IHA2 in H3. assumption.
+       - inversion H.
+       - inversion H.
+Qed.
+       
+
+
+Lemma prog_i_l : forall {n} (c : prog') (A B : vType n), (PG c) :'' A → B ->  (I ⨶ c) :'' (I .⊗ A → I .⊗ B).
+Proof. intros n c A B H.
+       do 2 constructor; try constructor; inversion H; inversion H2; inversion H4; subst.
+       4:{ simpl. easy. }
+       - destruct A; simpl in *.
+         + constructor.
+         + constructor; inversion H5; subst.
+           * apply (@cap_vt_tensor_l 1 n ([(C1, [gI])]) A1 H3).
+           * apply (@cap_vt_tensor_l 1 n ([(C1, [gI])]) A2 H4).
+         + inversion H5.
+         + inversion H5.
+       - destruct B; simpl in *.
+         + constructor.
+         + constructor; inversion H6; subst.
+           * apply (@cap_vt_tensor_l 1 n ([(C1, [gI])]) B1 H3).
+           * apply (@cap_vt_tensor_l 1 n ([(C1, [gI])]) B2 H4).
+         + inversion H6.
+         + inversion H6.
+       - inversion H7. unfold singGateType' in *.  intros v c0 H3. simpl in H0. simpl in H3.
+         Admitted.
+           
+       
+
+
+Lemma TdaggerTypes' :  PG (Tdagger'' 1) :'' (I .⊗ Z → I .⊗ Z) ∩ (I .⊗ X → I .⊗ ((1/√2) .· (X.+ -Y))).
+Proof.
+  (*
+  repeat constructor.
+  solve_ground_type.
+  solve_ground_type.
+   *)
+  
+  repeat eapply SeqTypes;
+         eauto with typing_db;
+         autorewrite with typing_db;
+         eauto with typing_db.
+Admitted.
+
+
+Lemma TdaggerTypes'' :  (I ⨶ Tdagger'' 0) :'' (I .⊗ Z → I .⊗ Z) ∩ (I .⊗ X → I .⊗ ((1/√2) .· (X.+ -Y))).
+Proof. constructor.
+       - constructor. constructor.
+         repeat eapply SeqTypes;
+         eauto with typing_db;
+         autorewrite with typing_db;
+         eauto with typing_db.
+Admitted.
+**)
+
+
+
+
+
+
 Notation Toffoli' a b c := (H' c ;; CNOT' b c ;; Tdagger' c ;; CNOT' a c ;; T' c ;; CNOT' b c ;; Tdagger' c ;; CNOT' a c ;; T' b ;; T' c ;; H' c ;; CNOT' a b ;; T' a ;; Tdagger' b ;; CNOT' a b).
+
+
+
+(*** toffoli ***)
+(*
+Lemma ToffoliTypes : Toffoli' 0 1 2 :' (Z .⊗ I .⊗ I → Z .⊗ I .⊗ I).
+Proof. 
+  eapply SeqTypes with (B:=Z .⊗ I .⊗ I). solve_ground_type.
+  eapply SeqTypes with (B:=Z .⊗ I .⊗ I). solve_ground_type.
+  eapply SeqTypes with (B:=Z .⊗ I .⊗ I).
+  eapply SeqTypes with (B:=Z .⊗ I .⊗ I). solve_ground_type.
+  eapply SeqTypes with (B:=Z .⊗ I .⊗ I). solve_ground_type.
+  solve_ground_type.
+  eapply SeqTypes with (B:=Z .⊗ I .⊗ I). solve_ground_type.
+  eapply SeqTypes with (B:=Z .⊗ I .⊗ I). solve_ground_type.
+  eapply SeqTypes with (B:=Z .⊗ I .⊗ I). solve_ground_type.
+  eapply SeqTypes with (B:=Z .⊗ I .⊗ I).
+  eapply SeqTypes with (B:=Z .⊗ I .⊗ I). solve_ground_type.
+  eapply SeqTypes with (B:=Z .⊗ I .⊗ I). solve_ground_type.
+  solve_ground_type.
+  eapply SeqTypes with (B:=Z .⊗ I .⊗ I). solve_ground_type.
+  eapply SeqTypes with (B:=Z .⊗ I .⊗ I). solve_ground_type.
+  eapply SeqTypes with (B:=Z .⊗ I .⊗ I). solve_ground_type.
+  eapply SeqTypes with (B:=Z .⊗ I .⊗ I). solve_ground_type.
+  eapply SeqTypes with (B:=Z .⊗ I .⊗ I). solve_ground_type.
+  eapply SeqTypes with (B:=Z .⊗ I .⊗ I). solve_ground_type.
+  eapply SeqTypes with (B:=Z .⊗ I .⊗ I).
+  eapply SeqTypes with (B:=Z .⊗ I .⊗ I). solve_ground_type.
+  eapply SeqTypes with (B:=Z .⊗ I .⊗ I). solve_ground_type.
+  solve_ground_type.
+  solve_ground_type.
+Qed.
+*)
 
 (*
 Lemma ToffoliTypes' : Toffoli' 0 1 2 :' (I .⊗ I .⊗ Z → 1/2 .· (I .⊗ I .⊗ Z .+ Z .⊗ I .⊗ Z .+ I .⊗ Z .⊗ Z .+ Z .⊗ Z .⊗ -Z)).
@@ -2291,7 +3676,7 @@ Qed.
 *)
 
 
-
+(*
 Lemma ToffoliTypes : Toffoli' 0 1 2 :' (Z .⊗ I .⊗ I → Z .⊗ I .⊗ I) ∩ (I .⊗ Z .⊗ I → I .⊗ Z .⊗ I ) ∩ (I .⊗ I .⊗ X → I .⊗ I .⊗ X ) ∩ (I .⊗ I .⊗ Z → 1/2 .· (I .⊗ I .⊗ Z .+ Z .⊗ I .⊗ Z .+ I .⊗ Z .⊗ Z .+ Z .⊗ Z .⊗ -Z)).
 Proof. repeat apply cap_intro.
        - eapply SeqTypes with (B:=Z .⊗ I .⊗ I). solve_ground_type.
@@ -2391,7 +3776,7 @@ Proof. repeat apply cap_intro.
          solve_ground_type.
          solve_ground_type. (* 12m 33s / 19m 14s *)
 Qed. (* 03m 47s / 23m 01s *)
-
+*)
 
 
 
@@ -2408,6 +3793,8 @@ Notation s := Datatypes.S.
 Definition smpl_prog_H (p : nat -> prog) : Prop := 
   (forall (n : nat), p n = H' n).
 
+Definition smpl_prog_I (p : nat -> prog) : Prop := 
+  (forall (n : nat), p n = I'' n).
 Definition smpl_prog_X (p : nat -> prog) : Prop := 
   (forall (n : nat), p n = X'' n).
 Definition smpl_prog_Y (p : nat -> prog) : Prop := 
@@ -2422,7 +3809,7 @@ Definition smpl_prog_T (p : nat -> prog) : Prop :=
   (forall (n : nat), p n = T' n).
         
 Definition smpl_prog (p : nat -> prog) : Prop := 
-  smpl_prog_H p \/ smpl_prog_X p \/ smpl_prog_Y p \/ smpl_prog_Z p \/ smpl_prog_S p \/ smpl_prog_T p.
+  smpl_prog_H p \/ smpl_prog_I p \/ smpl_prog_X p \/ smpl_prog_Y p \/ smpl_prog_Z p \/ smpl_prog_S p \/ smpl_prog_T p.
 
 
 Definition ctrl_prog (p : prog) : Prop :=
@@ -2432,13 +3819,14 @@ Definition ctrl_prog (p : prog) : Prop :=
   end.
 
 Lemma smpl_prog_H_ver : smpl_prog H'. Proof. repeat (try (try left; easy); right). Qed.
+Lemma smpl_prog_I_ver : smpl_prog I''. Proof. repeat (try (try left; easy); right). Qed.
 Lemma smpl_prog_X_ver : smpl_prog X''. Proof. repeat (try (try left; easy); right). Qed.
 Lemma smpl_prog_Y_ver : smpl_prog Y''. Proof. repeat (try (try left; easy); right). Qed.
 Lemma smpl_prog_Z_ver : smpl_prog Z''. Proof. repeat (try (try left; easy); right). Qed.
 Lemma smpl_prog_S_ver : smpl_prog S'. Proof. repeat (try (try left; easy); right). Qed.
 Lemma smpl_prog_T_ver : smpl_prog T'. Proof. repeat (try (try left; easy); right). Qed.
 
-Hint Resolve smpl_prog_H_ver smpl_prog_X_ver smpl_prog_Y_ver smpl_prog_Z_ver smpl_prog_S_ver smpl_prog_T_ver : wfvt_db.
+Hint Resolve smpl_prog_H_ver smpl_prog_I_ver smpl_prog_X_ver smpl_prog_Y_ver smpl_prog_Z_ver smpl_prog_S_ver smpl_prog_T_ver : wfvt_db.
 
 
 Lemma prog_smpl_inc_reduce : forall (p : nat -> prog) (prg_len bit : nat),
@@ -2446,7 +3834,7 @@ Lemma prog_smpl_inc_reduce : forall (p : nat -> prog) (prg_len bit : nat),
   translate_prog prg_len (p bit) = 
   (Matrix.I (2^bit)) ⊗ translate_prog 1 (p 0) ⊗ (Matrix.I (2^(prg_len - bit - 1))).
 Proof. intros.    
-       destruct H; [ | destruct H; [ | destruct H; [ | destruct H; [ | destruct H]]]];
+       destruct H; [ | destruct H; [ | destruct H; [ | destruct H; [ | destruct H; [ | destruct H]]]]];
          do 2 (rewrite H); 
          simpl;
          unfold prog_smpl_app;
@@ -2511,15 +3899,72 @@ Lemma kron_simplify : forall (n m o p : nat) (a b : Matrix n m) (c d : Matrix o 
     a = b -> c = d -> a ⊗ c = b ⊗ d.
 Proof. Admitted.
 
-
+(** original 
 Lemma tensor_smpl_ground : forall (prg_len bit : nat) (p : nat -> prog)
                              (l : list Pauli) (a : Pauli) (c1 c2 : Coef),
-    (c2 * c2 ^*)%C = C1 ->
+(*    (c2 * c2 ^* )%C = C1 -> *)
     smpl_prog p -> bit < prg_len ->
     prg_len = length l -> 
     (p 0) :' @G 1 ([(C1, [nth bit l gI])]) → @G 1 ([(c2, [a])])  -> 
     (p bit) :'  @G prg_len ([(c1, l)]) → @G prg_len ([((c1*c2)%C, switch l a bit)]).
-Proof. intros. 
+Proof. intros prg_len bit p l a c1 c2 H H0 H1 H2. 
+       inversion H2; inversion H5; subst.
+       apply Arrow_pht; apply PHST; try apply G_cvt.
+       simpl in *. destruct H9; split; try easy. 
+       apply sgt_implies_sgt'; try easy. 
+       apply sgt'_implies_sgt in H1; try easy. 
+       unfold singGateType in *; intros; simpl in *.
+       destruct H4; destruct H6; try easy. 
+       rewrite <- H4, <- H6.
+       unfold translateA in *; simpl in *.
+       rewrite ! Mplus_0_l in *.
+       unfold translate in *; simpl in *.  
+       rewrite (nth_inc bit l gI); auto.
+       repeat rewrite map_app.  
+       rewrite <- (nth_inc bit l gI); auto. 
+       rewrite switch_inc; auto.
+       repeat rewrite map_app.
+       repeat rewrite big_kron_app; try (intros; apply WF_helper).
+       repeat rewrite app_length.
+       repeat rewrite map_length.
+       rewrite firstn_length_le, skipn_length; try lia.
+       do 4 rewrite Nat.pow_add_r.
+       do 2 rewrite <- Mscale_kron_dist_r, <- Mscale_kron_dist_l. 
+       rewrite prog_smpl_inc_reduce; auto.
+       rewrite kron_assoc; auto with wf_db.
+       replace (length l - bit - 1) with (length l - s bit) by lia. 
+       repeat rewrite (kron_mixed_product' _ _ _ _ _ _ _ _ (2 ^ (length l))); 
+         try (simpl; lia).         
+       apply kron_simplify.
+       rewrite Mmult_1_l, Mmult_1_r; try easy; try apply WF_helper2.
+       all : try (apply firstn_length_le; lia).
+       repeat rewrite (kron_mixed_product' _ _ _ _ _ _ _ _ ((2^1) * (2^(length l - s bit)))); 
+         try (simpl; lia).  
+       apply kron_simplify. simpl. 
+       rewrite Mscale_mult_dist_r, (H1 _  (c2 .* (translate_P a ⊗ Matrix.I 1))%M).
+       rewrite Mscale_mult_dist_l, Mscale_assoc, Mscale_mult_dist_l; easy.
+       all : try (left; try rewrite Mscale_1_l; easy).
+       assert (H' := (WF_big_kron _ _ (map translate_P (skipn (s bit) l)))).
+       rewrite map_length, skipn_length in H'; try lia. 
+       rewrite Mmult_1_l, Mmult_1_r; try easy.
+       all : try apply (H' Zero); intros. 
+       all : try apply WF_helper.
+       all : try (simpl length; do 2 rewrite <- Nat.pow_add_r; apply pow_components; lia).  
+       apply unit_prog. 
+       all : try (rewrite <- map_app; apply WF_helper). 
+       rewrite <- (Nat.pow_1_r 2); apply unit_prog.
+       simpl; split; unfold translateA; simpl; rewrite Mplus_0_l; apply (@univ_TType 1); simpl; try easy; try constructor; try lca.
+Qed.
+*)
+
+Lemma tensor_smpl_ground : forall (prg_len bit : nat) (p : nat -> prog)
+                             (l : list Pauli) (a : Pauli) (c1 c2 : Coef),
+    (c2 * c2 ^* )%C = C1 -> 
+    smpl_prog p -> bit < prg_len ->
+    prg_len = length l -> 
+    (p 0) :' @G 1 ([(C1, [nth bit l gI])]) → @G 1 ([(c2, [a])])  -> 
+    (p bit) :'  @G prg_len ([(c1, l)]) → @G prg_len ([((c1*c2)%C, switch l a bit)]).
+Proof. intros prg_len bit p l a c1 c2 H H0 H1 H2 H3. 
        inversion H3; inversion H6; subst.
        apply Arrow_pht; apply PHST; try apply G_cvt.
        simpl in *. destruct H10; split; try easy. 
@@ -2573,7 +4018,7 @@ Qed.
 
 Lemma tensor_ctrl_zero : forall (l : list Pauli) (prg_len targ : nat)
                            (a b : Pauli) (c1 c2 : Coef),
-    (c2 * c2 ^*)%C = C1 ->
+    (c2 * c2 ^* )%C = C1 ->
     targ < prg_len -> 0 <> targ -> 
     prg_len = length l -> 
     (CNOT' 0 1) :' @G 2 ([(C1, (nth 0 l gI) :: [nth targ l gI])]) → @G 2 ([(c2, a :: [b])])  ->
@@ -2636,7 +4081,7 @@ Proof. intros. destruct targ; try easy.
       distribute_scale.
       rewrite (H2 _ ( c2 .* (translate_P a ⊗ (translate_P b ⊗ Matrix.I 1)))%M); 
         try left; try easy. 
-      rewrite kron_1_r, Mscale_mult_dist_l, Mscale_assoc.
+      rewrite ! kron_1_r, Mscale_mult_dist_l, Mscale_assoc.
       distribute_scale; easy.
       rewrite kron_1_r, Mscale_1_l; easy. 
       all : try apply WF_kron; try lia. 
@@ -2648,22 +4093,9 @@ Proof. intros. destruct targ; try easy.
       rewrite adj_ctrlX_is_cnot1; auto with unit_db.
       simpl; split; unfold translateA; simpl; rewrite Mplus_0_l; apply (@univ_TType 2); simpl; try constructor; try easy; try lca. 
 Qed.
-(*
-    (CNOT' 0 1) :' @G 2 ([(C1, (nth ctrl l gI) :: [nth 0 l gI])]) → @G 2 ([(c2, a :: [b])])  ->
-    (CNOT' ctrl 0) :'  @G prg_len ([(c1, l)]) → 
-                         @G prg_len ([((c1*c2)%C, switch (switch l a ctrl) b 0)]).
 
 
-    (CNOT' 0 1) :' @G 2 ([(C1, (nth ctrl l gI) :: [nth targ l gI])]) → @G 2 ([(c2, a :: [b])])  ->
-    (CNOT' ctrl targ) :'  @G prg_len ([(c1, l)]) → 
-                         @G prg_len ([((c1*c2)%C, switch (switch l a ctrl) b targ)]).
-
-
-    (CNOT' 1 0) :' @G 2 ([(C1, (nth 0 l gI) :: [nth ctrl l gI])]) → @G 2 ([(c2, a :: [b])])  ->
-    (CNOT' ctrl 0) :'  @G prg_len ([(c1, l)]) → 
-                         @G prg_len ([((c1*c2)%C, switch (switch l b ctrl) a 0)]).
- *)
-
+(** original
 Lemma tensor_targ_zero : forall (l : list Pauli) (prg_len ctrl : nat)
                              (a b : Pauli) (c1 c2 : Coef),
     (c2 * c2 ^* )%C = C1 ->
@@ -2724,13 +4156,13 @@ Proof. intros. destruct ctrl; try easy.
       rewrite adj_ctrlX_is_cnot1 in H2.
       simpl; rewrite Nat.add_0_r, double_mult, Nat.sub_0_r, kron_1_r.
       rewrite Nat.add_0_r, double_mult.
-      replace (2 * (2 * 2^ctrl)) with (2 * 2^ctrl * 2) by lia. 
+      replace (2 * (2 * 2^ctrl)) with (2 * 2^ctrl * 2) by lia.
       apply notc_conv_inc; auto with wf_db.
       all : try (apply WF_helper2; apply firstn_length_le; lia).
       distribute_scale.
       rewrite (H2 _ (c2 .* (translate_P a ⊗ (translate_P b ⊗ Matrix.I 1)))%M); 
         try left; try easy. 
-      rewrite kron_1_r,  Mscale_mult_dist_l, Mscale_assoc.
+      rewrite ! kron_1_r,  Mscale_mult_dist_l, Mscale_assoc.
       distribute_scale; easy.
       rewrite kron_1_r, Mscale_1_l. easy. 
       all : try apply WF_kron; try lia. 
@@ -2741,9 +4173,95 @@ Proof. intros. destruct ctrl; try easy.
       all : intros; try (rewrite <- map_app; apply WF_helper). 
       rewrite adj_ctrlX_is_notc1; auto with unit_db.
       simpl; split; unfold translateA; simpl; rewrite Mplus_0_l; apply (@univ_TType 2); try constructor; simpl; try lca; easy. 
+Qed. 
+*)
+
+
+Lemma tensor_targ_zero : forall (l : list Pauli) (prg_len ctrl : nat)
+                             (a b : Pauli) (c1 c2 : Coef),
+    (c2 * c2 ^* )%C = C1 ->
+    ctrl < prg_len -> ctrl <> 0 -> 
+    prg_len = length l -> 
+    (CNOT' 1 0) :' @G 2 ([(C1, (nth 0 l gI) :: [nth ctrl l gI])]) → @G 2 ([(c2, a :: [b])])  ->
+    (CNOT' ctrl 0) :'  @G prg_len ([(c1, l)]) → 
+                         @G prg_len ([((c1*c2)%C, switch (switch l b ctrl) a 0)]).
+Proof. intros. destruct ctrl; try easy.
+       inversion H3; inversion H6; subst. 
+       apply Arrow_pht; apply PHST; try apply G_cvt.
+       destruct l; try easy.
+       simpl in *. destruct H10; split; try easy.
+       apply sgt_implies_sgt'; try easy. 
+       apply sgt'_implies_sgt in H2; try easy. 
+       unfold singGateType in *; intros; simpl in *.
+       destruct H5; destruct H7; try easy. 
+       rewrite <- H5, <- H7.
+       unfold translateA in *; simpl in *.
+       rewrite ! Mplus_0_l in *.
+       unfold translate in *; simpl in *. 
+       bdestruct (ctrl <? length l); try lia. 
+       rewrite (nth_inc ctrl l gI); auto.
+       repeat rewrite map_app.  
+       rewrite <- (nth_inc ctrl l gI); auto.
+       rewrite switch_inc; auto.
+       repeat rewrite map_app.
+       repeat rewrite big_kron_app; try (intros; apply WF_helper).
+       repeat rewrite app_length.
+       repeat rewrite map_length.
+       rewrite firstn_length_le, skipn_length; try lia.
+       do 4 rewrite Nat.pow_add_r.
+       do 3 rewrite Nat.add_0_r, double_mult. 
+       do 2 rewrite <- Mscale_kron_dist_l.
+       unfold prog_ctrl_app; bdestruct_all; rewrite ite_conv.
+       rewrite Nat.pow_0_r, mult_1_l, kron_1_l; auto with wf_db.
+       repeat rewrite <- kron_assoc. 
+       replace (length (cons (nth ctrl l gI) nil)) with 1 by easy. 
+       replace (length (cons b nil)) with 1 by easy. 
+       replace (s (length l) - s ctrl - 1) with (length l - s ctrl) by lia. 
+       rewrite Nat.pow_1_r. 
+       assert (H' : ((2 * 2^ctrl) * 2) = (2 * 2 ^ (S ctrl - 0))). 
+       { rewrite <- (Nat.pow_1_r 2).
+         repeat rewrite <- Nat.pow_add_r.
+         rewrite (Nat.pow_1_r 2).
+         apply pow_components; try lia. } 
+       rewrite H'. 
+       assert (H'' : 2 * 2^(length l) = 
+                   ((2 * 2^(s ctrl - 0))) * (2 ^ ((length l) - s ctrl))).
+      { replace 2 with (2^1) by easy.
+        repeat rewrite <- Nat.pow_add_r.
+        apply pow_components; try lia. } 
+      rewrite H''.
+      rewrite (mult_comm 2 _).
+      do 2 rewrite (kron_mixed_product).
+      rewrite Mmult_1_l, Mmult_1_r. 
+      apply kron_simplify; try easy.
+      
+      rewrite adj_ctrlX_is_notc1 in H2.
+      simpl; rewrite Nat.add_0_r, double_mult, Nat.sub_0_r, kron_1_r.
+      rewrite Nat.add_0_r, double_mult.
+      replace (2 * (2 * 2^ctrl)) with (2 * 2^ctrl * 2) by lia.
+      apply notc_conv_inc; auto with wf_db.
+      all : try (apply WF_helper2; apply firstn_length_le; lia).
+      distribute_scale.
+      rewrite (H2 _ (c2 .* (translate_P a ⊗ (translate_P b ⊗ Matrix.I 1)))%M); 
+        try left; try easy. 
+      rewrite ! kron_1_r,  Mscale_mult_dist_l, Mscale_assoc.
+      
+      distribute_scale; easy.
+
+      rewrite kron_1_r, Mscale_1_l. easy. 
+      all : try apply WF_kron; try lia. 
+      all : try (apply WF_helper2); try easy. 
+      all : try apply skipn_length.
+      all : try apply WF_kron; try lia; auto with wf_db. 
+      all : try (apply firstn_length_le; lia).
+      all : intros; try (rewrite <- map_app; apply WF_helper). 
+      rewrite adj_ctrlX_is_notc1; auto with unit_db.
+      simpl; split; unfold translateA; simpl; rewrite Mplus_0_l; apply (@univ_TType 2); try constructor; simpl; try lca; easy. 
 Qed.
-(* *)
-(*
+
+
+
+(** original
 Lemma tensor_ctrl_reduce : forall (l1 l2 : list Pauli) (prg_len ctrl targ : nat)
                                   (a : Pauli) (c1 c2 : Coef),
   (c1 * c1 ^* )%C = C1 -> (c2 * c2 ^* )%C = C1 ->
@@ -2804,6 +4322,622 @@ Proof. intros.
 Qed.  
 
 
+
+
+
+
+
+
+
+
+
+(** B invertible -> 
+     A * B = C * B -> A = C ***)
+Lemma Minvert_r {n : nat} (A B C : Square n) :
+  WF_Matrix A -> WF_Matrix C ->
+  invertible B -> A × B = C × B ->  A = C.
+Proof. intros WFA WFC H H0.
+       destruct H as [B' H']. inversion H'.
+       assert ( A × B × B' = C × B × B' ).
+       { rewrite H0. easy. }
+       rewrite ! Mmult_assoc in H2.
+       rewrite ! H in H2.
+       rewrite ! Mmult_1_r in H2; assumption.
+Qed.
+    
+(** B invertible -> A * B = B -> A = Id ***) (* results from the above *)
+
+
+(** unitary -> invertible ***) (* obvious *)
+
+
+Lemma Mmult_r {n : nat} (A B C : Square n) :
+  WF_Matrix A -> WF_Matrix C ->
+  WF_Matrix B -> A = C -> A × B = C × B.
+Proof. intros H H0 H1 H2. rewrite H2. reflexivity. Qed. 
+
+(*** A ⊗ B = C ⊗ D -> A = c1 * C & B = c2 * D & c1*c2 = 1 ***)
+
+(** Proof :
+  Let A, C have the same w × x dimensions and B, D have the same y × z dimensions.
+  Let A, B, C, D be nonzero matrices.
+  
+  Then there exists some nonzero elements a_{i,j}, b_{k,l} in A, B respectively.
+  Consider the (y(i-1)+k, w(j-1)+l) th element in A ⊗ B which is a nonzero element 
+               a_{i,j} * b_{k,l}.
+  Now consider the (y(i-1)+k, w(j-1)+l) th element in C ⊗ D = A ⊗ B which must be a 
+               nonzero element c_{i,j} * d_{k,l} = a_{i,j} * b_{k,l}.           --------------------------- (1)
+  Both c_{i,j} and d_{k,l} are nonzero.
+
+  From A ⊗ B = C ⊗ D, we have a_{p,q} * b_{r,s} = c_{p,q} * d_{r,s}   
+               for any 1 <= p <= w, 1 <= q <= x, 1 <= r <= y, and 1 <= s <= z.    ---------------- (2)
+
+  Consider the matrix A * b_{k,l} and C * d_{k,l}. 
+  For an arbitrary p, q, since the (p,q) th element of both matrices are 
+               a_{p,q} * b_{k,l} and c_{p,q} * d_{k,l} respectively, 
+               by (2), we have A * b_{k,l} = C * d_{k,l}.               -------------------------------------- (3)
+
+  Now consider the matrix a_{i,j} * B and c_{i,j} * D. 
+  For an arbitrary p, q, since the (p,q) th element of both matrices are 
+               a_{i,j} * b_{p,q} and c_{i,j} * d_{p,q} respectively, 
+               by (2), we have a_{i,j} * B = c_{i,j} * D.                  -------------------------------------- (4)
+
+   From (1), let β = d_{k,l} / b_{k,l} = a_{i,j} / c_{i,j}.
+
+   Then from (3), A = C * d_{k.l} / b_{k,l} = C * β,
+   and from (4), B = D * c_{i,j} / a_{i,j} = D * (1/β).
+QED.
+ **)
+
+Lemma Cmult_r (a b c : C) : a = b -> (a * c = b * c)%C.
+Proof. intros H. rewrite H. easy. Qed.
+
+Lemma Cmult_l (a b c : C) : a = b -> (c * a = c * b)%C.
+Proof. intros H. rewrite H. easy. Qed.
+
+(*** Rename test0 ***)
+Lemma test0 {n m o p : nat} (A D : Matrix n m) (B E : Matrix o p) (* c1 c2 : C *) :
+  WF_Matrix A -> WF_Matrix B -> WF_Matrix D -> WF_Matrix E ->
+  A ⊗ B <> Zero ->
+  A ⊗ B = D ⊗ E -> exists c1 c2, A = (c1 .* D)%M /\ B = (c2 .* E)%M /\ (c1 * c2)%C = C1.
+Proof.
+  intros WFA WFB WFD WFE H G. 
+  Search (?f = ?g -> ?f _ = ?g _).
+  Search Coq.Logic.ClassicalFacts.excluded_middle.
+  assert (A0 : A <> Zero).
+  { intro H0. rewrite H0 in H. rewrite kron_0_l in H. contradiction. }
+  assert (A1 :  ~ A == Zero ).
+  { intro H0. apply mat_equiv_eq in H0. contradiction. assumption. auto with wf_db. }
+  assert (A2 : exists i j, i < n /\ j < m /\ A i j <> C0).
+  { unfold mat_equiv in A1. Print Logic. Search (~ forall x, _ ).
+    (*** classical logic used.
+         is this ok? ***)
+    apply Classical_Pred_Type.not_all_ex_not in A1.
+    destruct A1 as [i A1].
+    apply Classical_Pred_Type.not_all_ex_not in A1.
+    destruct A1 as [j A1].
+    exists i, j.
+    Search (~ (?P -> ?Q) -> (?P /\ ~ ?Q)).
+    apply Classical_Prop.imply_to_and in A1.
+    destruct A1 as [A1 A2].
+    split. assumption.
+    apply Classical_Prop.imply_to_and in A2.
+    destruct A2 as [A2 A3].
+    split. assumption.
+    assumption.}
+  assert (B0 : B <> Zero).
+  { intro H0. rewrite H0 in H. rewrite kron_0_r in H. contradiction. }
+  assert (B1 : ~ B == Zero ).
+  { intro H0. apply mat_equiv_eq in H0. contradiction. assumption. auto with wf_db. }
+  assert (B2 : exists i j, i < o /\ j < p /\ B i j <> C0).
+  { unfold mat_equiv in B1. Print Logic. Search (~ forall x, _ ).
+    (*** classical logic used.
+         is this ok? ***)
+    apply Classical_Pred_Type.not_all_ex_not in B1.
+    destruct B1 as [k B1].
+    apply Classical_Pred_Type.not_all_ex_not in B1.
+    destruct B1 as [l B1].
+    exists k, l.
+    Search (~ (?P -> ?Q) -> (?P /\ ~ ?Q)).
+    apply Classical_Prop.imply_to_and in B1.
+    destruct B1 as [B1 B2].
+    split. assumption.
+    apply Classical_Prop.imply_to_and in B2.
+    destruct B2 as [B2 B3].
+    split. assumption.
+    assumption.}
+
+  destruct A2 as [i [j [A2 [A3 A4]]]].
+  destruct B2 as [k [l [B2 [B3 B4]]]].
+
+  remember G as G0. clear HeqG0.
+  
+  unfold kron in G0.
+  apply f_equal_inv with (x := o * i + k) in G0.
+  apply f_equal_inv with (x := p * j + l) in G0.
+  assert (R1: (o * i + k) / o = i). { rewrite Nat.mul_comm. rewrite Nat.div_add_l. rewrite Nat.div_small. rewrite Nat.add_0_r. reflexivity. assumption. lia. }
+  assert (R2: (p * j + l) / p = j). { rewrite Nat.mul_comm. rewrite Nat.div_add_l. rewrite Nat.div_small. rewrite Nat.add_0_r. reflexivity. assumption. lia. }
+  assert (R3: (o * i + k) mod o = k). { rewrite Nat.add_comm. rewrite Nat.mul_comm. rewrite Nat.mod_add. rewrite Nat.mod_small. reflexivity. assumption. lia. }
+  assert (R4: (p * j + l) mod p = l). { rewrite Nat.add_comm. rewrite Nat.mul_comm. rewrite Nat.mod_add. rewrite Nat.mod_small. reflexivity. assumption. lia. }
+
+
+  rewrite R1, R2, R3, R4 in G0.
+
+  assert (H0 : (A i j * B k l)%C <> C0). { apply Cmult_neq_0; assumption. }
+
+  assert (H1 : (D i j * E k l)%C <> C0). { rewrite G0 in H0. assumption. }
+  assert (H2 : A i j <> C0). { intro H2. rewrite H2 in H0. rewrite Cmult_0_l in H0. contradiction. }
+  assert (H3 : B k l <> C0). { intro H3. rewrite H3 in H0. rewrite Cmult_0_r in H0. contradiction. }
+  assert (H4 : D i j <> C0). { intro H4. rewrite H4 in H1. rewrite Cmult_0_l in H1. contradiction. }
+  assert (H5 : E k l <> C0). {intro H5. rewrite H5 in H1. rewrite Cmult_0_r in H1. contradiction. }
+
+  assert (G1 : forall w x y z : nat, w < n -> x < m -> y < o -> z < p -> (A w x * B y z = D w x * E y z)%C). { intros w x y z G1 G2 G3 G4. remember G as G5. clear HeqG5. unfold kron in G5.
+  apply f_equal_inv with (x := o * w + y) in G5. apply f_equal_inv with (x := p * x + z) in G5.
+  assert (R1': (o * w + y) / o = w). { rewrite Nat.mul_comm. rewrite Nat.div_add_l. rewrite Nat.div_small. rewrite Nat.add_0_r. reflexivity. assumption. lia. }
+  assert (R2': (p * x + z) / p = x). { rewrite Nat.mul_comm. rewrite Nat.div_add_l. rewrite Nat.div_small. rewrite Nat.add_0_r. reflexivity. assumption. lia. }
+  assert (R3': (o * w + y) mod o = y). { rewrite Nat.add_comm. rewrite Nat.mul_comm. rewrite Nat.mod_add. rewrite Nat.mod_small. reflexivity. assumption. lia. }
+  assert (R4': (p * x + z) mod p = z). { rewrite Nat.add_comm. rewrite Nat.mul_comm. rewrite Nat.mod_add. rewrite Nat.mod_small. reflexivity. assumption. lia. }
+  
+  rewrite R1', R2', R3', R4' in G5. assumption. }
+
+  eexists. eexists.
+  split. 
+  - prep_matrix_equality.
+    remember G1 as G2. clear HeqG2.
+  
+    specialize (G2 x y k l ).
+    bdestruct (x <? n).
+    + bdestruct (y <? m).
+      * unfold ".*"%M.
+        specialize (G2 H6 H7 B2 B3). 
+        assert ( A x y = ((E k l) / (B k l)) * D x y )%C.
+        { apply Cmult_r with (c := /(B k l)) in G2.
+          assert ((B k l * / B k l)%C = C1).
+          { apply Cinv_r. assumption. }
+          rewrite <- Cmult_assoc in G2.
+          rewrite H8 in G2.
+          rewrite Cmult_1_r in G2.
+          rewrite <- Cmult_assoc in G2.
+          rewrite Cmult_comm in G2.
+          assumption. }
+        instantiate (1 := (E k l / B k l)%C).
+        assumption.
+      * unfold ".*"%M.
+        unfold WF_Matrix in WFA. 
+        unfold WF_Matrix in WFD.
+        assert (x >= n \/ y >= m). { right. assumption. }
+        specialize (WFA x y H8).
+        specialize (WFD x y H8).
+        rewrite WFA, WFD.
+        lca.
+    + unfold ".*"%M.
+        unfold WF_Matrix in WFA. 
+        unfold WF_Matrix in WFD.
+        assert (x >= n \/ y >= m). { left. assumption. }
+        specialize (WFA x y H7).
+        specialize (WFD x y H7).
+        rewrite WFA, WFD.
+        lca. 
+  - split. 
+    + prep_matrix_equality.
+    remember G1 as G2. clear HeqG2.
+  
+    specialize (G2 i j x y ).
+    bdestruct (x <? o).
+    * bdestruct (y <? p).
+      -- unfold ".*"%M.
+        specialize (G2 A2 A3 H6 H7). 
+        assert ( B x y = ((D i j) / (A i j)) * E x y )%C.
+        setoid_rewrite Cmult_comm in G2.
+        { apply Cmult_r with (c := /(A i j)) in G2.
+          assert ((A i j * / A i j)%C = C1).
+          { apply Cinv_r. assumption. }
+          rewrite <- Cmult_assoc in G2.
+          rewrite H8 in G2.
+          rewrite Cmult_1_r in G2.
+          rewrite <- Cmult_assoc in G2.
+          rewrite Cmult_comm in G2.
+          assumption. }
+        instantiate (1 := (D i j / A i j)%C).
+        assumption.
+      -- unfold ".*"%M.
+         unfold WF_Matrix in WFB. 
+        unfold WF_Matrix in WFE.
+        assert (x >= o \/ y >= p). { right. assumption. }
+        specialize (WFB x y H8).
+        specialize (WFE x y H8).
+        rewrite WFB, WFE.
+        lca.
+    * unfold ".*"%M.
+         unfold WF_Matrix in WFB. 
+        unfold WF_Matrix in WFE.
+        assert (x >= o \/ y >= p). { left. assumption. }
+        specialize (WFB x y H7).
+        specialize (WFE x y H7).
+        rewrite WFB, WFE.
+        lca.
+    + setoid_rewrite Cmult_assoc.
+      apply Cmult_r with (c := /(A i j * B k l)%C) in G0.
+      rewrite Cinv_r in G0.
+      symmetry in G0.
+      rewrite Cinv_mult_distr in G0.
+      rewrite Cmult_assoc in G0.
+      unfold Cdiv.
+      rewrite <- ! Cmult_assoc.
+      assert (/ B k l * (D i j * / A i j) = D i j * (/ A i j * / B k l))%C.
+      {rewrite Cmult_comm.
+       rewrite <- Cmult_assoc.
+       reflexivity. }
+      rewrite H6.
+      rewrite ! Cmult_assoc.
+      assert (E k l * D i j = D i j * E k l)%C.
+      { rewrite Cmult_comm.
+        reflexivity. }
+      rewrite H7.
+      assumption.
+      assumption.
+      assumption.
+      assumption.
+Qed.
+
+
+
+Print Ceq_dec.
+
+Lemma Mat_eq_dec : forall m n (A B : Matrix m n),
+    WF_Matrix A ->
+    WF_Matrix B ->
+    {A = B} + {A <> B}.
+Proof.
+  intros.
+  destruct (mat_equiv_dec A B).
+  - left.
+    apply mat_equiv_eq; easy.
+  - right.
+    intros F.
+    rewrite F in n0.
+    apply n0.
+    apply mat_equiv_refl. 
+Qed.
+
+(*** Rename test00 ***)
+Lemma test00 {n m o p : nat} (A D : Matrix n m) (B E : Matrix o p) :
+  WF_Matrix A -> WF_Matrix B -> WF_Matrix D -> WF_Matrix E ->
+  A ⊗ B = D ⊗ E -> B ⊗ A = E ⊗ D.
+Proof. intros.
+       assert ({A ⊗ B = Zero} + {A ⊗ B <> Zero}). { apply Mat_eq_dec; auto with wf_db. }
+       destruct H4.
+       - assert (A = Zero \/ B = Zero).
+         {
+    (*** classical logic used.
+         is this ok? ***)
+           apply Classical_Prop.NNPP.
+           intro.
+           apply Classical_Prop.not_or_and in H4.
+           destruct H4.
+           assert (A1 : ~ A == Zero ).
+           { intro. apply mat_equiv_eq in H6. contradiction. assumption. auto with wf_db. }
+           assert (B1 : ~ B == Zero ).
+           { intro. apply mat_equiv_eq in H6. contradiction. assumption. auto with wf_db. }
+           
+           assert (A2 : exists i j, i < n /\ j < m /\ A i j <> C0).
+             { unfold mat_equiv in A1. Print Logic. Search (~ forall x, _ ).
+    (*** classical logic used.
+         is this ok? ***)
+    apply Classical_Pred_Type.not_all_ex_not in A1.
+    destruct A1 as [i A1].
+    apply Classical_Pred_Type.not_all_ex_not in A1.
+    destruct A1 as [j A1].
+    exists i, j.
+    Search (~ (?P -> ?Q) -> (?P /\ ~ ?Q)).
+    apply Classical_Prop.imply_to_and in A1.
+    destruct A1 as [A1 A2].
+    split. assumption.
+    apply Classical_Prop.imply_to_and in A2.
+    destruct A2 as [A2 A3].
+    split. assumption.
+    assumption.}
+
+
+  assert (B2 : exists i j, i < o /\ j < p /\ B i j <> C0).
+  { unfold mat_equiv in B1. Print Logic. Search (~ forall x, _ ).
+    (*** classical logic used.
+         is this ok? ***)
+    apply Classical_Pred_Type.not_all_ex_not in B1.
+    destruct B1 as [k B1].
+    apply Classical_Pred_Type.not_all_ex_not in B1.
+    destruct B1 as [l B1].
+    exists k, l.
+    Search (~ (?P -> ?Q) -> (?P /\ ~ ?Q)).
+    apply Classical_Prop.imply_to_and in B1.
+    destruct B1 as [B1 B2].
+    split. assumption.
+    apply Classical_Prop.imply_to_and in B2.
+    destruct B2 as [B2 B3].
+    split. assumption.
+    assumption.}
+
+  destruct A2 as [i [j [A2 [A3 A4]]]].
+  destruct B2 as [k [l [B2 [B3 B4]]]].
+  
+  Print f_equal_inv.
+  unfold kron in H3.
+  apply f_equal_inv with (x := o*i+k) in H3.
+  apply f_equal_inv with (x := p*j+l) in H3.
+
+    assert (R1: (o * i + k) / o = i). { rewrite Nat.mul_comm. rewrite Nat.div_add_l. rewrite Nat.div_small. rewrite Nat.add_0_r. reflexivity. assumption. lia. }
+  assert (R2: (p * j + l) / p = j). { rewrite Nat.mul_comm. rewrite Nat.div_add_l. rewrite Nat.div_small. rewrite Nat.add_0_r. reflexivity. assumption. lia. }
+  assert (R3: (o * i + k) mod o = k). { rewrite Nat.add_comm. rewrite Nat.mul_comm. rewrite Nat.mod_add. rewrite Nat.mod_small. reflexivity. assumption. lia. }
+    assert (R4: (p * j + l) mod p = l). { rewrite Nat.add_comm. rewrite Nat.mul_comm. rewrite Nat.mod_add. rewrite Nat.mod_small. reflexivity. assumption. lia. }
+
+    rewrite R1, R2, R3, R4 in H3.
+
+    assert ((A i j * B k l)%C <> C0).
+    { intro.
+      assert (A i j = C0).
+      { Search "Cmult". apply Cmult_r with (c := /B k l) in H6.
+        rewrite Cmult_0_l in H6.
+        rewrite <- Cmult_assoc in H6.
+        rewrite Cinv_r in H6.
+        rewrite Cmult_1_r in H6.
+        assumption. assumption. }
+      contradiction. }
+
+    unfold kron in e.
+  apply f_equal_inv with (x := o*i+k) in e.
+  apply f_equal_inv with (x := p*j+l) in e.
+  rewrite R1, R2, R3, R4 in e.
+  unfold Zero in e.
+  contradiction. }
+
+                assert (D = Zero \/ E = Zero).
+         {
+    (*** classical logic used.
+         is this ok? ***)
+           apply Classical_Prop.NNPP.
+           intro.
+           apply Classical_Prop.not_or_and in H5.
+           destruct H5.
+           assert (D1 : ~ D == Zero ).
+           { intro. apply mat_equiv_eq in H7. contradiction. assumption. auto with wf_db. }
+           assert (E1 : ~ E == Zero ).
+           { intro. apply mat_equiv_eq in H7. contradiction. assumption. auto with wf_db. }
+           
+           assert (D2 : exists i j, i < n /\ j < m /\ D i j <> C0).
+             { unfold mat_equiv in D1. Print Logic. Search (~ forall x, _ ).
+    (*** classical logic used.
+         is this ok? ***)
+    apply Classical_Pred_Type.not_all_ex_not in D1.
+    destruct D1 as [i D1].
+    apply Classical_Pred_Type.not_all_ex_not in D1.
+    destruct D1 as [j D1].
+    exists i, j.
+    Search (~ (?P -> ?Q) -> (?P /\ ~ ?Q)).
+    apply Classical_Prop.imply_to_and in D1.
+    destruct D1 as [D1 D2].
+    split. assumption.
+    apply Classical_Prop.imply_to_and in D2.
+    destruct D2 as [D2 D3].
+    split. assumption.
+    assumption.}
+
+
+  assert (E2 : exists i j, i < o /\ j < p /\ E i j <> C0).
+  { unfold mat_equiv in E1. Print Logic. Search (~ forall x, _ ).
+    (*** classical logic used.
+         is this ok? ***)
+    apply Classical_Pred_Type.not_all_ex_not in E1.
+    destruct E1 as [k E1].
+    apply Classical_Pred_Type.not_all_ex_not in E1.
+    destruct E1 as [l E1].
+    exists k, l.
+    Search (~ (?P -> ?Q) -> (?P /\ ~ ?Q)).
+    apply Classical_Prop.imply_to_and in E1.
+    destruct E1 as [E1 E2].
+    split. assumption.
+    apply Classical_Prop.imply_to_and in E2.
+    destruct E2 as [E2 E3].
+    split. assumption.
+    assumption.}
+
+  destruct D2 as [i [j [D2 [D3 D4]]]].
+  destruct E2 as [k [l [E2 [E3 E4]]]].
+  
+  Print f_equal_inv.
+  unfold kron in H3.
+  apply f_equal_inv with (x := o*i+k) in H3.
+  apply f_equal_inv with (x := p*j+l) in H3.
+
+    assert (R1: (o * i + k) / o = i). { rewrite Nat.mul_comm. rewrite Nat.div_add_l. rewrite Nat.div_small. rewrite Nat.add_0_r. reflexivity. assumption. lia. }
+  assert (R2: (p * j + l) / p = j). { rewrite Nat.mul_comm. rewrite Nat.div_add_l. rewrite Nat.div_small. rewrite Nat.add_0_r. reflexivity. assumption. lia. }
+  assert (R3: (o * i + k) mod o = k). { rewrite Nat.add_comm. rewrite Nat.mul_comm. rewrite Nat.mod_add. rewrite Nat.mod_small. reflexivity. assumption. lia. }
+    assert (R4: (p * j + l) mod p = l). { rewrite Nat.add_comm. rewrite Nat.mul_comm. rewrite Nat.mod_add. rewrite Nat.mod_small. reflexivity. assumption. lia. }
+
+    rewrite R1, R2, R3, R4 in H3.
+
+    assert ((D i j * E k l)%C <> C0).
+    { intro.
+      assert (D i j = C0).
+      { Search "Cmult". apply Cmult_r with (c := /E k l) in H7.
+        rewrite Cmult_0_l in H7.
+        rewrite <- Cmult_assoc in H7.
+        rewrite Cinv_r in H7.
+        rewrite Cmult_1_r in H7.
+        assumption. assumption. }
+      contradiction. }
+
+    unfold kron in e.
+  apply f_equal_inv with (x := o*i+k) in e.
+  apply f_equal_inv with (x := p*j+l) in e.
+  rewrite R1, R2, R3, R4 in e.
+  unfold Zero in e.
+  rewrite H3 in e.
+  contradiction. }
+
+         destruct H4.
+         + destruct H5.
+           * rewrite H4.
+             rewrite H5.
+             rewrite kron_0_r.
+             rewrite kron_0_r.
+             reflexivity.
+           * rewrite H4.
+             rewrite H5.
+             rewrite kron_0_r.
+             rewrite kron_0_l.
+             reflexivity.
+         + destruct H5.
+           * rewrite H4.
+             rewrite H5.
+             rewrite kron_0_r.
+             rewrite kron_0_l.
+             reflexivity.
+           * rewrite H4.
+             rewrite H5.
+             rewrite kron_0_l.
+             rewrite kron_0_l.
+             reflexivity.
+       - apply test0 in H3; auto.
+       do 2 destruct H3.
+       destruct H3 as [E1 [E2 E3]].
+       rewrite E1, E2.
+       distribute_scale.
+       rewrite Cmult_comm.
+       rewrite E3.
+       rewrite Mscale_1_l.
+       reflexivity.
+Qed.
+
+(*** Rename test000 ***)
+Lemma test000 (p q a b : Pauli) (c : Coef) :
+cnot × (translate_P p ⊗ translate_P q) =
+       (c .* (translate_P a ⊗ translate_P b × cnot))%M
+     -> notc × (translate_P q ⊗ translate_P p) =
+  (c .* (translate_P b ⊗ translate_P a × notc))%M.
+Proof.
+  intros H.
+
+  assert (H1 : cnot × (Matrix.I 2 ⊗ Matrix.I 2) = (Matrix.I 2 ⊗ Matrix.I 2) × cnot). { lma'. }
+  assert (H2 : cnot × (σx ⊗ Matrix.I 2) = (σx  ⊗ σx) × cnot). { lma'. }
+  assert (H3 : cnot × (Matrix.I 2 ⊗ σx) = (Matrix.I 2 ⊗ σx) × cnot). { lma'. }
+  assert (H4 : cnot × (σy ⊗ Matrix.I 2) = (σy ⊗ σx) × cnot). { lma'. }
+  assert (H5 : cnot × (Matrix.I 2 ⊗ σy) = (σz ⊗ σy) × cnot). { lma'. }
+  assert (H6 : cnot × (σz ⊗ Matrix.I 2) = (σz ⊗ Matrix.I 2) × cnot). { lma'. }
+  assert (H7 : cnot × (Matrix.I 2 ⊗ σz) = (σz ⊗ σz) × cnot). { lma'. }
+  assert (H8 : cnot × (σx ⊗ σx) = (σx ⊗ Matrix.I 2) × cnot). { lma'. }
+  assert (H9 : cnot × (σx ⊗ σy) = (σy ⊗ σz) × cnot). { lma'. }
+  assert (H10 : (cnot × (σx ⊗ σz) = (Copp C1) .* (σy ⊗ σy) × cnot)%M). { lma'. }
+  assert (H11 : cnot × (σy ⊗ σx) = (σy ⊗ Matrix.I 2) × cnot). { lma'. }
+  assert (H12 : (cnot × (σy ⊗ σy) = (Copp C1) .* (σx ⊗ σz) × cnot)%M). { lma'. }
+  assert (H13 : cnot × (σy ⊗ σz) = (σx ⊗ σy) × cnot). { lma'. }
+  assert (H14 : cnot × (σz ⊗ σx) = (σz ⊗ σx) × cnot). { lma'. }
+  assert (H15 : cnot × (σz ⊗ σy) = (Matrix.I 2 ⊗ σy) × cnot). { lma'. }
+  assert (H16 : cnot × (σz ⊗ σz) = (Matrix.I 2 ⊗ σz) × cnot). { lma'. }
+  
+  assert (G1 : notc × (Matrix.I 2 ⊗ Matrix.I 2) = (Matrix.I 2 ⊗ Matrix.I 2) × notc). { lma'. }
+  assert (G2 : notc × (Matrix.I 2 ⊗ σx) = (σx  ⊗ σx) × notc). { lma'. }
+  assert (G3 : notc × (σx ⊗ Matrix.I 2) = (σx ⊗ Matrix.I 2) × notc). { lma'. }
+  assert (G4 : notc × (Matrix.I 2 ⊗ σy) = (σx ⊗ σy) × notc). { lma'. }
+  assert (G5 : notc × (σy ⊗ Matrix.I 2) = (σy ⊗ σz) × notc). { lma'. }
+  assert (G6 : notc × (Matrix.I 2 ⊗ σz) = (Matrix.I 2 ⊗ σz) × notc). { lma'. }
+  assert (G7 : notc × (σz ⊗ Matrix.I 2) = (σz ⊗ σz) × notc). { lma'. }
+  assert (G8 : notc × (σx ⊗ σx) = (Matrix.I 2 ⊗ σx) × notc). { lma'. }
+  assert (G9 : notc × (σy ⊗ σx) = (σz ⊗ σy) × notc). { lma'. }
+  assert (G10 : (notc × (σz ⊗ σx) = (Copp C1) .* (σy ⊗ σy) × notc)%M). { lma'. }
+  assert (G11 : notc × (σx ⊗ σy) = (Matrix.I 2 ⊗ σy) × notc). { lma'. }
+  assert (G12 : (notc × (σy ⊗ σy) = (Copp C1) .* (σz ⊗ σx) × notc)%M). { lma'. }
+  assert (G13 : notc × (σz ⊗ σy) = (σy ⊗ σx) × notc). { lma'. }
+  assert (G14 : notc × (σx ⊗ σz) = (σx ⊗ σz) × notc). { lma'. }
+  assert (G15 : notc × (σy ⊗ σz) = (σy ⊗ Matrix.I 2) × notc). { lma'. }
+  assert (G16 : notc × (σz ⊗ σz) = (σz ⊗ Matrix.I 2) × notc). { lma'. }
+
+  destruct p, q; simpl in *;
+
+    (try rewrite G1;
+     try rewrite G2;
+     try rewrite G3;
+     try rewrite G4;
+     try rewrite G5;
+     try rewrite G6;
+     try rewrite G7;
+     try rewrite G8;
+     try rewrite G9;
+     try rewrite G10;
+     try rewrite G11;
+     try rewrite G12;
+     try rewrite G13;
+     try rewrite G14;
+     try rewrite G15;
+     try rewrite G16;
+  rewrite <- Mscale_mult_dist_l;
+  apply Mmult_r; auto with wf_db;
+  
+  try setoid_rewrite H1 in H;
+  try setoid_rewrite H2 in H;
+  try setoid_rewrite H3 in H;
+  try setoid_rewrite H4 in H;
+  try setoid_rewrite H5 in H;
+  try setoid_rewrite H6 in H;
+  try setoid_rewrite H7 in H;
+  try setoid_rewrite H8 in H;
+  try setoid_rewrite H9 in H;
+  try setoid_rewrite H10 in H;
+  try setoid_rewrite H11 in H;
+  try setoid_rewrite H12 in H;
+  try setoid_rewrite H13 in H;
+  try setoid_rewrite H14 in H;
+  try setoid_rewrite H15 in H;
+  try setoid_rewrite H16 in H;
+  
+     rewrite <- Mscale_mult_dist_l in *;
+  apply Minvert_r in H; [auto | auto with wf_db | auto with wf_db | exists cnot; split; lma'];
+  
+  setoid_rewrite <- Mscale_kron_dist_l;
+  setoid_rewrite <- Mscale_kron_dist_r in H;
+     (*** Rename test00 ***)
+  apply test00; auto with wf_db).
+Qed.
+
+(*** Rename test000 ***)
+Lemma cnot_flip (c : Coef) (p q a b : Pauli) :
+  (c * c ^* )%C = C1 ->
+  CNOT' 0 1 :' @G 2 ([(C1, (p :: [q]))]) → @G 2 ([(c, (a :: [b]))]) ->
+  CNOT' 1 0 :' @G 2 ([(C1, (q :: [p]))]) → @G 2 ([(c, (b :: [a]))]).
+Proof. intros G H.
+       inversion H; inversion H2; inversion H6; subst.
+       repeat constructor. simpl in *.
+       rewrite adj_ctrlX_is_notc1 in *.
+       rewrite adj_ctrlX_is_cnot1 in *.
+       
+       unfold translateA in *; simpl in *.
+       rewrite ! Mplus_0_l in *.
+       
+       unfold translate in *; simpl in *.
+       
+       apply sgt_implies_sgt'; try easy.
+
+       apply sgt'_implies_sgt in H10; try auto with *.
+       2:{simpl; split;
+          unfold uni_vecType; intros A H0; inversion H0;
+          try inversion H1;
+          try rewrite <- H1;
+          apply unit_scale; try lca; try assumption; rewrite kron_1_r;
+          replace (S (S (S (S O)))) with (Init.Nat.mul (S (S O)) (S (S O))) by lia;
+          apply kron_unitary; apply unit_Pauli. }
+
+       unfold singGateType in *.
+       intros A B H0 H1.
+       simpl in *. destruct H0, H1; try contradiction.
+       rewrite ! kron_1_r in *. rewrite ! Mscale_1_l in *.
+       rewrite <- H0, <- H1.
+       assert (cnot × (translate_P p ⊗ translate_P q) = ((c .* (translate_P a ⊗ translate_P b))%M) × cnot). { apply (H10 (translate_P p ⊗ translate_P q) ((c .* (translate_P a ⊗ translate_P b))%M)); left; easy. }
+       
+       rewrite Mscale_mult_dist_l in *.
+(*** Rename test000 ***)
+       apply test000 in H3. assumption.
+Qed.
+
+       
 Lemma tensor_ctrl_ground : forall (l : list Pauli) (prg_len ctrl targ : nat)
                                   (a b : Pauli) (c1 c2 : Coef),
     (c1 * c1 ^* )%C = C1 -> (c2 * c2 ^* )%C = C1 ->
@@ -2816,28 +4950,93 @@ Proof. induction l.
        - intros; subst; simpl in *; lia.
        - intros.
          destruct ctrl; try (apply tensor_ctrl_zero; auto).
-         destruct targ; try (apply tensor_targ_zero; auto).
-         2: subst; simpl in *.
-         2: apply tensor_ctrl_reduce; auto.
-         2: replace  (c1 * c2 * (c1 * c2) ^*)%C with  ((c1 * c1 ^*) * (c2 * c2 ^*))%C by lca.
-         2: rewrite H, H0; lca.
-         3: do 2 rewrite switch_len; easy.
-         3: apply IHl; auto; lia.
+         destruct targ. try (apply tensor_targ_zero; auto).
+         apply cnot_flip; assumption.
+         subst; simpl in *.
+         apply tensor_ctrl_reduce; auto.
+         replace  (c1 * c2 * (c1 * c2) ^* )%C with  ((c1 * c1 ^*) * (c2 * c2 ^*))%C by lca.
+         rewrite H, H0; lca.
+         lia.                                            
+         do 2 rewrite switch_len; easy.
+         apply IHl; auto; lia.
 Qed.
+
 
 
 (****************)
 (* tensor rules *)
 (****************)
 
+Fixpoint nth_ArithPauli {n} (bit : nat) (A : ArithPauli n) : ArithPauli 1 :=
+  match A with
+  | nil => nil
+  | t :: ts => (C1, [nth bit (snd t) gI]) :: (nth_ArithPauli bit ts)
+  end.
+                                                     
 
 Definition nth_vType {n} (bit : nat) (A : vType n) : vType 1 :=
   match A with 
-  | G g => G (p_1, [nth bit (snd g) gI])         
+  | G a => G (nth_ArithPauli bit a)
   | _ => Err
   end. 
+                                                     
+(** original
+Definition nth_vType {n} (bit : nat) (A : vType n) : vType 1 :=
+  match A with 
+  | G g => G ([ (C1, [nth bit (snd g) gI]) ])
+  | _ => Err
+  end. 
+**)
+
+(*** is this the correct definition? ***)
+(* length of g must match with g0 *)
+Fixpoint switch_ArithPauli {n} (A : ArithPauli n) (a : ArithPauli 1) (bit : nat) {struct A} : ArithPauli n :=
+  match A with 
+  | x :: xs=>
+    match a with
+    | y :: ys => (((fst x) * (fst y))%C, switch (snd x) (hd gI (snd y))  bit) :: (switch_ArithPauli xs ys bit)
+    | nil => nil
+    end
+  | nil => nil
+  end.
+
+(* length of g must match with g0 *)
+Fixpoint switch_ArithPauli' {n} (A : ArithPauli n) (a : ArithPauli 1) (bit : nat) {struct a} : ArithPauli n :=
+  match A with 
+  | x :: xs=>
+    match a with
+    | y :: ys => (((fst x) * (fst y))%C, switch (snd x) (hd gI (snd y))  bit) :: (switch_ArithPauli' xs ys bit)
+    | nil => nil
+    end
+  | nil => nil
+  end.
+
+(** is this even needed?
+(*** Admitted ***)
+Lemma switch_ArithPauli_is_switch_ArithPauli' : forall (n : nat) (A : ArithPauli n) (a : ArithPauli 1) (bit : nat), length A = length a -> switch_ArithPauli A a bit = switch_ArithPauli' A a bit.
+Proof.
+  intros n A a bit H.
+  induction A. simpl in *. symmetry in H. rewrite length_zero_iff_nil in H. rewrite H. easy.
+  induction a. simpl in *. easy. simpl in *. inversion H.
+Admitted.
+*)
 
 
+  
+  
+
+(* length of g must match with g0 *)
+Definition switch_vType {n} (A : vType n) (a : vType 1) (bit : nat) : vType n :=
+  match A with 
+  | G g =>
+    match a with
+    | G g0 => G (switch_ArithPauli' g g0 bit)
+    | _ => Err
+    end
+  | _ => Err
+  end.
+
+(** original
 Definition switch_vType {n} (A : vType n) (a : vType 1) (bit : nat) : vType n :=
   match A with 
   | G g =>
@@ -2847,7 +5046,7 @@ Definition switch_vType {n} (A : vType n) (a : vType 1) (bit : nat) : vType n :=
     end
   | _ => Err
   end.
-
+**)
 
 
 Lemma WFA_nth_vType : forall {n} (A : vType n) (bit : nat),
@@ -2856,30 +5055,152 @@ Proof. intros.
        inversion H; subst. 
        destruct A; try easy.
        apply WFA.
-       apply G_svt.
-       apply WF_G; apply WF_tt.
-       easy. 
+       constructor.
+       constructor.
+       inversion H1; subst.
+       clear H. clear H0. clear H1.
+       induction H3.
+       do 2 constructor. lia. simpl. easy.
+       constructor. constructor. lia. simpl. easy.
+       assumption.
 Qed.       
 
 
+Inductive equal_len {n m : nat} : vType n -> vType m -> Prop :=
+| Eq_len : forall (A : ArithPauli n) (a : ArithPauli m), length A = length a -> equal_len (G A) (G a).
+
+(*** Admitted ***)
 Lemma WFA_switch_vType : forall {n} (A : vType n) (a : vType 1) (bit : nat),
+  equal_len A a ->
   WFA_vType A -> WFA_vType a -> WFA_vType (switch_vType A a bit).
-Proof. intros.
-       inversion H; inversion H0; subst. 
-       destruct A; destruct a; try easy.
-       apply WFA.
-       apply G_svt.
-       apply WF_G; apply WF_tt.
-       simpl. rewrite switch_len.
-       inversion H2; inversion H6; 
-       easy. 
-Qed.       
+Proof. intros n A a bit G H H0.
 
+       inversion G; subst.
+       
+       clear G.
+       inversion H; inversion H0; subst.
+       do 2 constructor.
+       inversion H3; inversion H6; subst.
+       
+       clear H. clear H0. clear H2. clear H5. clear H3. clear H6.
+
+       induction H7; induction H9.
+       - destruct a, a0. simpl. constructor. constructor.
+         + inversion H. assumption.
+         + simpl. rewrite switch_len. inversion H. simpl in H3. assumption.
+       - inversion H1. symmetry in H3. rewrite length_zero_iff_nil in H3. rewrite H3 in *. simpl in *. destruct a, a0. simpl. constructor. constructor.
+         + inversion H. assumption.
+         + simpl. rewrite switch_len. inversion H. simpl in H4. assumption.
+       - inversion H1. rewrite length_zero_iff_nil in H3. rewrite H3 in *. simpl in *. destruct a, a0. simpl. constructor. constructor.
+         + inversion H. assumption.
+         + simpl. rewrite switch_len. inversion H. simpl in H4. assumption.
+       - inversion H1. 
+       
+(*
+       destruct t, t0. simpl in *. constructor. constructor. inversion H7. inversion H2. assumption. inversion H3. assumption. simpl. Search switch. rewrite switch_len. inversion H7. inversion H2. simpl in H5. assumption. inversion H3. simpl in H6. assumption.
+       *)
+       
+
+       
+       destruct a, a0. simpl in *.
+
+       constructor. constructor.  inversion H7. inversion H2. assumption. inversion H2. assumption. simpl. rewrite switch_len. inversion H. simpl in *. assumption.
+(*** useless IH ***)
+
+(*
+       rewrite length_zero_iff_nil in H0. rewrite H0 in *. inversion H7. inversion H2. simpl.        
+       inversion H9. inversion H1.
+       inversion H1. *)
+
+Admitted.
 
 Hint Resolve WFA_nth_vType WFA_switch_vType : wfvt_db.
 
 
 
+
+(*** Admitted ***)
+Lemma tensor_smpl : forall (prg_len bit : nat) (p : nat -> prog)
+                      (A : vType prg_len) (a : vType 1),
+    equal_len A a ->
+    WFA_vType a -> WFA_vType A -> 
+    smpl_prog p -> bit < prg_len ->
+    (p 0) :' (nth_vType bit A) → a ->
+    (p bit) :' A → (switch_vType A a bit).
+(* 
+
+(p 0) :' (nth_vType bit A) → a ->
+(H 0) :' (nth_vType 1 (X ⊗ X + Y ⊗ X)) → (Z + Z)
+where (nth_vType 1 (X ⊗ X + Y ⊗ X)) = (X + X)
+
+
+(p bit) :' A → (switch_vType A a bit).
+(H 1) :' (X ⊗ X + Y ⊗ X) → (switch_vType (X ⊗ X + Y ⊗ X) (Z + Z) 1)
+where (switch_vType (X ⊗ X + Y ⊗ X) (Z + Z) 1) = (X ⊗ Z + Y ⊗ Z) 
+
+
+
+H 0 :' X -> Z
+
+update 
+
+
+
+*)
+
+
+Proof. intros prg_len bit p A a E H H0 H1 H2 H3.  
+       inversion H; inversion H0; subst. 
+       inversion H5; inversion H8; subst; try easy.
+       inversion E; subst.
+       unfold switch_vType.
+       simpl in *.
+(*
+       constructor.
+       constructor.
+       constructor. constructor.
+       constructor. 2:{ constructor. }
+                  simpl.
+       *)
+       inversion H3. inversion H13. inversion H17. subst. simpl in *.
+       
+       
+       (* apply tensor_smpl_ground. *)
+       induction H6; induction H10; subst. 
+  -  destruct a. destruct a0. simpl in *.
+     
+     apply tensor_smpl_ground; simpl; auto. 
+          2:{ inversion H9. simpl in *. symmetry. assumption. }
+          inversion H3. inversion H13. inversion H17. subst.
+       2:{ inversion H6; subst. simpl in H11. destruct l. discriminate. simpl in *. inversion H11.
+           rewrite length_zero_iff_nil in H18. rewrite H18 in *. simpl in *. assumption. }
+       (***  how to handle
+ (c * c ^* )%C = C1 ***)
+       admit.
+
+           - inversion H12. rewrite length_zero_iff_nil in H14. rewrite H14 in *. simpl in *. destruct a0; destruct a; simpl in *. 
+             apply tensor_smpl_ground; auto; simpl in *.
+             2:{ inversion H9; subst. simpl in *. easy. }
+             2:{ destruct l0. inversion H6. discriminate. simpl in *. inversion H6. simpl in *. inversion H14. rewrite H14 in *. simpl in *. easy. }
+                    (***  how to handle
+ (c * c ^* )%C = C1 ***)
+             admit.
+
+           - inversion H12. symmetry in H14. rewrite length_zero_iff_nil in H14. rewrite H14 in *. simpl in *. destruct a0; destruct a; simpl in *. 
+             apply tensor_smpl_ground; auto; simpl in *.
+             2:{ inversion H9; subst. }
+             2:{ destruct l0. inversion H6. discriminate. simpl in *. inversion H6. simpl in *. inversion H14.  rewrite H14 in *. simpl in *. easy. }
+                    (***  how to handle
+ (c * c ^* )%C = C1 ***)
+             admit.
+
+           - destruct a, a0. inversion H6. simpl in *. destruct l. discriminate. simpl in *.
+             inversion H18. rewrite length_zero_iff_nil in H20. rewrite H20 in *. 
+             (*** useless IH ***)
+Admitted.
+
+
+(* original
 Lemma tensor_smpl : forall (prg_len bit : nat) (p : nat -> prog)
                            (A : vType prg_len) (a : vType 1),
     WFA_vType a -> WFA_vType A -> 
@@ -2894,21 +5215,21 @@ Proof. intros.
        apply tensor_smpl_ground; auto; simpl in *.
        do 2 (destruct l; try easy).
 Qed.
+*)
 
-
-
-
+(*** Admitted ***)
 Lemma tensor_ctrl : forall (prg_len ctrl targ : nat)   
                            (A : vType prg_len) (a b : vType 1),
   WFA_vType A -> WFA_vType a -> WFA_vType b -> 
   ctrl < prg_len -> targ < prg_len -> ctrl <> targ -> 
-  (CNOT 0 1) :' (nth_vType ctrl A) .⊗ (nth_vType targ A) → a .⊗ b ->
-  (CNOT ctrl targ) :'  A → switch_vType (switch_vType A a ctrl) b targ.
+  (CNOT' 0 1) :' (nth_vType ctrl A) .⊗ (nth_vType targ A) → a .⊗ b ->
+  (CNOT' ctrl targ) :'  A → switch_vType (switch_vType A a ctrl) b targ.
 Proof. intros. 
        inversion H; inversion H0; inversion H1; subst.
        inversion H7; inversion H10; inversion H13; subst; try easy. 
-       destruct tt; destruct tt0; destruct tt1; simpl. 
-       inversion H8; inversion H14; inversion H16; subst. 
+       (* destruct tt; destruct tt0; destruct tt1; simpl. *)
+       inversion H8; inversion H14; inversion H16; subst.
+       - 
        rewrite cMul_assoc.
        apply tensor_ctrl_ground; auto; simpl in *.
        rewrite H17, H19 in H5; simpl in H5.
@@ -2916,6 +5237,19 @@ Proof. intros.
 Qed.
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+(*
 (***************)
 (* Arrow rules *)
 (***************)
@@ -2992,14 +5326,14 @@ Proof. intros;
 Qed.
 
 
-
-Hint Resolve HTypes STypes TTypes CNOTTypes : base_types_db.
+(*
+Hint Resolve HTypes ZTypes STypes TTypes CNOTTypes : base_types_db.
 Hint Resolve cap_elim_l cap_elim_r : base_types_db.
 
-Hint Resolve HTypes STypes TTypes CNOTTypes : typing_db.
+Hint Resolve HTypes ZTypes STypes TTypes CNOTTypes : typing_db.
 Hint Resolve cap_intro cap_elim_l cap_elim_r : typing_db.
 Hint Resolve SeqTypes : typing_db.
-
+*)
 
 
 (* basically just eq_type_conv_output but with different order hypotheses *)
@@ -3008,6 +5342,14 @@ Lemma eq_arrow_r : forall {n} (g : prog) (A B B' : vType n),
     B = B' ->
     g :' A → B'.
 Proof. intros. subst; easy. Qed.
+
+*)
+
+
+
+
+
+
 
 (* Tactics *)
 
