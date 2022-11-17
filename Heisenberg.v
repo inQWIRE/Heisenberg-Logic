@@ -92,9 +92,13 @@ Qed.
 
 Notation "v :' T" := (vecHasType v T) (at level 61) : heisenberg_scope. 
 
+(*** define a operation that adds together intersection types *)
+Definition intersection_vec{n} (A B : vecType n) := A ++ B.
+Notation "A ∩ B" := (intersection_vec A B) (at level 60, no associativity) : heisenberg_scope.
 
-Notation "A ∩ B" := (A ++ B) (at level 60, no associativity) : heisenberg_scope.
+(* Notation "A ∩ B" := (A ++ B) (at level 60, no associativity) : heisenberg_scope. *)
 
+Hint Unfold intersection_vec : sub_db.
 
 
 (*****************************)
@@ -1481,20 +1485,20 @@ Lemma cap_idem : forall (n : nat) (A : vecType n), A ∩ A ≡ A.
 Proof. intros n A.
        apply eq_types_same_type.
        split. 
-       - auto with sub_db.
-       - auto with sub_db.
+       - autounfold with sub_db. auto with sub_db.
+       - autounfold with sub_db. auto with sub_db.
 Qed. 
 
 Lemma cap_comm : forall (n : nat) (A B : vecType n), A ∩ B ≡ B ∩ A.
 Proof. intros n A B.
        apply eq_types_same_type.
        split.
-       - auto with sub_db.
-       - auto with sub_db.
+       - autounfold with sub_db. auto with sub_db.
+       - autounfold with sub_db. auto with sub_db.
 Qed.
 
 Lemma cap_assoc_eq : forall (n : nat) (A B C : vecType n), A ∩ (B ∩ C) = (A ∩ B) ∩ C.
-Proof. intros n A B C. rewrite app_ass. reflexivity.
+Proof. intros n A B C. autounfold with sub_db. rewrite app_ass. reflexivity.
 Qed.
 
 
@@ -1505,6 +1509,7 @@ Proof. intros n A.
        unfold eq_vecType.
        intros v; split.
        - apply has_type_subset.
+         autounfold with sub_db.
          auto with sub_db.
        - intros H0.
          unfold vecHasType; intros A0.
@@ -1532,6 +1537,7 @@ Lemma cap_elim_l : forall {n} (g : Vector n) (A B : vecType n),
   g :' A ∩ B -> g :' A.
 Proof. intros n g A B H. 
        apply (has_type_subset _ _ A (A ∩ B)).
+       autounfold with sub_db. 
        auto with sub_db.
        apply H.
 Qed.
@@ -1540,6 +1546,7 @@ Lemma cap_elim_r : forall {n} (g : Vector n) (A B : vecType n),
   g :' A ∩ B -> g :' B.
 Proof. intros n g A B H. 
        apply (has_type_subset _ _ B (A ∩ B)).
+       autounfold with sub_db. 
        auto with sub_db. 
        apply H.
 Qed.
@@ -1689,6 +1696,7 @@ Lemma cap_elim_l_pair : forall {n} (g : Vector n * C) (A B : vecType n),
   pairHasType g (A ∩ B) -> pairHasType g A.
 Proof. intros n g A B H. 
        apply (has_type_subset_pair _ _ A (A ∩ B)).
+       autounfold with sub_db. 
        auto with sub_db.
        apply H.
 Qed.
@@ -1697,6 +1705,7 @@ Lemma cap_elim_r_pair : forall {n} (g : Vector n * C) (A B : vecType n),
   pairHasType g (A ∩ B) -> pairHasType g B.
 Proof. intros n g A B H. 
        apply (has_type_subset_pair _ _ B (A ∩ B)).
+       autounfold with sub_db. 
        auto with sub_db. 
        apply H.
 Qed.
@@ -1706,7 +1715,17 @@ Qed.
 (* Writing actual programs *)
 (***************************)
 
+Declare Scope heisenberg_scope_gateType.
+Delimit Scope heisenberg_scope_gateType with Hg.
+Open Scope heisenberg_scope_gateType.
+
+
 Notation gateType n := (list (vecType n * vecType n)).
+Notation "v :' T" := (vecHasType v T) (at level 61) : heisenberg_scope_gateType. 
+
+Definition intersection_gate{n} (A B : gateType n) := A ++ B.
+Notation "A ∩ B" := (intersection_gate A B) (at level 60, no associativity) : heisenberg_scope_gateType.
+Hint Unfold intersection_gate : sub_db.
 
 
 
@@ -1820,9 +1839,9 @@ Definition gateApp {n : nat} (U A : Square n) : Square n :=
   U × A × U†.
 
 (* NOTE!! We use the second def, formGateType', here since it works better with singletons *)
-Notation "U ::' F" := (gateHasType' U F) (at level 61) : heisenberg_scope.
-Notation "A → B" := (formGateType A B) (at level 60, no associativity) : heisenberg_scope. 
-Notation "U [ A ]" := (gateApp U A) (at level 0) : heisenberg_scope. 
+Notation "U ::' F" := (gateHasType' U F) (at level 61) : heisenberg_scope_gateType.
+Notation "A → B" := (formGateType A B) (at level 60, no associativity) : heisenberg_scope_gateType. 
+Notation "U [ A ]" := (gateApp U A) (at level 0) : heisenberg_scope_gateType. 
 
 
 Lemma type_is_app : forall (n: nat) (U A B : Square n),
@@ -2004,7 +2023,7 @@ Definition eq_gateType {n} (T1 T2 : gateType n) :=
   (forall v, v ::' T1 <-> v ::' T2).
 
 
-Infix "≡≡" := eq_gateType (at level 70, no associativity) : heisenberg_scope.
+Infix "≡≡" := eq_gateType (at level 70, no associativity) : heisenberg_scope_gateType.
 
 (* will now show this is an equivalence relation *)
 Lemma eq_gateType_refl : forall {n} (A : gateType n), A ≡≡ A.
@@ -2048,9 +2067,10 @@ Qed.
 
 
 Lemma cap_elim_l_gate : forall {n} (g : Square n) (A B : gateType n),
-  g ::' A ∩ B -> g ::' A.
+  g ::' (A ∩ B) -> g ::' A.
 Proof. intros n g A B H. 
        apply (has_type_subset_gate _ _ A (A ∩ B)).
+       autounfold with sub_db.
        auto with sub_db.
        apply H.
 Qed.
@@ -2059,6 +2079,7 @@ Lemma cap_elim_r_gate : forall {n} (g : Square n) (A B : gateType n),
   g ::' A ∩ B -> g ::' B.
 Proof. intros n g A B H. 
        apply (has_type_subset_gate _ _ B (A ∩ B)).
+       autounfold with sub_db.
        auto with sub_db. 
        apply H.
 Qed.
@@ -2085,7 +2106,7 @@ Proof. eauto with subtype_db. Qed.
 
 Lemma cap_arrow : forall {n} (g : Square n) (A B C : vecType n),
   g ::' (A → B) ∩ (A → C) ->
-  g ::' A → (B ∩ C).
+  g ::' A → (B ∩ C)%H.
 Proof. intros n g A B C [Ha [Hb _]].  
        apply kill_true.
        unfold singGateType' in *; simpl in *.
@@ -2120,7 +2141,7 @@ Hint Resolve cap_elim cap_arrow arrow_sub : subtype_db.
 (* this is killed by eauto with subtype_db *)
 Lemma cap_arrow_distributes : forall {n} (g : Square n) (A A' B B' : vecType n),
   g ::' (A → A') ∩ (B → B') ->
-  g ::' (A ∩ B) → (A' ∩ B').
+  g ::' (A ∩ B)%H → (A' ∩ B')%H.
 Proof.
   intros; apply cap_arrow.
   apply cap_intro; eauto with subtype_db. 
@@ -2129,7 +2150,7 @@ Qed.
 (* "Full explicit proof", as in Programs.v *)
 Lemma cap_arrow_distributes'' : forall {n} (g : Square n) (A A' B B' : vecType n),
   g ::' (A → A') ∩ (B → B') ->
-  g ::' (A ∩ B) → (A' ∩ B').
+  g ::' (A ∩ B)%H → (A' ∩ B')%H.
 Proof.
   intros.
   apply cap_arrow.
@@ -2322,8 +2343,8 @@ Definition scaleT (c : C) {n : nat} (A : vecTypeT n) : vecTypeT n :=
 Definition formGateTypeT {n : nat} (A B : vecTypeT n) : gateType n := [(⨂' A, ⨂' B)].
 
 
-Infix "'⊗'" := tensorT (at level 51, right associativity) : heisenberg_scope. 
-Notation "A →' B" := (formGateTypeT A B) (at level 60, no associativity) : heisenberg_scope.
+Infix "'⊗'" := tensorT (at level 51, right associativity) : heisenberg_scope_gateType. 
+Notation "A →' B" := (formGateTypeT A B) (at level 60, no associativity) : heisenberg_scope_gateType.
 
 
 Definition WF_vtt {len : nat} (vt : vecTypeT len) := length vt = len.
