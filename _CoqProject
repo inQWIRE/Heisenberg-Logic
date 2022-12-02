@@ -2,7 +2,6 @@
 
 Complex.v
 Eigenvectors.v
-Heisenberg.v
 Matrix.v
 Monad.v
 Monoid.v
@@ -10,5 +9,10 @@ Polynomial.v
 Prelim.v
 Quantum.v
 RealAux.v
-Types.v
 
+new_Heisenberg.v
+new_Types.v
+new_Helper.v
+
+Heisenberg.v
+Types.v

@@ -3105,11 +3105,6 @@ Qed.
 Lemma kron_simp : forall (g1 g2 : Pauli), 
     @translate 2 (C1 * C1, g1 :: [g2]) = (translate_P g1) ⊗ (translate_P g2).  
 Proof. intros. 
-       unfold translate; simpl. 
-       autorewrite with C_db.
-       rewrite Mscale_1_l. 
-       rewrite kron_1_r. 
-       reflexivity. 
 Qed.
 
 
@@ -4414,6 +4409,14 @@ Lemma Mmult_r {n : nat} (A B C : Square n) :
   WF_Matrix B -> A = C -> A × B = C × B.
 Proof. intros H H0 H1 H2. rewrite H2. reflexivity. Qed. 
 
+
+Lemma Cmult_r (a b c : C) : a = b -> (a * c = b * c)%C.
+Proof. intros H. rewrite H. easy. Qed.
+
+Lemma Cmult_l (a b c : C) : a = b -> (c * a = c * b)%C.
+Proof. intros H. rewrite H. easy. Qed.
+
+
 (*** A ⊗ B = C ⊗ D -> A = c1 * C & B = c2 * D & c1*c2 = 1 ***)
 
 (** Proof :
@@ -4446,13 +4449,6 @@ Proof. intros H H0 H1 H2. rewrite H2. reflexivity. Qed.
    and from (4), B = D * c_{i,j} / a_{i,j} = D * (1/β).
 QED.
  **)
-
-Lemma Cmult_r (a b c : C) : a = b -> (a * c = b * c)%C.
-Proof. intros H. rewrite H. easy. Qed.
-
-Lemma Cmult_l (a b c : C) : a = b -> (c * a = c * b)%C.
-Proof. intros H. rewrite H. easy. Qed.
-
 
 Lemma tensor_nonzero_exists {n m o p : nat} (A D : Matrix n m) (B E : Matrix o p) (* c1 c2 : C *) :
   WF_Matrix A -> WF_Matrix B -> WF_Matrix D -> WF_Matrix E ->
