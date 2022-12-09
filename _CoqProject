@@ -10,9 +10,11 @@ Prelim.v
 Quantum.v
 RealAux.v
 
-new_Heisenberg.v
-new_Types.v
 new_Helper.v
 
 Heisenberg.v
+
+new_Types.v
+
 Types.v
+new_Heisenberg.v

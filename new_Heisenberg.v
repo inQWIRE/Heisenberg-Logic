@@ -2049,6 +2049,9 @@ Proof. intros n g A A' B B' gAB gA'B'.
          - constructor. reflexivity. }
        clear gA'B'.
        
+       specialize (eAB (A' × v) c).
+       unfold Eigenpair in *. simpl in *.
+     
        
 
 

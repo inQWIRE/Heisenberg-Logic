@@ -553,6 +553,18 @@ Proof. intros.
        rewrite notc_sko_cnot in H3; easy. 
 Qed.
 
+(* Types.v line 123 *)
+Lemma fold_left_Cmult : forall (c : C) (l : list C),
+        fold_left Cmult l (C1 * c)%C = (c * (fold_left Cmult l C1))%C.
+Proof. intros c l. generalize dependent c.
+  induction l.
+  - simpl. intros c.  lca.
+  - simpl. intros c. rewrite <- Cmult_assoc. rewrite (Cmult_comm c a).
+    rewrite 2 IHl.
+    rewrite Cmult_assoc.
+    rewrite (Cmult_comm a c). reflexivity.
+Qed.
+
 (* Types.v line 846 *)
 Lemma n_plus_m_zero_n_zero : forall (n m : nat), (n + m = 0 -> n = 0)%nat.
   intros n m H. induction m.
