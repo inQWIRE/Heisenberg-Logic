@@ -43,9 +43,36 @@ Lemma cons_conc : forall (X : Type) (x : X) (ls : list X),
     x :: ls = [x] ++ ls.
 Proof. reflexivity. Qed.
 
+
+(* Heisenberg.v line 1588 *)
+Ltac pauli_matrix_computation :=
+  repeat
+    (try apply mat_equiv_eq;
+     match goal with
+     | |- WF_Unitary ?A => unfold WF_Unitary
+    | |- WF_Matrix ?A /\ _ => split
+    | |- WF_Matrix ?A => auto 10 with wf_db;
+                                        try (unfold WF_Matrix;
+                                        (let x := fresh "x" in
+                                         let y := fresh "y" in
+                                         let H := fresh "H" in
+                                         intros x y [H| H];
+                                         apply le_plus_minus in H;
+                                         rewrite H; compute; destruct_m_eq))
+    | |- (?A ≡ ?B)%M => by_cell
+    | |- _ => autounfold with U_db;
+                  simpl;
+                  autorewrite with Cexp_db C_db;
+                  try (eapply c_proj_eq);
+                  simpl;
+                  repeat (autorewrite with R_db; field_simplify_eq; simpl);
+                  try easy
+    end).
+
+
 (* defining program application *)
 (* Heisenberg.v line 2355 *)
-Definition prog_smpl_app (prg_len : nat) (U : Square 2) (bit : nat) : Square (2^prg_len) :=
+Definition prog_simpl_app (prg_len : nat) (U : Square 2) (bit : nat) : Square (2^prg_len) :=
   match bit <? prg_len with
   | true => I (2^bit) ⊗ U ⊗ I (2^(prg_len - bit - 1))
   | false => I (2^prg_len)
@@ -53,10 +80,10 @@ Definition prog_smpl_app (prg_len : nat) (U : Square 2) (bit : nat) : Square (2^
 
 
 (* Heisenberg.v line 2363 *)
-Lemma unit_prog_smpl_app : forall (prg_len : nat) (U : Square 2) (bit : nat),
-  WF_Unitary U -> WF_Unitary (prog_smpl_app prg_len U bit). 
+Lemma unit_prog_simpl_app : forall (prg_len : nat) (U : Square 2) (bit : nat),
+  WF_Unitary U -> WF_Unitary (prog_simpl_app prg_len U bit). 
 Proof. intros.  
-       unfold prog_smpl_app.
+       unfold prog_simpl_app.
        destruct (bit <? prg_len) eqn:E; auto with unit_db.
        rewrite (easy_pow3 _ bit); try (apply Nat.ltb_lt; easy).
        auto with unit_db.
@@ -623,7 +650,7 @@ Proof. intros m n A B c H H0. apply Mscale_inj with (c:= /c) in H0.
 Qed.
 
 (* Types.v line 1262 *)
-Lemma kron_2_l : forall {n} ,
+Lemma kron_2_l' : forall {n} ,
       Matrix.I 2 ⊗ Matrix.I (2 ^ n + (2 ^ n + 0)) =
         Matrix.I (2 ^ n + (2 ^ n + 0) + (2 ^ n + (2 ^ n + 0) + 0)).
 Proof. intros n.
@@ -633,6 +660,14 @@ Proof. intros n.
         2:{ simpl; easy. }
         rewrite <- ! kron_n_I. rewrite <- kron_n_assoc; auto with wf_db.
 Qed.
+
+Lemma kron_2_l : forall {n},
+    Matrix.I 2 ⊗ Matrix.I (2 ^ n) = Matrix.I (2 ^ (S n)).
+Proof.
+  intros n.
+  rewrite <- ! kron_n_I. rewrite <- kron_n_assoc; auto with wf_db.
+Qed.
+    
 
 (* Types.v line 1273 *)
 Lemma big_kron_adj : forall {n} (l : list (Square n)), (⨂ l)† = (⨂ (map adjoint l)).
