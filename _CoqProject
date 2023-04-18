@@ -12,9 +12,11 @@ RealAux.v
 
 new_Helper.v
 
+new_Types.v
+
 Heisenberg.v
 
-new_Types.v
+
 
 Types.v
 new_Heisenberg.v

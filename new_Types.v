@@ -13,9 +13,9 @@ Require Export new_Helper.
 
 
 
-Declare Scope PType_scope.
-Delimit Scope PType_scope with P.
-Open Scope PType_scope.
+Declare Scope Predicate_scope.
+Delimit Scope Predicate_scope with P.
+Open Scope Predicate_scope.
 
 
 
@@ -255,8 +255,8 @@ Proof. intros.
   apply WF_Matrix_Pauli.
 Qed.
 
-Hint Resolve WF_Matrix_Pauli WF_Matrix_Big_Pauli : wf_db.
-Hint Resolve WF_Unitary_Pauli : unit_db.
+#[export] Hint Resolve WF_Matrix_Pauli WF_Matrix_Big_Pauli : wf_db.
+#[export] Hint Resolve WF_Unitary_Pauli : unit_db.
 
 
 (* Here we define a gMul to give Coef followed by a gMul to give the actual type *)
@@ -463,18 +463,18 @@ Proof. intros n c1 c2 a.
 Qed.
 
 
-Inductive PType (n : nat) : Type :=
-| G : AType n -> PType n
-| Cap : PType n -> PType n -> PType n
-| Cup : PType n -> PType n -> PType n
-| Err : PType n.
+Inductive Predicate (n : nat) : Type :=
+| G : AType n -> Predicate n
+| Cap : Predicate n -> Predicate n -> Predicate n
+| Cup : Predicate n -> Predicate n -> Predicate n
+| Err : Predicate n.
 
 Arguments G {n}.
 Arguments Cap {n}.
 Arguments Cup {n}.
 Arguments Err {n}.
 
-Definition translateP {n} (A : PType n) :=
+Definition translateP {n} (A : Predicate n) :=
   match A with
   | G a => translateA a
   | Cap a b => Zero
@@ -484,7 +484,7 @@ Definition translateP {n} (A : PType n) :=
 
 (* you cannot multiply cap or cup types 
    so any of these options returns Err *)
-Definition mul {n} (A B : PType n) : PType n :=
+Definition mul {n} (A B : Predicate n) : Predicate n :=
   match A with
   | G a =>
     match B with
@@ -494,7 +494,7 @@ Definition mul {n} (A B : PType n) : PType n :=
   | _ => Err
   end.
 
-Definition add {n} (A B : PType n) : PType n :=
+Definition add {n} (A B : Predicate n) : Predicate n :=
   match A with
   | G a =>
     match B with
@@ -504,7 +504,7 @@ Definition add {n} (A B : PType n) : PType n :=
   | _ => Err
   end.
 
-Definition tensor {n m} (A : PType n) (B : PType m): PType (n + m) :=
+Definition tensor {n m} (A : Predicate n) (B : Predicate m): Predicate (n + m) :=
   match A with
   | G a =>
       match B with
@@ -514,7 +514,7 @@ Definition tensor {n m} (A : PType n) (B : PType m): PType (n + m) :=
   | _ => Err
   end.
 
-Definition scale {n} (c : Coef) (A : PType n) : PType n :=
+Definition scale {n} (c : Coef) (A : Predicate n) : Predicate n :=
   match A with
   | G a => G (gScaleA c a)
   | _ => Err
@@ -532,63 +532,63 @@ Proof. intros n A. destruct A. simpl. rewrite Cmult_1_l. reflexivity. Qed.
 Lemma gScaleA_1 : forall n (A : AType n), gScaleA C1 A = A.
 Proof. intros n A. induction A; simpl; try easy. rewrite gScaleT_1. rewrite IHA. reflexivity. Qed.
                                                 
-Hint Rewrite gMulA_nil_r gMulA'_nil_l gScaleT_1 gScaleA_1 : typing_db.
+#[export] Hint Rewrite gMulA_nil_r gMulA'_nil_l gScaleT_1 gScaleA_1 : typing_db.
 
 
-Definition i {n} (A : PType n) := scale Ci A.
-Notation "- A" := (scale (Copp C1) A)  (at level 35, right associativity) : PType_scope.
+Definition i {n} (A : Predicate n) := scale Ci A.
+Notation "- A" := (scale (Copp C1) A)  (at level 35, right associativity) : Predicate_scope.
 
-Infix "⊗'" := tensor (at level 39, left associativity) : PType_scope.
-Infix "*'" := mul (at level 40, left associativity) : PType_scope.
-Infix "·'" := scale (at level 43, left associativity) : PType_scope.
-Infix "+'" := add (at level 50, left associativity) : PType_scope.
+Infix "⊗'" := tensor (at level 39, left associativity) : Predicate_scope.
+Infix "*'" := mul (at level 40, left associativity) : Predicate_scope.
+Infix "·'" := scale (at level 43, left associativity) : Predicate_scope.
+Infix "+'" := add (at level 50, left associativity) : Predicate_scope.
 
-Notation "A ∩ B" := (Cap A B) (at level 60, no associativity) : PType_scope.
-Notation "A ⊍ B" := (Cup A B) (at level 60, no associativity) : PType_scope.
+Notation "A ∩ B" := (Cap A B) (at level 60, no associativity) : Predicate_scope.
+Notation "A ⊍ B" := (Cup A B) (at level 60, no associativity) : Predicate_scope.
 
 
 (******************************************************************************)
-(* Defining different types of PTypes to ensure WF(Well-formedness) and translations *)
+(* Defining different types of Predicates to ensure WF(Well-formedness) and translations *)
 (******************************************************************************)
 
-Inductive TPType {n} : PType n -> Prop :=
-| G_tpt : forall t : TType n, TPType (G [t]). 
+Inductive TPredicate {n} : Predicate n -> Prop :=
+| G_tpt : forall t : TType n, TPredicate (G [t]). 
 
-Inductive APType {n} : PType n -> Prop :=
-| G_apt : forall a : AType n, APType (G a).
+Inductive APredicate {n} : Predicate n -> Prop :=
+| G_apt : forall a : AType n, APredicate (G a).
 
-Inductive CPType {n} : PType n -> Prop :=
-| Cap_pt : forall A B : PType n, CPType (Cap A B)
-| Cup_pt : forall A B : PType n, CPType (Cup A B).
+Inductive CPredicate {n} : Predicate n -> Prop :=
+| Cap_pt : forall A B : Predicate n, CPredicate (Cap A B)
+| Cup_pt : forall A B : Predicate n, CPredicate (Cup A B).
 
-Lemma TPType_implies_APType : forall {n} (T : PType n),
-    TPType T -> APType T.
+Lemma TPredicate_implies_APredicate : forall {n} (T : Predicate n),
+    TPredicate T -> APredicate T.
 Proof. intros. inversion H; apply G_apt. Qed.
 
 
-Lemma TPType_simplify : forall {n} (A : PType n),
-  TPType A -> (exists t, A = G [t]).
+Lemma TPredicate_simplify : forall {n} (A : Predicate n),
+  TPredicate A -> (exists t, A = G [t]).
 Proof. intros. destruct A; try easy.
        inversion H; subst.
        exists t. reflexivity. 
 Qed.
 
-Lemma APType_simplify : forall {n} (A : PType n),
-  APType A -> (exists a, A = G a).
+Lemma APredicate_simplify : forall {n} (A : Predicate n),
+  APredicate A -> (exists a, A = G a).
 Proof. intros. destruct A; try easy.
        exists a. reflexivity. 
 Qed.
 
 
 
-Hint Resolve TPType_implies_APType TPType_simplify APType_simplify : wfpt_db.
+#[export] Hint Resolve TPredicate_implies_APredicate TPredicate_simplify APredicate_simplify : wfpt_db.
 
 
 
-Definition pI : PType 1 := G [ (C1, [gI]) ].
-Definition pX : PType 1 := G [ (C1, [gX]) ].
-Definition pY : PType 1 := G [ (C1, [gY]) ].
-Definition pZ : PType 1 := G [ (C1, [gZ]) ].
+Definition pI : Predicate 1 := G [ (C1, [gI]) ].
+Definition pX : Predicate 1 := G [ (C1, [gX]) ].
+Definition pY : Predicate 1 := G [ (C1, [gY]) ].
+Definition pZ : Predicate 1 := G [ (C1, [gZ]) ].
 
 Lemma Y_is_iXZ : pY = (i (pX *' pZ)).
 Proof. simpl.
@@ -599,70 +599,70 @@ Proof. simpl.
   constructor.
 Qed.
 
-Hint Resolve Y_is_iXZ : wfpt_db.
+#[export] Hint Resolve Y_is_iXZ : wfpt_db.
 
 (***************)
-(* TPType Lemmas *)
+(* TPredicate Lemmas *)
 (***************)
-Lemma TI : TPType pI. Proof. easy. Qed.
-Lemma TX : TPType pX. Proof. easy. Qed.
-Lemma TZ : TPType pZ. Proof. easy. Qed.
+Lemma TI : TPredicate pI. Proof. easy. Qed.
+Lemma TX : TPredicate pX. Proof. easy. Qed.
+Lemma TZ : TPredicate pZ. Proof. easy. Qed.
 
-Lemma T_scale : forall {n} (A : PType n) (c : Coef), TPType A -> (TPType (scale c A)).  
+Lemma T_scale : forall {n} (A : Predicate n) (c : Coef), TPredicate A -> (TPredicate (scale c A)).  
 Proof. intros. inversion H. simpl. easy. Qed. 
 
-Lemma T_neg : forall {n} (A : PType n), TPType A -> TPType (- A).
+Lemma T_neg : forall {n} (A : Predicate n), TPredicate A -> TPredicate (- A).
 Proof. intros. inversion H. simpl. easy. Qed. 
  
-Lemma T_i : forall {n} (A : PType n), TPType A -> TPType (i A).
+Lemma T_i : forall {n} (A : Predicate n), TPredicate A -> TPredicate (i A).
 Proof. intros. inversion H. simpl. easy. Qed. 
 
-Lemma T_mul : forall {n} (A B : PType n), TPType A -> TPType B -> TPType (A *' B).
+Lemma T_mul : forall {n} (A B : Predicate n), TPredicate A -> TPredicate B -> TPredicate (A *' B).
 Proof. intros. inversion H. inversion H0. simpl. easy. Qed.
 
-Lemma T_tensor : forall {n m} (A : PType n) (B : PType m), TPType A -> TPType B -> TPType (A ⊗' B).
+Lemma T_tensor : forall {n m} (A : Predicate n) (B : Predicate m), TPredicate A -> TPredicate B -> TPredicate (A ⊗' B).
 Proof. intros. inversion H. inversion H0. simpl. constructor. Qed.
 
-Lemma TY : TPType pY.
+Lemma TY : TPredicate pY.
 Proof. easy. Qed.
 
-Hint Resolve TI TX TZ TY T_scale T_neg T_i T_mul T_tensor : wfpt_db.
+#[export] Hint Resolve TI TX TZ TY T_scale T_neg T_i T_mul T_tensor : wfpt_db.
 
 
 
 
 (***************)
-(* APType Lemmas *)
+(* APredicate Lemmas *)
 (***************)
 
-Lemma AI : APType pI. Proof. easy. Qed.
-Lemma AX : APType pX. Proof. easy. Qed.
-Lemma AZ : APType pZ. Proof. easy. Qed.
+Lemma AI : APredicate pI. Proof. easy. Qed.
+Lemma AX : APredicate pX. Proof. easy. Qed.
+Lemma AZ : APredicate pZ. Proof. easy. Qed.
 
-Lemma A_scale : forall {n} (A : PType n) (c : Coef), APType A -> (APType (scale c A)).  
+Lemma A_scale : forall {n} (A : Predicate n) (c : Coef), APredicate A -> (APredicate (scale c A)).  
 Proof. intros. destruct A; easy. Qed.
 Locate "-".
 
-Lemma A_neg : forall {n} (A : PType n), APType A -> APType (- A).
+Lemma A_neg : forall {n} (A : Predicate n), APredicate A -> APredicate (- A).
 Proof. intros. destruct A; easy. Qed. 
  
-Lemma A_i : forall {n} (A : PType n), APType A -> APType (i A).
+Lemma A_i : forall {n} (A : Predicate n), APredicate A -> APredicate (i A).
 Proof. intros. destruct A; easy. Qed. 
 
-Lemma A_mul : forall {n} (A B : PType n), APType A -> APType B -> APType (A *' B).
+Lemma A_mul : forall {n} (A B : Predicate n), APredicate A -> APredicate B -> APredicate (A *' B).
 Proof. intros.
        destruct A; destruct B; easy.
 Qed.
 
-Lemma A_tensor : forall {n m} (A : PType n) (B : PType m), APType A -> APType B -> APType (A ⊗' B).
+Lemma A_tensor : forall {n m} (A : Predicate n) (B : Predicate m), APredicate A -> APredicate B -> APredicate (A ⊗' B).
 Proof. intros.
        destruct A; destruct B; easy.
 Qed.
 
-Lemma AY : APType pY.
+Lemma AY : APredicate pY.
 Proof. easy. Qed.
 
-Hint Resolve AI AX AZ AY A_scale A_neg A_i A_mul A_tensor : wfpt_db.
+#[export] Hint Resolve AI AX AZ AY A_scale A_neg A_i A_mul A_tensor : wfpt_db.
 
 
 
@@ -776,7 +776,7 @@ Proof. intros. apply proper_length_TType_implies_proper_length_TType_nil in H.
   assumption.
 Qed.
 
-Hint Resolve WF_Matrix_translate_nil WF_Matrix_translate : wf_db.
+#[export] Hint Resolve WF_Matrix_translate_nil WF_Matrix_translate : wf_db.
 
 
 (** define this directly on the list of Paulis **)
@@ -930,7 +930,7 @@ Proof. intros.
 Qed.
 
 
-Hint Resolve WF_Matrix_translateA_nil WF_Matrix_translateA : wf_db.
+#[export] Hint Resolve WF_Matrix_translateA_nil WF_Matrix_translateA : wf_db.
 
 
 
@@ -964,6 +964,7 @@ Definition commute_TType {n : nat} (t1 t2 : TType n) : Prop :=
   let (c1, Ps1) := t1 in
   let (c2, Ps2) := t2 in
   (cBigMul (zipWith gMul_Coef Ps1 Ps2)) = (cBigMul (zipWith gMul_Coef Ps2 Ps1)).
+
 
 Fixpoint anticommute_TType_AType {n : nat} (t : TType n) (a : AType n) : Prop :=
   match a with
@@ -1460,7 +1461,7 @@ Proof. intros.
   apply unit_Pauli.
 Qed.
 
-Hint Resolve unit_Pauli unit_list_Pauli : unit_db.
+#[export] Hint Resolve unit_Pauli unit_list_Pauli : unit_db.
 
 
 (* norm of coeff = 1, precondition *)
@@ -1938,7 +1939,8 @@ Proof. intro. intro.
   reflexivity.
 Qed.
 
-(* not needed??
+(** ** not needed?? *)
+(*
 Inductive WF_AType_nil (n : nat) : AType n -> Prop :=
 | WF_A_nil : WF_AType_nil n nil
 | WF_A_nil_syntactic (a : AType n) : restricted_addition_syntactic a -> WF_AType_nil n a.
@@ -1957,7 +1959,8 @@ Qed.
 
 
 
-(* old definition
+(** ** old definition *)
+(*
 Inductive WF_AType_nil (n : nat) : AType n -> Prop :=
 | WF_A_nil : WF_AType_nil n nil
 | WF_A_nil_Cons (a : TType n) (b : AType n) : WF_TType n a -> WF_AType_nil n b -> WF_AType_nil n (a :: b).
@@ -1973,7 +1976,11 @@ Proof. intros. induction H; constructor; try easy; constructor. Qed.
 
 
 
-(* Failed attempt
+
+
+
+(** ** Failed attempt *)
+(* 
 Definition RA {n : nat} (a : AType n) := restricted_addition_syntactic a.
 Definition RA_semantic {n : nat} (a : AType n) := restricted_addition_semantic a.
 
@@ -2001,19 +2008,24 @@ Proof. intros. induction H;
   - simpl in *.
 *)
 
-  
 
-Inductive WF_PType {n} : PType n -> Prop :=
-| WF_G : forall a : AType n, WF_AType n a -> WF_PType (G a)
-| WF_Cap : forall T1 T2 : PType n, WF_PType T1 -> WF_PType T2 -> WF_PType (Cap T1 T2)
-| WF_Cup : forall T1 T2 : PType n, WF_PType T1 -> WF_PType T2 -> WF_PType (Cup T1 T2).
+
+Inductive anticommute_Predicate_syntactic {n} : Predicate n -> Predicate n -> Prop :=
+| anticomm_Pred : forall (a1 a2 : AType n),  anticommute_AType_syntactic a1 a2 ->
+                             anticommute_Predicate_syntactic (G a1) (G a2).
+
+
+Inductive WF_Predicate {n} : Predicate n -> Prop :=
+| WF_G : forall a : AType n, WF_AType n a -> WF_Predicate (G a)
+| WF_Cap : forall T1 T2 : Predicate n, WF_Predicate T1 -> WF_Predicate T2 -> WF_Predicate (Cap T1 T2)
+| WF_Cup : forall T1 T2 : Predicate n, WF_Predicate T1 -> WF_Predicate T2 -> WF_Predicate (Cup T1 T2).
 
 
 
 
 (* we are treating I as not well-formed 
-Lemma WF_I : WF_PType pI. Proof. repeat constructor; try lia; try easy. Qed. *)
-Lemma not_WF_I : ~ WF_PType pI.
+Lemma WF_I : WF_Predicate pI. Proof. repeat constructor; try lia; try easy. Qed. *)
+Lemma not_WF_I : ~ WF_Predicate pI.
 Proof. intro. 
   inversion H; subst.
   inversion H1; subst.
@@ -2038,8 +2050,8 @@ Qed.
 
 
 
-Lemma WF_X : WF_PType pX. Proof. repeat constructor; try lia; easy. Qed.
-Lemma WF_Z : WF_PType pZ. Proof. repeat constructor; try lia; easy. Qed.
+Lemma WF_X : WF_Predicate pX. Proof. repeat constructor; try lia; easy. Qed.
+Lemma WF_Z : WF_Predicate pZ. Proof. repeat constructor; try lia; easy. Qed.
 
 
 Lemma WF_TType_scale : forall {n} (a : TType n) (c : Coef),
@@ -2058,43 +2070,37 @@ Lemma WF_AType_scale : forall {n} (A : AType n) (c : Coef),
     c = C1 \/ c = (- C1)%C -> WF_AType n A -> WF_AType n (gScaleA c A).
 Proof. intros n A c H H0. inversion H0; subst.
   constructor.
-  
   induction H1; simpl in *.
   - constructor. apply WF_TType_scale; easy.
   - apply WF_A_syntactic in H1_, H1_0.
     remember H1_ as H1'. clear HeqH1'.
     remember H1_0 as H2'. clear HeqH2'.
     destruct H1', H2'.
-    apply restricted_addition_semantic_implies_proper_length_AType in H2, H3.
-    apply IHrestricted_addition_semantic1 in H1_.
-    apply IHrestricted_addition_semantic2 in H1_0.
-    clear IHrestricted_addition_semantic1. clear IHrestricted_addition_semantic2.
+    apply restricted_addition_syntactic_implies_proper_length_AType in H2, H3.
+    apply IHrestricted_addition_syntactic1 in H1_.
+    apply IHrestricted_addition_syntactic2 in H1_0.
+    clear IHrestricted_addition_syntactic1. clear IHrestricted_addition_syntactic2.
     inversion H0; subst. clear H0.
     rewrite gScaleA_comm. rewrite gScaleA_dist_app.
     constructor; try easy.
-    unfold anticommute_AType_semantic in *.
-    rewrite ! translateA_gScaleA; try assumption.
-    distribute_scale. rewrite H1. distribute_scale.
-    rewrite Cmult_comm, Cmult_assoc.
-    reflexivity.
-    (* syntactic version proof
-    induction a1; simpl in *.
+    clear -H1.
+    induction a; simpl in *.
     + apply Logic.I.
     + destruct H1. split.
-      2: apply IHa1; assumption.
-      clear -H H0.
-      induction a2; simpl in *.
+      2: apply IHa; try assumption.
+      clear -H.
+      induction a0; simpl in *.
       * apply Logic.I.
-      * destruct H0. split.
-        2: apply IHa2; assumption.
+      * destruct H. split.
+        2: apply IHa0; try  assumption.
         destruct a, a0.
         simpl in *.
-        assumption. *)
+        assumption.
 Qed.
 
-Lemma WF_PType_scale : forall {n} (A : PType n) (c : Coef), 
-    c = C1 \/ c = (- C1)%C -> APType A -> 
-    WF_PType A -> (WF_PType (scale c A)).  
+Lemma WF_Predicate_scale : forall {n} (A : Predicate n) (c : Coef), 
+    c = C1 \/ c = (- C1)%C -> APredicate A -> 
+    WF_Predicate A -> (WF_Predicate (scale c A)).  
 Proof. intros n A c H H0 H1. 
   induction H0; simpl. constructor. inversion H1; subst.
   apply WF_AType_scale; try easy.
@@ -2102,7 +2108,7 @@ Qed.
 
 
 Lemma WF_AType_app : forall {n} (a b : AType n),
-    anticommute_AType_semantic a b ->
+    anticommute_AType_syntactic a b ->
     WF_AType n a -> WF_AType n b -> WF_AType n (gScaleA (C1 / √ 2) (a ++ b)).
 Proof. intros n a b H H0 H1.
   destruct H0, H1.
@@ -2110,25 +2116,240 @@ Proof. intros n a b H H0 H1.
 Qed.
 
 
-(* simple multiplication does not preserve well-formedness
-Lemma WF_TType_mul : forall {n} (a b : TType n), WF_TType n a -> WF_TType n b -> WF_TType n (gMulT a b).
-Proof. intros n a b H H0.
+Lemma gMulT_gScaleT_l : forall {n} (a b : TType n) (c : Coef),
+    gMulT (gScaleT c a) b = gScaleT c (gMulT a b).
+Proof. intros n a b c. destruct a, b. simpl.
+  f_equal. rewrite ! Cmult_assoc.
+  reflexivity.
+Qed.
+
+Lemma gMulA_gScaleA_l : forall {n} (A B : AType n) (c : Coef),
+    (gMulA (gScaleA c A) B) = gScaleA c (gMulA A B).
+Proof. intros n A B c. induction A.
+  - simpl. reflexivity.
+  - simpl. rewrite gScaleA_dist_app.
+    rewrite IHA. f_equal.
+    unfold gScaleA.
+    rewrite map_map.
+    f_equal.
+    apply functional_extensionality.
+    intros. apply gMulT_gScaleT_l.
+Qed.
+
+Lemma gMulT_gScaleT_r : forall {n} (a b : TType n) (c : Coef),
+    gMulT a (gScaleT c b) = gScaleT c (gMulT a b).
+Proof. intros n a b c. destruct a, b. simpl.
+  f_equal. rewrite ! Cmult_assoc.
+  do 2 f_equal. rewrite Cmult_comm. reflexivity.
+Qed.
+
+Lemma proper_length_TType_zipWith_gMul_base : forall (n : nat) (c c0 c1 : Coef) (l l0 : list Pauli),
+    proper_length_TType n (c, l) ->
+    proper_length_TType n (c0, l0) ->
+    proper_length_TType n (c1, zipWith gMul_base l l0).
+Proof. intros n c c0 c1 l l0 H H0.
+  destruct H, H0. simpl in *.
+  constructor; try assumption.
+  simpl in *.
+  apply zipWith_len_pres; try assumption.
+Qed.
+
+Lemma trace_zero_syntax_zipWith_gMul_base_anticomm : forall (l l0 : list Pauli),
+    length l = length l0 ->
+    cBigMul (zipWith gMul_Coef l l0) = (- cBigMul (zipWith gMul_Coef l0 l))%C ->
+    trace_zero_syntax (zipWith gMul_base l l0).
+Proof. induction l.
+  - intros.
+    simpl in *.
+    symmetry in H. rewrite length_zero_iff_nil in H.
+    rewrite H. subst.
+    unfold zipWith, gMul_base, cBigMul in *. simpl in *.
+    inversion H0. lra.
+  - intros.
+    destruct l0.
+    + simpl in *. inversion H.
+    + simpl in *. inversion H.
+      unfold zipWith in *. simpl in *.
+      apply Pauli_anticomm_cons_comm_anticomm in H0; try assumption.
+      destruct H0.
+      unfold zipWith in *.
+      assert (C1 = C1). { easy. }
+      assert (Ci = (- - Ci)%C). { rewrite Copp_involutive. easy. }
+      assert ((- Ci)%C = (- Ci)%C). {easy. }
+      destruct a, p; simpl in *;
+        try (apply H1 in H3; clear H4; clear H5; rename H3 into anticomm);
+        try (apply H0 in H4; clear H3; clear H5; rename H4 into comm);
+        try (apply H0 in H5; clear H3; clear H4; rename H5 into comm).
+      all : unfold gMul_base at 1; unfold uncurry at 1; simpl in *.
+      2,3,4,5,7,8,9,10,12,13,14,15 : 
+      rewrite cons_conc in *; apply trace_zero_syntax_L; constructor.
+      all : rewrite cons_conc in *; apply trace_zero_syntax_R; apply IHl; assumption.
+      all : apply IHl; try assumption.
+Qed.
+
+
+
+Lemma gMul_Coef_comm_anticomm : forall (p1 p2 : Pauli),
+    (gMul_Coef p1 p2 = gMul_Coef p2 p1) \/ (gMul_Coef p1 p2 = - gMul_Coef p2 p1)%C.
+Proof. intros p1 p2. destruct p1, p2; unfold gMul_Coef; simpl; auto.
+  all: right; lca.
+Qed.
+
+Lemma gMul_Coef_comm_1 : forall (p1 p2 : Pauli),
+    (gMul_Coef p1 p2 = gMul_Coef p2 p1) -> gMul_Coef p1 p2 = C1.
+Proof. intros p1 p2 H. destruct p1, p2; unfold gMul_Coef in *; auto.
+  all: inversion H; lra.
+Qed.
+
+Lemma gMul_Coef_anticomm_plus_minus_i : forall (p1 p2 : Pauli),
+    (gMul_Coef p1 p2 = - gMul_Coef p2 p1)%C -> (gMul_Coef p1 p2 = Ci \/ gMul_Coef p1 p2 = (- Ci)%C).
+Proof. intros p1 p2 H. destruct p1, p2; unfold gMul_Coef in *; auto.
+  all: inversion H; lra.
+Qed.
+
+(** prove stronger lemma: 
+even occurrences of anticommuting Paulis have coefficients +1 or -1
+odd occurrences of anticommuting Paulis have coefficients +I or -i **)
+
+Lemma cBigMul_zipWith_gMul_Coef_comm_anticomm_plus_minus_1_i : forall (l l0 : list Pauli),
+    length l = length l0 ->
+    (cBigMul (zipWith gMul_Coef l l0) = cBigMul (zipWith gMul_Coef l0 l)
+     -> cBigMul (zipWith gMul_Coef l l0) = C1 \/ cBigMul (zipWith gMul_Coef l l0) = (-C1)%C)
+      /\ (cBigMul (zipWith gMul_Coef l l0) = (- (cBigMul (zipWith gMul_Coef l0 l)))%C
+     -> cBigMul (zipWith gMul_Coef l l0) = Ci \/ cBigMul (zipWith gMul_Coef l l0) = (-Ci)%C).
+Proof. induction l; intros.
+  - simpl in *. symmetry in H. Search (length ?a = 0%nat). rewrite length_zero_iff_nil in H.
+    subst.
+    unfold cBigMul, zipWith, gMul_Coef; simpl.
+    split; intros.
+    + auto.
+    + inversion H. lra.
+  - destruct l0.
+    + simpl in H. inversion H.
+    + inversion H.
+      simpl in *.
+      destruct (IHl l0); auto.
+      split; intros.
+       * apply Pauli_comm_cons_comm_anticomm in H3; auto.
+         destruct H3.
+         unfold zipWith, cBigMul in *; simpl.
+         rewrite fold_left_Cmult.
+         unfold uncurry at 1 3; simpl.
+         destruct (gMul_Coef_comm_anticomm a p).
+         -- specialize (H0 (H3 H5)).
+            apply gMul_Coef_comm_1 in H5.
+            rewrite H5.
+            rewrite Cmult_1_l.
+            auto.
+         -- specialize (H2 (H4 H5)).
+            apply gMul_Coef_anticomm_plus_minus_i in H5.
+            destruct H2, H5; rewrite H2, H5;
+              [ right | left | left | right ]; lca.
+       * apply Pauli_anticomm_cons_comm_anticomm in H3; auto.
+         destruct H3.
+         unfold zipWith, cBigMul in *; simpl.
+         rewrite fold_left_Cmult.
+         unfold uncurry at 1 3; simpl.
+         destruct (gMul_Coef_comm_anticomm a p).
+         -- specialize (H2 (H4 H5)).
+            apply gMul_Coef_comm_1 in H5.
+            rewrite H5.
+            rewrite Cmult_1_l.
+            auto.
+         -- specialize (H0 (H3 H5)).
+            apply gMul_Coef_anticomm_plus_minus_i in H5.
+            destruct H0, H5; rewrite H0, H5;
+              [ left | right | right | left ]; lca.
+Qed.
+
+Lemma cBigMul_zipWith_gMul_Coef_comm_plus_minus_1 : forall (l l0 : list Pauli),
+    length l = length l0 ->
+    cBigMul (zipWith gMul_Coef l l0) = cBigMul (zipWith gMul_Coef l0 l)
+    -> cBigMul (zipWith gMul_Coef l l0) = C1 \/ cBigMul (zipWith gMul_Coef l l0) = (-C1)%C.
+(** The number of the anticommuting paulis must be even, so the number of Ci coefficients in the multiplied tensor must also be even. Hence, the multiplication of all coefficients must be either 1 or -1 **)
+Proof. apply cBigMul_zipWith_gMul_Coef_comm_anticomm_plus_minus_1_i. Qed.
+
+Lemma trace_zero_syntax_zipWith_gMul_base_comm : forall (n : nat) (l l0 : list Pauli),
+  cBigMul (zipWith gMul_Coef l l0) = cBigMul (zipWith gMul_Coef l0 l)
+  -> length l = n -> length l0 = n ->
+  zipWith gMul_base l l0 <> repeat gI n ->
+  trace_zero_syntax (zipWith gMul_base l l0).
+Proof. intros. gen l0 n.  induction l.
+  - intros.
+    simpl in *.
+    rewrite <- H0 in H1.
+    rewrite length_zero_iff_nil in H1.
+    subst.
+    unfold zipWith, gMul_base, cBigMul in *. simpl in *.
+    contradiction.
+  - intros.
+    destruct l0.
+    + simpl in *. rewrite <- H1 in H0. inversion H0.
+    + simpl in *. destruct n; inversion H0; inversion H1.
+      unfold zipWith in *. simpl in *.
+      
+      unfold cBigMul in *. simpl in *.
+      rewrite ! fold_left_Cmult in H.
+      unfold uncurry at 1 3 in H. unfold uncurry at 1 in H2.
+      unfold uncurry at 1.
+      simpl in *.
+      destruct (gMul_base a p) eqn:base.
+      * assert ( ~ (uncurry gMul_base (a, p) = gI /\ map (uncurry gMul_base) (combine l l0) = repeat gI n)).
+      { generalize H2. apply not_iff_compat.
+        split. intros. destruct H3. unfold uncurry in H3. simpl in *.
+        f_equal. auto. intros. inversion H3. split; auto. }
+        assert (gMul_Coef a p = C1).
+        { destruct a, p; unfold gMul_Coef; simpl; auto.
+          all: unfold gMul_base in base; simpl in base; inversion base. }
+        assert (gMul_Coef p a = C1).
+        { destruct a, p; unfold gMul_Coef; simpl; auto.
+          all: unfold gMul_base in base; simpl in base; inversion base. }
+
+        rewrite H6, H7 in *. rewrite ! Cmult_1_l in H.
+        unfold "<>" in H3.
+        unfold uncurry at 1 in H3.
+        simpl in H3.
+        assert ( map (uncurry gMul_base) (combine l l0) <> repeat gI n ).
+        { intro.
+          assert (gMul_base a p = gI /\ map (uncurry gMul_base) (combine l l0) = repeat gI n).
+          { auto. }
+          destruct (H3 H9). }
+        specialize (IHl l0 H n H4 H5 H8).
+        Search ([?a] ++ ?b). rewrite cons_conc.
+        apply trace_zero_syntax_R. assumption.
+      * rewrite cons_conc. do 2 constructor.
+      * rewrite cons_conc. do 2 constructor.
+      * rewrite cons_conc. do 2 constructor.
+Qed.
+  
+                                                                                      
+(** Precondition: Commute -> gMulT a b <> (c, gI^n) <- use repeat function
+Precondition : Anticommute **)
+Lemma WF_TType_mul_commute : forall {n} (a b : TType n),
+    proper_length_TType n a -> proper_length_TType n b ->  (** this is line is not needed **)
+    commute_TType a b -> (snd (gMulT a b) <> repeat gI n) ->
+    WF_TType n a -> WF_TType n b -> WF_TType n (gMulT a b).
+Proof. intros n a b H H0 H1 H2 H3 H4. 
   unfold gMulT. destruct a, b.
+  unfold commute_TType in H1.
   destruct H, H0; simpl in *.
   constructor; simpl.
   unfold proper_length_TType in *.
-  destruct H, H0; simpl in *.
-  split; try assumption.
+  simpl; split; try assumption.
   apply zipWith_len_pres; assumption.
-  assert (cBigMul (zipWith gMul_Coef l l0) = C1 \/ cBigMul (zipWith gMul_Coef l l0) = (-C1)%C). ..
-  unfold zipWith, gMul_base, uncurry, combine, map.
-  constructor; simpl.
-  rewrite zipWith_len_pres with (n:=n).
-  inversion H. split; easy.
-  inversion H. simpl in H2. easy.
-  inversion H0. simpl in H2. easy.
+  assert (cBigMul (zipWith gMul_Coef l l0) = C1 \/ cBigMul (zipWith gMul_Coef l l0) = (-C1)%C).
+  { apply cBigMul_zipWith_gMul_Coef_comm_plus_minus_1 in H1;
+      rewrite <- H6 in H5; assumption. }
+  destruct H3, H4; simpl in *.
+  destruct H8, H10, H7; rewrite H8, H10, H7; autorewrite with C_db;
+    [ left | right | right | left | right | left | left | right ]; reflexivity.
+  apply trace_zero_syntax_zipWith_gMul_base_comm with (n := n);
+    try assumption.
 Qed.
 
+
+
+(* simple multiplication does not preserve well-formedness
 Lemma WF_AType_map_gMulT : forall {n} (a : TType n) (B : AType n),
     WF_TType n a -> WF_AType n B -> WF_AType n (map (fun x : TType n => gMulT a x) B).
 Proof. intros n a B0 H H0.
@@ -2145,20 +2366,92 @@ Proof.  intros n A0 B0 H H0.
      apply WF_AType_map_gMulT; easy.
 Qed.
 
-Lemma WF_PType_mul : forall {n} (A B : PType n),
-    APType A -> APType B -> 
-  WF_PType A -> WF_PType B ->
-  WF_PType (A *' B). 
+Lemma WF_Predicate_mul : forall {n} (A B : Predicate n),
+    APredicate A -> APredicate B -> 
+  WF_Predicate A -> WF_Predicate B ->
+  WF_Predicate (A *' B). 
 Proof. intros n A B H H0 H1 H2.
   induction H, H0. inversion H1; inversion H2; subst.
   constructor. apply WF_AType_mul; easy.
 Qed.
-*)
+ *)
+
+
+Lemma cBigMul_zipWith_gMul_Coef_anticomm_plus_minus_i : forall (l l0 : list Pauli),
+    length l = length l0 ->
+    (cBigMul (zipWith gMul_Coef l l0) = (- (cBigMul (zipWith gMul_Coef l0 l)))%C
+     -> cBigMul (zipWith gMul_Coef l l0) = Ci \/ cBigMul (zipWith gMul_Coef l l0) = (-Ci)%C).
+Proof. apply cBigMul_zipWith_gMul_Coef_comm_anticomm_plus_minus_1_i. Qed.
+
+
+Lemma WF_TType_mul_anticommute : forall {n} (a b : TType n),
+    anticommute_TType a b ->
+    WF_TType n a -> WF_TType n b -> WF_TType n (gScaleT Ci (gMulT a b)).
+Proof. intros n a b H H0 H1.
+  unfold anticommute_TType in H.
+  destruct a, b.
+  unfold gMulT.
+  destruct H0, H1.
+  inversion H0; inversion H1.
+  simpl in *.
+  constructor; simpl.
+  - constructor; auto.
+    simpl.
+    rewrite zipWith_len_pres with (n := n); auto.
+  - subst.
+    apply cBigMul_zipWith_gMul_Coef_anticomm_plus_minus_i in H; auto.
+    destruct H, H2, H4; rewrite H, H2, H4;
+      [ right | left | left | right | left | right | right | left ]; lca.
+  - subst.
+    apply trace_zero_syntax_zipWith_gMul_base_anticomm; auto.
+Qed.
+
 Lemma WF_AType_imul : forall {n} (A B : AType n),
-    anticommute_AType_semantic A B ->
+    anticommute_AType_syntactic A B ->
     WF_AType n A -> WF_AType n B -> WF_AType n (gScaleA (Ci)%C (gMulA A B)).
 Proof. intros n A B H H0 H1.
   constructor. destruct H0, H1.
+
+  induction H0.
+  - simpl in *. rewrite app_nil_r.
+    destruct H.
+    induction H1.
+    + simpl. constructor.
+      destruct H. unfold anticommute_TType in H.
+      destruct t, t0. simpl in *.
+      constructor; simpl in *.
+      3:{ destruct H0, H1. destruct H0, H1. simpl in *. rewrite <- H9 in H8.
+          apply trace_zero_syntax_zipWith_gMul_base_anticomm; assumption. }
+      1:{ apply proper_length_TType_zipWith_gMul_base with (c:=c) (c0:=c0);
+          destruct H0; destruct H1; assumption. }
+      admit.
+    + Search gScaleA.
+      unfold gScaleA.
+      rewrite ! map_map.
+      assert ((fun x : TType n => gScaleT Ci (gMulT t (gScaleT (C1 / √ 2) x)))
+              = (fun x : TType n => gScaleT (C1 / √ 2) (gMulT t (gScaleT Ci x)))).
+      { apply functional_extensionality. intros. (*
+      rewrite gMulT_gScaleT_l.
+
+
+      
+
+
+      
+
+      
+  - 
+  
+  induction a.
+  - simpl. assumption.
+  - simpl in *. rewrite gScaleA_dist_app.
+
+    induction H1.
+    + simpl in *.
+    constructor.
+    Search gScaleA. 
+    
+  
   induction H0, H1.
   - constructor. destruct H0, H1. constructor.
     + apply proper_length_TType_gScaleT.
@@ -2168,10 +2461,17 @@ Proof. intros n A B H H0 H1.
       unfold gMulT; simpl in *.
       apply zipWith_len_pres; try easy.
     + unfold gMulT. destruct t, t0. simpl in *.
+      do 2 destruct H.
+      
       assert (@anticommute_AType_syntactic n [(c,l)] [(c0,l0)]).
       2:{ induction l; simpl in *. do 2 destruct H6.
           unfold cBigMul, gMul_Coef; simpl in *. Admitted.
+                                                  *)
 
+Admitted.
+
+
+        
 
 Lemma WF_TType_tensor : forall {n m} (a : TType n) (b : TType m), WF_TType n a -> WF_TType m b -> WF_TType (n+m) (gTensorT a b).
 Proof. intros n m a b H H0.
@@ -2186,44 +2486,425 @@ Proof. intros n m a b H H0.
     constructor. assumption.
 Qed.
 
+Lemma map_gTensorT_gScaleA : forall {n m} (c : Coef) (a : TType n) (A : AType m),
+    map (fun x : TType m => gTensorT a x) (gScaleA c A) =
+      gScaleA c (map (fun x : TType m => gTensorT a x) A).
+Proof. intros n m c a A.
+  induction A.
+  - simpl. auto.
+  - simpl. f_equal; auto.
+    clear IHA.
+    destruct a, a0. simpl.
+    f_equal. lca.
+Qed.
+
+
+
+Lemma gTensorT_gScaleT_comm : forall {n m} (c : Coef) (a : TType n) (b : TType m), gTensorT (gScaleT c a) b = gScaleT c (gTensorT a b).
+Proof. intros n m c a b.
+  unfold gScaleT, gTensorT.
+  destruct a, b.
+  f_equal.
+  lca.
+Qed. 
+
+Lemma gTensorA_gScaleA_comm : forall {n m} (c : Coef) (a : AType n) (b : AType m), gTensorA (gScaleA c a) b = gScaleA c (gTensorA a b).
+Proof. intros n m c a b.
+  induction a.
+  - auto.
+  - simpl.
+    Search gScaleA.
+    rewrite gScaleA_dist_app.
+    rewrite IHa.
+    f_equal.
+    unfold gScaleA.
+    rewrite map_map.
+    f_equal.
+    apply functional_extensionality.
+    intros t.
+    apply gTensorT_gScaleT_comm.
+Qed.
+
+Lemma gTensorA_app_dist : forall {n m} (a1 a2 : AType n) (a0 : AType m), gTensorA (a1 ++ a2) a0 = (gTensorA a1 a0) ++ (gTensorA a2 a0).
+Proof. intros n m a1 a2 a0.
+  induction a1; auto.
+  simpl.
+  rewrite <- app_assoc.
+  f_equal.
+  auto.
+Qed.
+
+
+Lemma gTensorA_nil_r : forall {n m} (a : AType n), @gTensorA n m a [] = [].
+Proof. intros n m a.
+  induction a.
+  - auto.
+  - simpl.
+    apply IHa.
+Qed.
+
+Lemma anticommute_AType_syntactic_nil_r : forall {n} (a : AType n), anticommute_AType_syntactic a [] <-> True.
+Proof. intros n a.
+  split.
+  - intro.
+    induction a; auto.
+  - intro.
+    induction a; auto.
+    simpl.
+    rewrite and_comm.
+    rewrite kill_true.
+    apply IHa.
+Qed.
+
+Lemma anticommute_TType_comm : forall {n} (a b : TType n), anticommute_TType a b -> anticommute_TType b a.
+Proof. intros n a b H.
+  destruct a,b; simpl in *.
+  rewrite H.
+  lca.
+Qed.
+
+Lemma anticommute_AType_syntactic_comm : forall {n} (a b : AType n), anticommute_AType_syntactic a b -> anticommute_AType_syntactic b a.
+Proof. intros n a b H.
+  induction a.
+  - apply anticommute_AType_syntactic_nil_r. auto.
+  - simpl in *.
+    destruct H. specialize (IHa H0).
+    clear H0.
+    induction b.
+    + simpl. auto.
+    + simpl in *.
+      destruct H, IHa.
+      specialize (IHb H0 H2).
+      repeat split; auto.
+      apply anticommute_TType_comm.
+      auto.
+Qed.
+
+      
+Lemma anticommute_AType_syntactic_app_dist_l : forall {n} (a b c : AType n), anticommute_AType_syntactic (a ++ b) c <-> anticommute_AType_syntactic a c /\ anticommute_AType_syntactic b c.
+Proof. intros n a b c.
+  split.
+  - intro. split.
+    + induction a.
+      * simpl. auto.
+      * simpl in *. destruct H. split.
+        -- auto.
+        -- apply (IHa H0).
+    + induction a.
+      * simpl in *. auto.
+      * simpl in *. destruct H.
+        apply (IHa H0).
+  - intro. destruct H.
+    induction a.
+    + simpl. auto.
+    + simpl in *. destruct H. split.
+      * auto.
+      * apply (IHa H1).
+Qed.
+
+Lemma anticommute_AType_syntactic_app_comm_l : forall {n} (a b c : AType n), anticommute_AType_syntactic (a ++ b) c <-> anticommute_AType_syntactic (b ++ a) c.
+Proof. intros n a b c. rewrite ! anticommute_AType_syntactic_app_dist_l. rewrite and_comm.
+  split; auto.
+Qed.
+
+Lemma anticommute_AType_syntactic_app_dist_r : forall {n} (a b c : AType n), anticommute_AType_syntactic a (b ++ c) <-> anticommute_AType_syntactic a b /\ anticommute_AType_syntactic a c.
+Proof. intros n a b c.
+  split.
+  - intros.
+    apply anticommute_AType_syntactic_comm in H.
+    rewrite anticommute_AType_syntactic_app_dist_l in H.
+    destruct H.
+    split; apply anticommute_AType_syntactic_comm; auto.
+  - intros [H H0].
+    apply anticommute_AType_syntactic_comm.
+    rewrite anticommute_AType_syntactic_app_dist_l.
+    apply anticommute_AType_syntactic_comm in H.
+    apply anticommute_AType_syntactic_comm in H0.
+    split; auto.
+Qed.
+
+Lemma anticommute_AType_syntactic_app_comm_r : forall {n} (a b c : AType n), anticommute_AType_syntactic a (b ++ c) <-> anticommute_AType_syntactic a (c ++ b).
+Proof. intros n a b c. rewrite ! anticommute_AType_syntactic_app_dist_r. rewrite and_comm.
+  split; auto.
+Qed.
+
+Lemma fold_left_Cmult_app : forall {l l0}, fold_left Cmult (l ++ l0) C1 = (fold_left Cmult l C1) * (fold_left Cmult l0 C1).
+Proof. intros l l0.
+  induction l.
+  - simpl. lca.
+  - simpl.
+    rewrite ! fold_left_Cmult.
+    rewrite IHl.
+    lca.
+Qed.
+
 Lemma WF_AType_map_gTensorT : forall {n m} (a : TType n) (B : AType m),
     WF_TType n a -> WF_AType m B -> WF_AType (n+m) (map (fun x : TType m => gTensorT a x) B).
-Proof. intros n m a B0 H H0.
+Proof. intros n m a B0 H H0. 
   constructor.
-  destruct a, H, H0. simpl in *.
+  destruct H, H0. simpl in *.
   induction H0; simpl in *.
-  - destruct t, H0. do 2 constructor; simpl in *.
+  - destruct a, t, H0. simpl in *.
+    do 2 constructor; simpl in *.
     + constructor; destruct H, H0; simpl in *; try lia.
       rewrite app_length. subst. reflexivity.
     + destruct H1, H3; subst; autorewrite with C_db; [left | right | right | left]; reflexivity.
     + constructor. assumption.
-  - 
-Admitted.
+  -  rewrite map_gTensorT_gScaleA.
+     rewrite map_app.
+     constructor; auto.
+     clear IHrestricted_addition_syntactic1 IHrestricted_addition_syntactic2.
+     clear -H0.
+     induction a1.
+     + simpl. auto.
+     + simpl in *. destruct H0.
+       split.
+       2: apply IHa1; auto.
+       clear IHa1.
+       induction a2.
+       * simpl. auto.
+       * simpl in *. destruct H.
+         apply anticommute_AType_syntactic_comm in H0.
+         simpl in *.
+         destruct H0.
+         apply anticommute_AType_syntactic_comm in H2.
+         split.
+         2: apply IHa2; auto.
+         clear IHa2.
+         clear -H.
+         destruct a, a0, a2.
+         simpl in *.
+         rewrite <- ! zipWith_app_product with (n:=length l); auto.
+         unfold cBigMul in *.
+         rewrite ! fold_left_Cmult_app.
+         Search fold_left.
+         rewrite H.
+         lca.
+Qed.
 
+Lemma anticommute_TType_AType_app_dist : forall {n} (a : TType n) (A B : AType n),
+    anticommute_TType_AType a (A ++ B) <-> anticommute_TType_AType a A /\ anticommute_TType_AType a B.
+Proof. intros n a A B.
+  split.
+  - intros.
+    induction A.
+    + simpl in *. auto.
+    + simpl in *. destruct H.
+      specialize (IHA H0) as [HA HB].
+      repeat split; auto.
+  - intros.
+    destruct H.
+    induction A.
+    + simpl. auto.
+    + simpl in *.
+      destruct H.
+      specialize (IHA H1).
+      auto.
+Qed.
+
+
+Lemma  anticommute_AType_syntactic_gTensorA_comm : forall {m n} (a0 : AType n) (a1 a2 : AType m),
+anticommute_AType_syntactic (gTensorA a1 a0) (gTensorA a2 a0)
+<-> anticommute_AType_syntactic (gTensorA a0 a1) (gTensorA a0 a2).
+Proof. intros m n a0 a1 a2.
+  split.
+  - intro. induction a0.
+    + simpl. auto.
+    + simpl. rewrite ! anticommute_AType_syntactic_app_dist_l.
+      rewrite ! anticommute_AType_syntactic_app_dist_r.
+      repeat split.
+      4: apply IHa0.
+      induction a1.
+      * simpl. auto.
+      * Admitted.
+  
+
+(** (a1 + a2)⊗(b1 + b2) **)
 Lemma WF_AType_tensor : forall {n m} (A : AType n) (B : AType m),
     WF_AType n A -> WF_AType m B -> WF_AType (n+m) (gTensorA A B).
 Proof. intros n m A0 B0 H H0.
   destruct H, H0.
-  induction H, H0.
-  - simpl. do 2 constructor. apply WF_TType_tensor; assumption.
-  - simpl.
-  unfold gTensorA.
-  induction H. rewrite <- app_nil_end.
-  apply WF_AType_map_gTensorT.
-  constructor; try easy.
-  constructor.
-  constructor; easy.
-  - admit.
-  - Admitted.
+  ... 
+  induction H.
+  - simpl. rewrite <- app_nil_end.
+    apply WF_AType_map_gTensorT; auto.
+    constructor; auto.
+  - rewrite gTensorA_gScaleA_comm.
+    constructor.
+    rewrite gTensorA_app_dist.
+    constructor.
+    1-2: destruct IHrestricted_addition_syntactic1, IHrestricted_addition_syntactic2; auto.
+    
+(* gMul_Coef *)
+(** not true: 
+a1 = X+Y
+a2 = Z
+a0 = X+Z
+a1⊗a0 = XX+XZ+YX+YZ
+a2⊗a0 = ZX+ZZ
+Then XX and YX are commutative with ZZ,
+and XZ and YZ are commmutative with ZX.
+XX*ZX+XZ*ZX+YX*ZX+YZ*ZX
++XX*ZZ+XZ*ZZ+YX*ZZ+YZ*ZZ
+= -iYI+YY+iXI-XY
+-YY-iYI+XY+iXI
 
-Lemma gTensorA_gScaleA_comm : forall {n m} (c : Coef) (a : AType n) (b : AType m),
-    gTensorA (gScaleA c a) b = gScaleA c (gTensorA a b).
-Proof. Admitted.
+ZX*XX+ZX*XZ+ZX*YX+ZX*YZ
++ZZ*XX+ZZ*XZ+ZZ*YX+ZZ*YZ
+= iYI+YY-iXI-XY
+-YY+iYI+XY-iXI
 
-Lemma WF_PType_tensor : forall {n m} (A : PType n) (B : PType m),
-  APType A -> APType B -> 
-  WF_PType A -> WF_PType B ->
-  WF_PType (A ⊗' B). 
+semantically anticommutes
+
+**)
+
+    (*
+    induction H0.
+    + rewrite anticommute_AType_syntactic_gTensorA_comm. simpl. admit.
+    + 
+    
+    clear -H2.
+    rewrite anticommute_AType_syntactic_gTensorA_comm.
+    induction a0.
+    + simpl. auto.
+    + simpl.
+      rewrite ! anticommute_AType_syntactic_app_dist_l.
+      rewrite ! anticommute_AType_syntactic_app_dist_r.
+      repeat split; auto.
+      *)
+
+
+    dependent induction H.
+    + simpl. rewrite <- app_nil_end. admit.
+    +
+      inversion IHrestricted_addition_syntactic0. subst.
+      rewrite gTensorA_gScaleA_comm in H5.
+      inversion H5. subst.
+      * admit.
+      * 
+
+ anticommute_AType_syntactic (gTensorA a1 a3) (gTensorA a2 a3)
+/\  anticommute_AType_syntactic (gTensorA a0 a3) (gTensorA a2 a3)
+      
+      
+
+    
+    induction a1.
+    + simpl. auto.
+    + simpl in *.
+      destruct H2.
+      rewrite anticommute_AType_syntactic_app_dist_l.
+      split.
+      2: apply IHa1; auto.
+      clear IHa1.
+      apply anticommute_AType_syntactic_comm.
+      induction a2.
+      * simpl. auto.
+      * simpl in *. destruct H.
+        rewrite cons_conc in H0.
+        apply anticommute_AType_syntactic_app_dist_r in H0.
+        destruct H0.
+        apply anticommute_AType_syntactic_comm in H0.
+        simpl in *.
+        destruct H0.
+        apply anticommute_AType_syntactic_app_dist_l.
+        split.
+        2: apply IHa2; auto.
+        clear IHa2.
+        induction a0.
+        -- simpl. auto.
+        -- simpl in *.
+           repeat split.
+           3: rewrite cons_conc; 
+           apply anticommute_AType_syntactic_app_dist_r; split.
+           3: apply anticommute_AType_syntactic_comm; simpl in *; split; auto.
+           4: apply IHa0.
+           ++ destruct a, a2, a0; simpl in *.
+              Search zipWith.
+              rewrite <- ! zipWith_app_product with (n:=length l); auto.
+              unfold cBigMul in *.
+              rewrite ! fold_left_Cmult_app.
+      *)
+
+
+
+
+
+
+
+
+
+
+
+    clear -H2.
+    induction a1.
+    + simpl. auto.
+    + simpl in *.
+      destruct H2.
+      rewrite anticommute_AType_syntactic_app_dist_l.
+      split.
+      2: apply IHa1; auto.
+      apply anticommute_AType_syntactic_comm.
+      specialize (IHa1 H0).
+      
+      induction a2.
+      * simpl. auto.
+      * simpl in *. destruct H.
+        rewrite cons_conc in H0.
+        apply anticommute_AType_syntactic_app_dist_r in H0.
+        destruct H0.
+        apply anticommute_AType_syntactic_comm in H0.
+        simpl in *.
+        destruct H0.
+        apply anticommute_AType_syntactic_app_dist_r in IHa1.
+        destruct IHa1.
+        apply anticommute_AType_syntactic_app_dist_l.
+        split.
+        2: apply IHa2; auto.
+        specialize (IHa2 H1 H2 H5).
+        
+        
+        clear H4 H5.
+          
+        induction a0.
+        -- simpl. auto.
+        -- simpl in *.
+           setoid_rewrite cons_conc in H4 at 2.
+           apply anticommute_AType_syntactic_app_dist_r in H4.
+           destruct H4.
+           apply anticommute_AType_syntactic_comm in H4.
+           simpl in *. destruct H4.
+           setoid_rewrite cons_conc in IHa2 at 2.
+           apply anticommute_AType_syntactic_app_dist_r in IHa2.
+           destruct IHa2.
+           apply anticommute_AType_syntactic_comm in H8.
+           simpl in *. destruct H8.
+           clear H3 H7 H10.
+           
+           repeat split.
+           3: rewrite cons_conc; 
+           apply anticommute_AType_syntactic_app_dist_r; split.
+           3: apply anticommute_AType_syntactic_comm; simpl in *; split; auto.
+           
+           4: apply IHa0.
+           ++ destruct a, a2, a0; simpl in *.
+              Search zipWith.
+              rewrite <- ! zipWith_app_product with (n:=length l); auto.
+              unfold cBigMul in *.
+              rewrite ! fold_left_Cmult_app.
+              Search fold_left.
+              rewrite H.
+              lca.
+              admit.
+              admit.
+           ++  admit.
+           ++ admit.
+Admitted.
+
+Lemma WF_Predicate_tensor : forall {n m} (A : Predicate n) (B : Predicate m),
+  APredicate A -> APredicate B -> 
+  WF_Predicate A -> WF_Predicate B ->
+  WF_Predicate (A ⊗' B). 
 Proof. intros n m A B H H0 H1 H2. 
   induction H, H0. inversion H1; inversion H2; subst.
   constructor. apply WF_AType_tensor; easy.
@@ -2231,29 +2912,30 @@ Qed.
 
 
 Lemma WF_AType_add : forall {n} (A B : AType n),
-     anticommute_AType_semantic A B ->
+     anticommute_AType_syntactic A B ->
     WF_AType n A -> WF_AType n B -> WF_AType n (gScaleA (C1 / √ 2) (gAddA A B)).
 Proof. intros n A B H H0 H1.
   unfold gAddA.  apply WF_AType_app; easy.
 Qed. 
 
 
-Lemma WF_PType_add : forall {n} (A : PType n) (B : PType n),
-    APType A -> APType B -> 
-    WF_PType A -> WF_PType B ->
-    WF_PType ((C1 / √ 2) ·' (A +' B)). 
-Proof. intros n A B H H0 H1 H2.
-  induction H, H0. inversion H1; inversion H2; subst.
-  constructor. apply WF_AType_add; try easy. Admitted.
+Lemma WF_Predicate_add : forall {n} (A : Predicate n) (B : Predicate n),
+    anticommute_Predicate_syntactic A B ->
+    APredicate A -> APredicate B -> 
+    WF_Predicate A -> WF_Predicate B ->
+    WF_Predicate ((C1 / √ 2) ·' (A +' B)). 
+Proof. intros n A B H H0 H1 H2 H3.
+  induction H0, H1. inversion H; inversion H2; inversion H3; subst.
+  constructor. apply WF_AType_add; try easy. Qed.
       
 
 Lemma WF_AType_neg : forall {n} (A : AType n),
     WF_AType n A -> WF_AType n (gScaleA (Copp C1) A).
 Proof. intros n A H.  apply WF_AType_scale; try easy. right. reflexivity. Qed.
 
-Lemma WF_PType_neg : forall {n} (A : PType n),
-    APType A -> 
-    WF_PType A ->  WF_PType (- A). 
+Lemma WF_Predicate_neg : forall {n} (A : Predicate n),
+    APredicate A -> 
+    WF_Predicate A ->  WF_Predicate (- A). 
 Proof. intros n A H H0.
   induction H. inversion H0; subst.
   constructor. apply WF_AType_neg; easy.
@@ -2264,19 +2946,19 @@ Lemma WF_AType_i : forall {n} (A : AType n),
     WF_AType n A -> WF_AType n (gScaleA Ci A).
 Proof. intros n A H.  apply WF_AType_scale; easy. Qed.
 
-Lemma WF_PType_i : forall {n} (A : PType n),
-    APType A -> 
-    WF_PType A ->  WF_PType (i A). 
+Lemma WF_Predicate_i : forall {n} (A : Predicate n),
+    APredicate A -> 
+    WF_Predicate A ->  WF_Predicate (i A). 
 Proof. intros n A H H0.
   induction H. inversion H0; subst.
   constructor. apply WF_AType_i; easy.
 Qed.
 *)
-Lemma WF_Y : WF_PType pY.
-Proof. rewrite Y_is_iXZ. apply WF_PType_i. easy. apply WF_PType_mul. easy. easy. apply WF_X. apply WF_Z. Qed.
+Lemma WF_Y : WF_Predicate pY.
+Proof. rewrite Y_is_iXZ. (*apply WF_Predicate_i. easy. apply WF_Predicate_mul. easy. easy. apply WF_X. apply WF_Z. Qed. *) Admitted.
 
-
-Hint Resolve WF_AType_implies_WF_AType_nil WF_I WF_X WF_Z WF_Y WF_AType_mul WF_PType_mul WF_AType_scale WF_PType_scale WF_AType_tensor WF_PType_tensor WF_AType_add WF_PType_add WF_AType_neg WF_PType_neg WF_AType_i WF_PType_i : wfpt_db.
+(** 
+Hint Resolve WF_AType_implies_WF_AType_nil WF_I WF_X WF_Z WF_Y WF_AType_mul WF_Predicate_mul WF_AType_scale WF_Predicate_scale WF_AType_tensor WF_Predicate_tensor WF_AType_add WF_Predicate_add WF_AType_neg WF_Predicate_neg WF_AType_i WF_Predicate_i : wfpt_db. *)
 
 
 Lemma fold_left_WF_Matrix_AType : forall {n} (a : TType n) (A : list (TType n)),  
@@ -2317,52 +2999,52 @@ Hint Resolve WF_Matrix_AType : wfpt_db.
 (* WFT types *)
 (*************)
 
-Inductive WF_TPType {n} : PType n -> Prop :=
-| WFT : forall T : PType n, TPType T -> WF_PType T -> WF_TPType T.
+Inductive WF_TPredicate {n} : Predicate n -> Prop :=
+| WFT : forall T : Predicate n, TPredicate T -> WF_Predicate T -> WF_TPredicate T.
 
 Lemma WFT_all : forall (c : Coef) (l : list Pauli),
-    length l <> 0%nat -> @WF_TPType (length l) (G ([(c,l)])).
+    length l <> 0%nat -> @WF_TPredicate (length l) (G ([(c,l)])).
 Proof. intros c l. do 4 constructor. assumption. simpl. reflexivity. Qed.
  
-Lemma WFT_I : WF_TPType pI. Proof. apply WFT; auto with wfpt_db. Qed.
-Lemma WFT_X : WF_TPType pX. Proof. apply WFT; auto with wfpt_db. Qed.
-Lemma WFT_Z : WF_TPType pZ. Proof. apply WFT; auto with wfpt_db. Qed.
-Lemma WFT_Y : WF_TPType pY. Proof. rewrite Y_is_iXZ. apply WFT; auto with wfpt_db. Qed.
+Lemma WFT_I : WF_TPredicate pI. Proof. apply WFT; auto with wfpt_db. Qed.
+Lemma WFT_X : WF_TPredicate pX. Proof. apply WFT; auto with wfpt_db. Qed.
+Lemma WFT_Z : WF_TPredicate pZ. Proof. apply WFT; auto with wfpt_db. Qed.
+Lemma WFT_Y : WF_TPredicate pY. Proof. rewrite Y_is_iXZ. apply WFT; auto with wfpt_db. Qed.
 
 
-Lemma WFT_mul : forall {n} (A B : PType n),
-  WF_TPType A -> WF_TPType B -> 
-  WF_TPType (A *' B). 
+Lemma WFT_mul : forall {n} (A B : Predicate n),
+  WF_TPredicate A -> WF_TPredicate B -> 
+  WF_TPredicate (A *' B). 
 Proof. intros n A B H H0. 
        inversion H; inversion H0.
        apply WFT; auto with wfpt_db.
 Qed.
 
 
-Lemma WFT_tensor : forall {n m} (A : PType n) (B : PType m),
-  WF_TPType A -> WF_TPType B ->
-  WF_TPType (A ⊗' B). 
+Lemma WFT_tensor : forall {n m} (A : Predicate n) (B : Predicate m),
+  WF_TPredicate A -> WF_TPredicate B ->
+  WF_TPredicate (A ⊗' B). 
 Proof. intros n m A B H H0. 
        inversion H; inversion H0.
        apply WFT; auto with wfpt_db.
 Qed.
 
 
-Lemma WFT_scale : forall {n} (A : PType n) (c : Coef),
-  WF_TPType A ->  WF_TPType (scale c A). 
+Lemma WFT_scale : forall {n} (A : Predicate n) (c : Coef),
+  WF_TPredicate A ->  WF_TPredicate (scale c A). 
 Proof. intros n A c H.
        inversion H.
        apply WFT; auto with wfpt_db.
 Qed.
 
-Lemma WFT_neg : forall {n} (A : PType n),
-  WF_TPType A ->  WF_TPType (- A). 
+Lemma WFT_neg : forall {n} (A : Predicate n),
+  WF_TPredicate A ->  WF_TPredicate (- A). 
 Proof. intros n A [H H0]. 
        apply WFT_scale; easy. 
 Qed.
    
-Lemma WFT_i : forall {n} (A : PType n),
-  WF_TPType A ->  WF_TPType (i A). 
+Lemma WFT_i : forall {n} (A : Predicate n),
+  WF_TPredicate A ->  WF_TPredicate (i A). 
 Proof. intros n A H.
        unfold i. 
        apply WFT_scale; easy. 
@@ -2375,52 +3057,52 @@ Hint Resolve WFT_all WFT_I WFT_X WFT_Z WFT_Y WFT_scale WFT_mul WFT_tensor WFT_ne
 (* WFA types *)
 (*************)
 
-Inductive WF_APType {n} : PType n -> Prop :=
-| WFA : forall T : PType n, APType T -> WF_PType T -> WF_APType T.
+Inductive WF_APredicate {n} : Predicate n -> Prop :=
+| WFA : forall T : Predicate n, APredicate T -> WF_Predicate T -> WF_APredicate T.
 
-Lemma WFT_implies_WFA : forall {n} (A : PType n),
-    WF_TPType A -> WF_APType A.
+Lemma WFT_implies_WFA : forall {n} (A : Predicate n),
+    WF_TPredicate A -> WF_APredicate A.
 Proof. intros n A H. inversion H. inversion H0. subst. constructor. easy. easy. Qed.
 
 
-Lemma WFA_I : WF_APType pI. Proof. apply WFA; auto with wfpt_db. Qed.
-Lemma WFA_X : WF_APType pX. Proof. apply WFA; auto with wfpt_db. Qed.
-Lemma WFA_Z : WF_APType pZ. Proof. apply WFA; auto with wfpt_db. Qed.
-Lemma WFA_Y : WF_APType pY. Proof. rewrite Y_is_iXZ.  apply WFA; auto with wfpt_db. Qed.
+Lemma WFA_I : WF_APredicate pI. Proof. apply WFA; auto with wfpt_db. Qed.
+Lemma WFA_X : WF_APredicate pX. Proof. apply WFA; auto with wfpt_db. Qed.
+Lemma WFA_Z : WF_APredicate pZ. Proof. apply WFA; auto with wfpt_db. Qed.
+Lemma WFA_Y : WF_APredicate pY. Proof. rewrite Y_is_iXZ.  apply WFA; auto with wfpt_db. Qed.
 
-Lemma WFA_mul : forall {n} (A B : PType n),
-  WF_APType A -> WF_APType B -> 
-  WF_APType (A *' B). 
+Lemma WFA_mul : forall {n} (A B : Predicate n),
+  WF_APredicate A -> WF_APredicate B -> 
+  WF_APredicate (A *' B). 
 Proof. intros n A B H H0. 
        inversion H; inversion H0.
        apply WFA; auto with wfpt_db.
 Qed.
 
 
-Lemma WFA_tensor : forall {n m} (A : PType n) (B : PType m),
-  WF_APType A -> WF_APType B ->
-  WF_APType (A ⊗' B). 
+Lemma WFA_tensor : forall {n m} (A : Predicate n) (B : Predicate m),
+  WF_APredicate A -> WF_APredicate B ->
+  WF_APredicate (A ⊗' B). 
 Proof. intros n m A B H H0. 
        inversion H; inversion H0.
        apply WFA; auto with wfpt_db.
 Qed.
 
 
-Lemma WFA_scale : forall {n} (A : PType n) (c : Coef),
-  WF_APType A ->  WF_APType (scale c A). 
+Lemma WFA_scale : forall {n} (A : Predicate n) (c : Coef),
+  WF_APredicate A ->  WF_APredicate (scale c A). 
 Proof. intros n A c H.
        inversion H.
        apply WFA; auto with wfpt_db.
 Qed.
 
-Lemma WFA_neg : forall {n} (A : PType n),
-  WF_APType A ->  WF_APType (- A). 
+Lemma WFA_neg : forall {n} (A : Predicate n),
+  WF_APredicate A ->  WF_APredicate (- A). 
 Proof. intros n A [H H0]. 
        apply WFA_scale; easy. 
 Qed.
    
-Lemma WFA_i : forall {n} (A : PType n),
-  WF_APType A ->  WF_APType (i A). 
+Lemma WFA_i : forall {n} (A : Predicate n),
+  WF_APredicate A ->  WF_APredicate (i A). 
 Proof. intros n A H.
        unfold i. 
        apply WFA_scale; easy. 
@@ -2428,7 +3110,7 @@ Qed.
 
 
 Lemma WFA_G_sing : forall {n} (a : TType n) (A : AType n),
-    WF_APType (G (a :: A)) -> WF_APType (G ([a])).
+    WF_APredicate (G (a :: A)) -> WF_APredicate (G ([a])).
 Proof. intros n a A H.
        inversion H; subst.
        inversion H1; subst.
@@ -2437,7 +3119,7 @@ Proof. intros n a A H.
 Qed.
 
 Lemma WFA_G_cons : forall {n} (a : TType n) (A : AType n),
-    A <> [] -> WF_APType (G (a :: A)) -> WF_APType (G (A)).
+    A <> [] -> WF_APredicate (G (a :: A)) -> WF_APredicate (G (A)).
 Proof. intros n a A G H. 
        inversion H; subst.
        inversion H1; subst.
@@ -2446,7 +3128,7 @@ Proof. intros n a A G H.
 Qed.
 
 Lemma WFA_G_cons' : forall {n} (a : TType n) (A : AType n),
-    WF_AType n A -> WF_APType (G (a :: A)) -> WF_APType (G (A)).
+    WF_AType n A -> WF_APredicate (G (a :: A)) -> WF_APredicate (G (A)).
 Proof. intros n a A G H. 
        inversion H; subst.
        inversion H1; subst.
@@ -2804,33 +3486,33 @@ Proof. intros. destruct t1, t2. simpl in H1, H2, H3.
     rewrite zipWith_gMul_base_symmetric; easy.
 Qed.
 
-Fixpoint uni_PType {n} (A : PType n) :=
+Fixpoint uni_Predicate {n} (A : Predicate n) :=
   match A with
   | G a => WF_Unitary (translateA a)
-  | Cap a b => (uni_PType a) /\ (uni_PType b)
-  | Cup a b => (uni_PType a) /\ (uni_PType b)
+  | Cap a b => (uni_Predicate a) /\ (uni_Predicate b)
+  | Cup a b => (uni_Predicate a) /\ (uni_Predicate b)
   | Err => False
   end.
 
-Lemma uni_vec_I : uni_PType pI.
+Lemma uni_vec_I : uni_Predicate pI.
 Proof. simpl. unfold translateA, translate, translate_P. simpl.
        rewrite Mplus_0_l, Mscale_1_l, kron_1_r. unfold WF_Unitary.
        split. auto with wf_db. lma'.
 Qed.
   
-Lemma uni_vec_X : uni_PType pX.
+Lemma uni_vec_X : uni_Predicate pX.
 Proof. simpl. unfold translateA, translate, translate_P. simpl.
        rewrite Mplus_0_l, Mscale_1_l, kron_1_r. unfold WF_Unitary.
        split. auto with wf_db. lma'.
 Qed.
 
-Lemma uni_vec_Y : uni_PType pY.
+Lemma uni_vec_Y : uni_Predicate pY.
 Proof.  simpl. unfold translateA, translate, translate_P. simpl.
        rewrite Mplus_0_l, Mscale_1_l, kron_1_r. unfold WF_Unitary.
        split. auto with wf_db. lma'.
 Qed.
 
-  Lemma uni_vec_Z : uni_PType pZ.
+  Lemma uni_vec_Z : uni_Predicate pZ.
 Proof.  simpl. unfold translateA, translate, translate_P. simpl.
        rewrite Mplus_0_l, Mscale_1_l, kron_1_r. unfold WF_Unitary.
        split. auto with wf_db. lma'.
@@ -3200,29 +3882,29 @@ Qed.
 
 
 (** G : equivalently, Cap&Cup: pointwise **)
-Inductive eq_PType {n} : PType n -> PType n -> Prop :=
-| G_eq : forall a b : AType n, translateA a = translateA b -> eq_PType (G a) (G b)
-| Cap_eq : forall T1 T'1 T2 T'2 : PType n, T1 = T'1 -> T2 = T'2 -> eq_PType (Cap T1 T2) (Cap T'1 T'2)
-| Arr_eq : forall T1 T'1 T2 T'2 : PType n, T1 = T'1 -> T2 = T'2 -> eq_PType (Cup T1 T2) (Cup T'1 T'2)
-| Err_eq : eq_PType Err Err.
+Inductive eq_Predicate {n} : Predicate n -> Predicate n -> Prop :=
+| G_eq : forall a b : AType n, translateA a = translateA b -> eq_Predicate (G a) (G b)
+| Cap_eq : forall T1 T'1 T2 T'2 : Predicate n, T1 = T'1 -> T2 = T'2 -> eq_Predicate (Cap T1 T2) (Cap T'1 T'2)
+| Arr_eq : forall T1 T'1 T2 T'2 : Predicate n, T1 = T'1 -> T2 = T'2 -> eq_Predicate (Cup T1 T2) (Cup T'1 T'2)
+| Err_eq : eq_Predicate Err Err.
 
 
 
-(* Declare Scope PType_scope.
-Delimit Scope PType_scope with P. *)
-Open Scope PType_scope.
-Infix "≡" := eq_PType (at level 70, no associativity): PType_scope.
+(* Declare Scope Predicate_scope.
+Delimit Scope Predicate_scope with P. *)
+Open Scope Predicate_scope.
+Infix "≡" := eq_Predicate (at level 70, no associativity): Predicate_scope.
 
 (* will now show this is an equivalence relation *)
-Lemma eq_PType_refl : forall {n} (A : PType n), A ≡ A.
+Lemma eq_Predicate_refl : forall {n} (A : Predicate n), A ≡ A.
 Proof. intros n A. destruct A; constructor; easy.
 Qed.
 
-Lemma eq_PType_sym : forall {n} (A B : PType n), A ≡ B -> B ≡ A.
+Lemma eq_Predicate_sym : forall {n} (A B : Predicate n), A ≡ B -> B ≡ A.
 Proof. intros n A B H. destruct A, B; inversion H; try discriminate; try constructor; try easy.
 Qed.
 
-Lemma eq_PType_trans : forall {n} (A B C : PType n),
+Lemma eq_Predicate_trans : forall {n} (A B C : Predicate n),
     A ≡ B -> B ≡ C -> A ≡ C.
 Proof.
   intros n A B C HAB HBC.
@@ -3232,17 +3914,17 @@ Proof.
 Qed.
 
 
-Add Parametric Relation n : (PType n) (@eq_PType n)
-  reflexivity proved by eq_PType_refl
-  symmetry proved by eq_PType_sym
-  transitivity proved by eq_PType_trans
-    as eq_PType_rel.
+Add Parametric Relation n : (Predicate n) (@eq_Predicate n)
+  reflexivity proved by eq_Predicate_refl
+  symmetry proved by eq_Predicate_sym
+  transitivity proved by eq_Predicate_trans
+    as eq_Predicate_rel.
 
 
 
 
 
-Lemma AType_PType_equiv_compat : forall{n} (A A' : AType n),
+Lemma AType_Predicate_equiv_compat : forall{n} (A A' : AType n),
     (A ≡ A')%A -> (G A ≡ G A')%P.
 Proof. intros n A A' H.
        unfold "≡"%A in *.
@@ -3251,14 +3933,14 @@ Proof. intros n A A' H.
 Qed.
        
 Add Parametric Morphism (n : nat) : G
-  with signature @eq_AType n ==> @eq_PType n as AType_PType_mor.
+  with signature @eq_AType n ==> @eq_Predicate n as AType_Predicate_mor.
 Proof.
   intros.
-  apply AType_PType_equiv_compat; easy.
+  apply AType_Predicate_equiv_compat; easy.
 Qed.
 
 
-Lemma add_comm : forall {n} (A A' : PType n) c, c ·' (A +' A') ≡ c ·' (A' +' A).
+Lemma add_comm : forall {n} (A A' : Predicate n) c, c ·' (A +' A') ≡ c ·' (A' +' A).
 Proof. intros n A A' c.    
   destruct A, A'; simpl; try easy.
   constructor. apply gAddA_comm.
@@ -3357,7 +4039,7 @@ Proof. intros. unfold "≡"%A.
 
 (***************************************************************************)
 (* proving some preliminary lemmas on the TType level before we prove their 
-                    counterparts on the PType level *)
+                    counterparts on the Predicate level *)
 (***************************************************************************)
 
 
@@ -3474,8 +4156,8 @@ Qed.
 
 (* Multiplication laws *)
 
-Lemma mul_assoc : forall {n} (A B C : PType n), 
-  WF_APType A -> WF_APType B -> WF_APType C -> 
+Lemma mul_assoc : forall {n} (A B C : Predicate n), 
+  WF_APredicate A -> WF_APredicate B -> WF_APredicate C -> 
   A *' (B *' C) = A *' B *' C. 
 Proof. intros. 
        destruct A; destruct B; destruct C; try easy.
@@ -3486,7 +4168,7 @@ Proof. intros.
 Qed.
 
 
-Lemma mul_I_l : forall (A : PType 1), WF_APType A -> pI *' A = A.
+Lemma mul_I_l : forall (A : Predicate 1), WF_APredicate A -> pI *' A = A.
 Proof. intros A H.
   inversion H. 
   destruct A; try easy.
@@ -3509,7 +4191,7 @@ Proof. intros A H.
     + simpl in IHWF_AType. rewrite IHWF_AType. easy.
 Qed.
 
-Lemma mul_I_r : forall (A : PType 1), WF_APType A -> A *' pI = A.
+Lemma mul_I_r : forall (A : Predicate 1), WF_APredicate A -> A *' pI = A.
 Proof. intros A H.
   inversion H. 
   destruct A; try easy.
@@ -3552,7 +4234,7 @@ Proof. simpl. do 3 f_equal.
 
 
 
-Lemma switch_neg : forall n (A : PType n) (c : Coef), - (c ·' A) = c ·' (- A).
+Lemma switch_neg : forall n (A : Predicate n) (c : Coef), - (c ·' A) = c ·' (- A).
   intros n A c.
   induction A; simpl; try rewrite IHA1, IHA2; try easy.
   f_equal. unfold gScaleA. rewrite 2 map_map. f_equal.
@@ -3561,7 +4243,7 @@ Lemma switch_neg : forall n (A : PType n) (c : Coef), - (c ·' A) = c ·' (- A).
 Qed.
 
 
-Lemma neg_inv : forall (n : nat) (A : PType n), WF_APType A -> - - A = A.
+Lemma neg_inv : forall (n : nat) (A : Predicate n), WF_APredicate A -> - - A = A.
 Proof. intros n A H.
        induction A; simpl; try easy.
        2,3: inversion H; inversion H0.
@@ -3585,8 +4267,8 @@ Proof. intros n a b H H0. induction H0.
   - simpl. rewrite IHWF_AType. f_equal. destruct a, a0. simpl. f_equal. lca.
 Qed.
 
-Lemma neg_dist_l : forall (n : nat) (A B : PType n), 
-  WF_APType A -> WF_APType B -> 
+Lemma neg_dist_l : forall (n : nat) (A B : Predicate n), 
+  WF_APredicate A -> WF_APredicate B -> 
   -A *' B = - (A *' B).
 Proof. intros. 
   inversion H; inversion H0; subst.
@@ -3615,8 +4297,8 @@ Proof. intros.
 Qed.
 
 
-Lemma neg_dist_r : forall (n : nat) (A B : PType n), 
-  WF_APType A -> WF_APType B -> 
+Lemma neg_dist_r : forall (n : nat) (A B : Predicate n), 
+  WF_APredicate A -> WF_APredicate B -> 
   A *' (-B) = - (A *' B).
 Proof. intros. 
   inversion H; inversion H0; subst.
@@ -3644,14 +4326,14 @@ Proof. intros.
     destruct a, a0. simpl. f_equal. lca.
 Qed.
 
-Lemma neg_dist_add : forall (n : nat) (A B : PType n), - (A +' B) = -A +' -B.
+Lemma neg_dist_add : forall (n : nat) (A B : Predicate n), - (A +' B) = -A +' -B.
 Proof. intros n A B.
   induction A; induction B; simpl; try easy.
   f_equal. unfold gScaleA, gAddA.
   rewrite <- map_app. f_equal.
 Qed. 
 
-Lemma i_sqr : forall (n : nat) (A : PType n), i (i A) = -A.
+Lemma i_sqr : forall (n : nat) (A : Predicate n), i (i A) = -A.
 Proof. intros. 
   induction A; try easy. 
   - destruct a.
@@ -3664,8 +4346,8 @@ Proof. intros.
         -- simpl. rewrite IHa. f_equal. destruct a. simpl. f_equal. lca.
   Qed.
 
-Lemma i_dist_l : forall (n : nat) (A B : PType n), 
-  WF_APType A -> WF_APType B -> 
+Lemma i_dist_l : forall (n : nat) (A B : Predicate n), 
+  WF_APredicate A -> WF_APredicate B -> 
   i A *' B = i (A *' B).
 Proof. intros. 
   inversion H; inversion H0; subst.
@@ -3687,8 +4369,8 @@ Proof. intros.
 Qed.
 
 
-Lemma i_dist_r : forall (n : nat) (A B : PType n), 
-  WF_APType A -> WF_APType B -> 
+Lemma i_dist_r : forall (n : nat) (A B : Predicate n), 
+  WF_APredicate A -> WF_APredicate B -> 
   A *' i B = i (A *' B).
 Proof. intros. 
   inversion H; inversion H0; subst.
@@ -3709,7 +4391,7 @@ Proof. intros.
     rewrite H1. f_equal. destruct a, a0. simpl. f_equal. lca.
 Qed.
 
-Lemma i_neg_comm : forall (n : nat) (A : PType n), i (-A) = -i A.
+Lemma i_neg_comm : forall (n : nat) (A : Predicate n), i (-A) = -i A.
 Proof. intros.
   induction A; try easy. 
   - destruct a.
@@ -3764,8 +4446,8 @@ Proof. intros n a1 a2 a3 H H0 H1.
 Qed.
 
 
-Lemma neg_tensor_dist_l : forall {n m} (A : PType n) (B : PType m), 
-  WF_APType A -> WF_APType B -> 
+Lemma neg_tensor_dist_l : forall {n m} (A : Predicate n) (B : Predicate m), 
+  WF_APredicate A -> WF_APredicate B -> 
   -A ⊗' B = - (A ⊗' B).
 Proof. intros.
        inversion H; inversion H0; subst.
@@ -3782,8 +4464,8 @@ Proof. intros.
 Qed.
 
 
-Lemma neg_tensor_dist_r : forall {n m} (A : PType n) (B : PType m), 
-  WF_APType A -> WF_APType B -> 
+Lemma neg_tensor_dist_r : forall {n m} (A : Predicate n) (B : Predicate m), 
+  WF_APredicate A -> WF_APredicate B -> 
   A ⊗' (-B) = - (A ⊗' B).
 Proof. intros. 
        inversion H; inversion H0; subst.
@@ -3800,8 +4482,8 @@ Proof. intros.
 Qed.
 
 
-Lemma i_tensor_dist_l : forall {n m} (A : PType n) (B : PType m), 
-  WF_APType A -> WF_APType B -> 
+Lemma i_tensor_dist_l : forall {n m} (A : Predicate n) (B : Predicate m), 
+  WF_APredicate A -> WF_APredicate B -> 
   i A ⊗' B = i (A ⊗' B).
 Proof. intros.
        inversion H; inversion H0; subst.
@@ -3818,8 +4500,8 @@ Proof. intros.
 Qed.
 
 
-Lemma i_tensor_dist_r : forall {n m} (A : PType n) (B : PType m), 
-  WF_APType A -> WF_APType B -> 
+Lemma i_tensor_dist_r : forall {n m} (A : Predicate n) (B : Predicate m), 
+  WF_APredicate A -> WF_APredicate B -> 
   A ⊗' i B = i (A ⊗' B).
 Proof. intros.
        inversion H; inversion H0; subst.
@@ -3844,8 +4526,8 @@ Qed.
    but axiomatization doesn't allow for that calculation. *)
 (* This should be generalizable to the other, assuming we're multiplying
    valid types. *)
-Lemma mul_tensor_dist : forall {n m} (A C : PType n) (B D : PType m),
-  WF_APType A -> WF_APType B -> WF_APType C -> WF_APType D ->
+Lemma mul_tensor_dist : forall {n m} (A C : Predicate n) (B D : Predicate m),
+  WF_APredicate A -> WF_APredicate B -> WF_APredicate C -> WF_APredicate D ->
   (A .⊗ B) .* (C .⊗ D) = (A .* C) .⊗ (B .* D).
 Proof. intros.
        destruct A; destruct B; destruct C; destruct D; try easy;
@@ -3858,8 +4540,8 @@ Qed.
 
 
 
-Lemma decompose_tensor : forall (A B : PType 1),
-  WF_APType A -> WF_APType B ->
+Lemma decompose_tensor : forall (A B : Predicate 1),
+  WF_APredicate A -> WF_APredicate B ->
   A .⊗ B = (A .⊗ I) .* (I .⊗ B).
 Proof.
   intros A B H H0.  
@@ -3868,8 +4550,8 @@ Proof.
 Qed.
 
 
-Lemma decompose_tensor_mult_l : forall (A B : PType 1),
-  WF_APType A -> WF_APType B ->
+Lemma decompose_tensor_mult_l : forall (A B : Predicate 1),
+  WF_APredicate A -> WF_APredicate B ->
   (A .* B) .⊗ I = (A .⊗ I) .* (B .⊗ I).
 Proof.
   intros. 
@@ -3877,8 +4559,8 @@ Proof.
 Qed.
 
 
-Lemma decompose_tensor_mult_r : forall (A B : PType 1),
-  WF_APType A -> WF_APType B ->
+Lemma decompose_tensor_mult_r : forall (A B : Predicate 1),
+  WF_APredicate A -> WF_APredicate B ->
   I .⊗ (A .* B) = (I .⊗ A) .* (I .⊗ B).
 Proof.
   intros. 
@@ -3982,7 +4664,7 @@ Definition vecSatisfies {n} (v : Vector n) (U : Square n) : Prop :=
 Definition vecSatisfiesA {n} (v : Vector (2 ^ n)) (A : AType n) : Prop :=
   vecSatisfies v (translateA A).
 
-Fixpoint vecSatisfiesP {n} (v : Vector (2 ^ n)) (P : PType n) : Prop :=
+Fixpoint vecSatisfiesP {n} (v : Vector (2 ^ n)) (P : Predicate n) : Prop :=
   match P with
   | G A => vecSatisfies v (translateA A)
   | Cap a b => (vecSatisfiesP v a) /\ (vecSatisfiesP v b)
@@ -3998,7 +4680,7 @@ Notation "P [[[ v ]]]" := (vecSatisfiesP v P) (at level 0).
 Definition vecSatisfies' {n} (v : Vector n) (U : Square n) : Prop :=
   WF_Matrix v /\ exists c, Eigenpair U (v, c).
 
-Fixpoint vecSatisfiesP' {n} (v : Vector (2 ^ n)) (P : PType n) : Prop :=
+Fixpoint vecSatisfiesP' {n} (v : Vector (2 ^ n)) (P : Predicate n) : Prop :=
   match P with
   | G A => vecSatisfies' v (translateA A)
   | Cap a b => (vecSatisfiesP' v a) /\ (vecSatisfiesP' v b)
@@ -4011,7 +4693,7 @@ Fixpoint vecSatisfiesP' {n} (v : Vector (2 ^ n)) (P : PType n) : Prop :=
 Definition pairSatisfies {n} (p : Vector n * Coef) (U : Square n) : Prop :=
   WF_Matrix (fst p) /\ Eigenpair U p.
 
-Fixpoint pairSatisfiesP {n} (p : Vector (2 ^ n) * Coef) (P : PType n) : Prop :=
+Fixpoint pairSatisfiesP {n} (p : Vector (2 ^ n) * Coef) (P : Predicate n) : Prop :=
   match P with
   | G A => pairSatisfies p (translateA A)
 (** ** what to do for cap?? does a and b must have the same eigenvalue? ** **)
@@ -4030,30 +4712,30 @@ Definition triple_vecA {n} (A : AType n) (g : prog) (B : AType n) :=
 
 
 (** P [[[v]]] := vecSatisfiesP v P **)
-Definition triple_vec {n} (A : PType n) (g : prog) (B : PType n) :=
+Definition triple_vec {n} (A : Predicate n) (g : prog) (B : Predicate n) :=
   forall (v : Vector (2 ^ n)), vecSatisfiesP v A -> vecSatisfiesP ((translate_prog n g) × v) B.
 
 
-Definition triple_vec' {n} (A : PType n) (g : prog) (B : PType n) :=
+Definition triple_vec' {n} (A : Predicate n) (g : prog) (B : Predicate n) :=
   forall (v : Vector (2 ^ n)), vecSatisfiesP' v A -> vecSatisfiesP' ((translate_prog n g) × v) B.
 
-Definition triple_pair {n} (A : PType n) (g : prog) (B : PType n) :=
+Definition triple_pair {n} (A : Predicate n) (g : prog) (B : Predicate n) :=
   forall (p : Vector (2 ^ n) * Coef), pairSatisfiesP p A -> pairSatisfiesP ((translate_prog n g) × (fst p), (snd p)) B.
 
 
 Inductive is_Heisenberg_triple {n} : AType n ->  prog -> AType n -> Prop :=
 | Heisenberg : forall (A : AType n) (U : prog) (B : AType n),
-(*    APType A -> APType B -> 
+(*    APredicate A -> APredicate B -> 
     ((translate_prog n U) × translateP A = translateP B × (translate_prog n U)) -> *)
     ((translate_prog n U) × translateA A = translateA B × (translate_prog n U)) ->
     is_Heisenberg_triple A U B
 (*
-| Heisenberg_neg_l : forall (A : PType n) (U : prog) (B : PType n),
-    CPType A -> is_Heisenberg_triple A U B
-| Heisenberg_neg_r : forall (A : PType n) (U : prog) (B : PType n),
-    CPType B -> is_Heisenberg_triple A U B
-| Heisenberg_Err_l : forall (U : prog) (B : PType n), is_Heisenberg_triple Err U B
-| Heisenberg_Err_r : forall (A : PType n) (U : prog), is_Heisenberg_triple A U Err.
+| Heisenberg_neg_l : forall (A : Predicate n) (U : prog) (B : Predicate n),
+    CPredicate A -> is_Heisenberg_triple A U B
+| Heisenberg_neg_r : forall (A : Predicate n) (U : prog) (B : Predicate n),
+    CPredicate B -> is_Heisenberg_triple A U B
+| Heisenberg_Err_l : forall (U : prog) (B : Predicate n), is_Heisenberg_triple Err U B
+| Heisenberg_Err_r : forall (A : Predicate n) (U : prog), is_Heisenberg_triple A U Err.
 *).
 
 Definition tripleA {n} (A : AType n) (g : prog) (B : AType n) := triple_vecA A g B /\ is_Heisenberg_triple A g B.
@@ -4061,7 +4743,7 @@ Definition tripleA {n} (A : AType n) (g : prog) (B : AType n) := triple_vecA A g
 Notation "{{ A }} g {{ B }}" := (tripleA A g B) (at level 70, no associativity).
 
 
-Definition triple {n} (A : PType n) (g : prog) (B : PType n) := triple_vec A g B.
+Definition triple {n} (A : Predicate n) (g : prog) (B : Predicate n) := triple_vec A g B.
 
 Notation "{{{ A }}} g {{{ B }}}" := (triple A g B) (at level 70, no associativity).
 
@@ -4079,15 +4761,15 @@ Reserved Infix "⇒P" (at level 65, no associativity).
 Definition PauliPred {n} (t : TType n) :=
   let (c, l) := t in c = C1.
     
-Inductive implies {n} : PType n -> PType n -> Prop :=
-| CapElim : forall (A B : PType n), (Cap A B) ⇒ (A)
-| CapComm : forall (A B : PType n), (Cap A B) ⇒ (Cap B A)
-| CapAssoc1 : forall (A B C : PType n), (Cap A (Cap B C)) ⇒ (Cap (Cap A B) C)
-| CapAssoc2 : forall (A B C : PType n), (Cap (Cap A B) C) ⇒ (Cap A (Cap B C))
-| CupIntro : forall (A B : PType n), (A) ⇒ (Cup A B)
-| CupComm : forall (A B : PType n), (Cup A B) ⇒ (Cup B A)
-| CupAssoc1 : forall (A B C : PType n), (Cup A (Cup B C)) ⇒ (Cup (Cup A B) C)
-| CupAssoc2 : forall (A B C : PType n), (Cup (Cup A B) C) ⇒ (Cup A (Cup B C))
+Inductive implies {n} : Predicate n -> Predicate n -> Prop :=
+| CapElim : forall (A B : Predicate n), (Cap A B) ⇒ (A)
+| CapComm : forall (A B : Predicate n), (Cap A B) ⇒ (Cap B A)
+| CapAssoc1 : forall (A B C : Predicate n), (Cap A (Cap B C)) ⇒ (Cap (Cap A B) C)
+| CapAssoc2 : forall (A B C : Predicate n), (Cap (Cap A B) C) ⇒ (Cap A (Cap B C))
+| CupIntro : forall (A B : Predicate n), (A) ⇒ (Cup A B)
+| CupComm : forall (A B : Predicate n), (Cup A B) ⇒ (Cup B A)
+| CupAssoc1 : forall (A B C : Predicate n), (Cup A (Cup B C)) ⇒ (Cup (Cup A B) C)
+| CupAssoc2 : forall (A B C : Predicate n), (Cup (Cup A B) C) ⇒ (Cup A (Cup B C))
 | PauliMult1 : forall (T1 T2 : TType n),
     WF_TType n T1 -> WF_TType n T2 ->
     (Cap (G [T1]) (G [T2]))
@@ -4097,10 +4779,10 @@ Inductive implies {n} : PType n -> PType n -> Prop :=
     WF_TType n T1 -> WF_TType n T2 ->
     (Cap (G [T1]) (G [gMulT T1 T2]))
       ⇒ (Cap (G [T1]) (G [T2]))
-| AddComm : forall (A B : PType n), (A +' B) ⇒ (B +' A)
-| AddAssoc1 : forall (A B C : PType n), ((A +' B) +' C) ⇒ (A +' (B +' C))
-| AddAssoc2 : forall (A B C : PType n), (A +' (B +' C)) ⇒ ((A +' B) +' C)
-| AddZeroElim : forall (A B C : PType n), (A +' ((C0 ·' C) *' B)) ⇒ (A) 
+| AddComm : forall (A B : Predicate n), (A +' B) ⇒ (B +' A)
+| AddAssoc1 : forall (A B C : Predicate n), ((A +' B) +' C) ⇒ (A +' (B +' C))
+| AddAssoc2 : forall (A B C : Predicate n), (A +' (B +' C)) ⇒ ((A +' B) +' C)
+| AddZeroElim : forall (A B C : Predicate n), (A +' ((C0 ·' C) *' B)) ⇒ (A) 
 where "x ⇒ y" := (implies x y).
 
 
@@ -4113,15 +4795,15 @@ where "x ⇒A y" := (impliesA x y).
 
 
 
-Inductive impliesP {n} : PType n -> PType n -> Prop :=
-| CapElimP : forall (A B : PType n), (Cap A B) ⇒P (A)
-| CapCommP : forall (A B : PType n), (Cap A B) ⇒P (Cap B A)
-| CapAssoc1P : forall (A B C : PType n), (Cap A (Cap B C)) ⇒P (Cap (Cap A B) C)
-| CapAssoc2P : forall (A B C : PType n), (Cap (Cap A B) C) ⇒P (Cap A (Cap B C))
-| CupIntroP : forall (A B : PType n), (A) ⇒P (Cup A B)
-| CupCommP : forall (A B : PType n), (Cup A B) ⇒P (Cup B A)
-| CupAssoc1P : forall (A B C : PType n), (Cup A (Cup B C)) ⇒P (Cup (Cup A B) C)
-| CupAssoc2P : forall (A B C : PType n), (Cup (Cup A B) C) ⇒P (Cup A (Cup B C))
+Inductive impliesP {n} : Predicate n -> Predicate n -> Prop :=
+| CapElimP : forall (A B : Predicate n), (Cap A B) ⇒P (A)
+| CapCommP : forall (A B : Predicate n), (Cap A B) ⇒P (Cap B A)
+| CapAssoc1P : forall (A B C : Predicate n), (Cap A (Cap B C)) ⇒P (Cap (Cap A B) C)
+| CapAssoc2P : forall (A B C : Predicate n), (Cap (Cap A B) C) ⇒P (Cap A (Cap B C))
+| CupIntroP : forall (A B : Predicate n), (A) ⇒P (Cup A B)
+| CupCommP : forall (A B : Predicate n), (Cup A B) ⇒P (Cup B A)
+| CupAssoc1P : forall (A B C : Predicate n), (Cup A (Cup B C)) ⇒P (Cup (Cup A B) C)
+| CupAssoc2P : forall (A B C : Predicate n), (Cup (Cup A B) C) ⇒P (Cup A (Cup B C))
 | PauliMult1P : forall (T1 T2 : TType n),
     WF_TType n T1 -> WF_TType n T2 ->
     (Cap (G [T1]) (G [T2]))
@@ -4160,7 +4842,7 @@ Proof.
 Qed.
 
 (** *** prove that the semantics are actually implications *** **)
-Lemma interpret_implies {n} (A B : PType n) :
+Lemma interpret_implies {n} (A B : Predicate n) :
   A ⇒ B -> (forall v : Vector (2 ^ n), vecSatisfiesP v A -> vecSatisfiesP v B).
 Proof.
   intros H0 v H1.
@@ -4360,7 +5042,7 @@ Proof.
 Qed.
 
 (** *** prove that the semantics are actually implications *** **)
-Lemma interpret_impliesP {n} (A B : PType n) :
+Lemma interpret_impliesP {n} (A B : Predicate n) :
   A ⇒P B -> (forall v : Vector (2 ^ n), vecSatisfiesP v A -> vecSatisfiesP v B).
 Proof.
   intros H0 v H1.
@@ -4451,7 +5133,7 @@ Qed.
 
 
 (** *** prove that the semantics are actually implications *** **)
-Lemma interpret_implies' {n} (A B : PType n) :
+Lemma interpret_implies' {n} (A B : Predicate n) :
   A ⇒ B -> (forall v : Vector (2 ^ n), vecSatisfiesP' v A -> vecSatisfiesP' v B).
 Proof.
   intros H0 v H1.
@@ -4603,7 +5285,7 @@ Qed.
 
 (*** Admitted ***)
 (** *** prove that the semantics are actually implications *** **)
-Lemma interpret_implies_pair {n} (A B : PType n) :
+Lemma interpret_implies_pair {n} (A B : Predicate n) :
   A ⇒ B -> (forall p : Vector (2 ^ n) * Coef, pairSatisfiesP p A -> pairSatisfiesP p B).
 Proof.
   intros H0 p H1.
@@ -4970,9 +5652,9 @@ Ltac unfold_triple  :=
             | H : is_Heisenberg_triple (G _) _ (G _) |- _ => inversion H; clear H
             end;
           repeat match goal with
-            | H : CPType (G _) |- _ => inversion H
-            | H : APType (G _) |- _ => clear H
-            | H : APType _ |- _ => inversion H; clear H; subst
+            | H : CPredicate (G _) |- _ => inversion H
+            | H : APredicate (G _) |- _ => clear H
+            | H : APredicate _ |- _ => inversion H; clear H; subst
             | H : translate_prog _ _ × translateP (G _) =
                     translateP (G _) × translate_prog _ _  |- _ => simpl in H
             end);
@@ -4983,7 +5665,7 @@ Ltac unfold_triple  :=
   try(apply Heisenberg_Err_r);
   try(apply Heisenberg;
       match goal with
-      | |- APType (G _) => constructor
+      | |- APredicate (G _) => constructor
       | |- translate_prog _ _ × translateP (G _) =
              translateP (G _) × translate_prog _ _  => simpl
       end).
@@ -5030,7 +5712,7 @@ Admitted.
 
 
 
-Lemma CAP_Heisenberg_PP : forall {n} (A A' B B' : PType n) (g : prog),
+Lemma CAP_Heisenberg_PP : forall {n} (A A' B B' : Predicate n) (g : prog),
     {{{ A }}} g {{{ A' }}} -> {{{ B }}} g {{{ B' }}} -> {{{ A ∩ B }}} g {{{ A' ∩ B' }}}.
 Proof.
   intros n A A' B B' g H0 H1.
@@ -5052,7 +5734,7 @@ Proof.
   - specialize (H1 v H4). easy.
 Qed.
 
-Lemma CAP_HeisenbergPA : forall {n} (a a' : AType n) (B B' : PType n) (g : prog),
+Lemma CAP_HeisenbergPA : forall {n} (a a' : AType n) (B B' : Predicate n) (g : prog),
     {{ a }} g {{ a' }} -> {{{ B }}} g {{{ B' }}} -> {{{ G a ∩ B }}} g {{{ G a' ∩ B' }}}.
 Proof.
   intros n a a' B B' g H0 H1.
@@ -5077,7 +5759,7 @@ Proof.
     destruct H2; try easy.
 Admitted.
 
-Lemma CONS_HeisenbergP : forall {n} (A' A B B' : PType n) (g : prog),
+Lemma CONS_HeisenbergP : forall {n} (A' A B B' : Predicate n) (g : prog),
     A' ⇒P A -> {{{ A }}} g {{{ B }}} -> B ⇒P B' -> {{{ A' }}} g {{{ B' }}}.
 Proof.
   intros n A' A B B' g H0 H1 H2.
@@ -6683,7 +7365,7 @@ Proof.
 Qed.
 
 
-Lemma SEQ : forall {n} (A B C : PType n) (g1 g2 : prog),
+Lemma SEQ : forall {n} (A B C : Predicate n) (g1 g2 : prog),
     {{ A }} g1 {{ B }} -> {{ B }} g2 {{ C }} ->  {{ A }} g1 ;; g2 {{ C }}.
 Proof.
   intros n A B C g1 g2 H0 H1.
@@ -6697,7 +7379,7 @@ Proof.
 Qed.
 
 
-Lemma CONS : forall {n} (A' A B B' : PType n) (g : prog),
+Lemma CONS : forall {n} (A' A B B' : Predicate n) (g : prog),
     A' ⇒ A -> {{ A }} g {{ B }} -> B ⇒ B' -> {{ A' }} g {{ B' }}.
 Proof.
   intros n A' A B B' g H0 H1 H2.
@@ -6710,7 +7392,7 @@ Qed.
   
   
   
-Lemma CAP : forall {n} (A A' B B' : PType n) (g : prog),
+Lemma CAP : forall {n} (A A' B B' : Predicate n) (g : prog),
     {{ A }} g {{ A' }} -> {{ B }} g {{ B' }} -> {{ A ∩ B }} g {{ A' ∩ B' }}.
 Proof.
   intros n A A' B B' g H0 H1.
@@ -6723,7 +7405,7 @@ Proof.
   - specialize (H1 v H3). easy.
 Qed.
   
-Lemma CUP : forall {n} (A A' B B' : PType n) (g : prog),
+Lemma CUP : forall {n} (A A' B B' : Predicate n) (g : prog),
     {{ A }} g {{ A' }} -> {{ B }} g {{ B' }} -> {{ A ⊍ B }} g {{ A' ⊍ B' }}.
 Proof.
   intros n A A' B B' g H0 H1.
@@ -6776,19 +7458,19 @@ Inductive conclude : Prop -> Prop :=
     i < n -> j < n -> ctrl_prog U -> ith_TType i T = A -> ith_TType j T = B ->
     ( @triple 1 (G [ (C1, [A ; B]) ]) (U 0 1) (G [ (C1, [C ; D]) ]) ) ->
     conclude ( {{ G [T] }} U i j {{ G [ith_switch_TType j (ith_switch_TType i T (C1, [C])) (C1, [D]) ] }} )
-| MUL : forall {n} (A B A' B' : PType n) (g : prog),
+| MUL : forall {n} (A B A' B' : Predicate n) (g : prog),
     {{ A }} g {{ B }} -> {{ A' }} g {{ B' }} -> conclude ( {{ A *' A' }} g {{ B *' B' }} )
-| SCALE : forall {n} (c : Coef) (A A' : PType n) (g : prog),
+| SCALE : forall {n} (c : Coef) (A A' : Predicate n) (g : prog),
     {{ A }} g {{ A' }} -> conclude ( {{ c ·' A }} g {{ c ·' A' }} )
-| SEQ : forall {n} (A B C : PType n) (g1 g2 : prog),
+| SEQ : forall {n} (A B C : Predicate n) (g1 g2 : prog),
     {{ A }} g1 {{ B }} -> {{ B }} g2 {{ C }} -> conclude ( {{ A }} g1 ;; g2 {{ C }} )
-| CONS : forall {n} (A' A B B' : PType n) (g : prog),
+| CONS : forall {n} (A' A B B' : Predicate n) (g : prog),
     A' ⇒ A -> {{ A }} g {{ B }} -> B ⇒ B' -> conclude ( {{ A' }} g {{ B' }} )
-| CAP : forall {n} (A A' B B' : PType n) (g : prog),
+| CAP : forall {n} (A A' B B' : Predicate n) (g : prog),
     {{ A }} g {{ A' }} -> {{ B }} g {{ B' }} -> conclude ( {{ A ∩ B }} g {{ A' ∩ B' }} )
-| CUP : forall {n} (A A' B B' : PType n) (g : prog),
+| CUP : forall {n} (A A' B B' : Predicate n) (g : prog),
     {{ A }} g {{ A' }} -> {{ B }} g {{ B' }} -> conclude ( {{ A ⊍ B }} g {{ A' ⊍ B' }} )
-| ADD : forall {n} (A B C D : PType n) (g : prog),
+| ADD : forall {n} (A B C D : Predicate n) (g : prog),
     {{ A }} g {{ C }} -> {{ B }} g {{ D }} -> conclude ( {{ A +' B }} g {{ C +' D }} )
 | TENADD : forall {n} (i : nat) (T : TType n) (A : Pauli) (B C : TType 1) (U : nat -> prog),
     i < n -> simpl_prog U -> ith_TType i T = A ->
@@ -6805,13 +7487,13 @@ Inductive conclude : Prop -> Prop :=
 
 
 
-Inductive progHasSingType {prg_len : nat} : prog -> PType prg_len -> PType prg_len -> Prop :=
+Inductive progHasSingType {prg_len : nat} : prog -> Predicate prg_len -> Predicate prg_len -> Prop :=
 | PHST : forall p T1 T2, Cap_vt T1 -> Cap_vt T2 -> 
   (translate_prog prg_len p) ::' [(translateP T1, translateP T2)] -> 
   progHasSingType p T1 T2.
 (* should use two cons for PHT, one for arrow one for cap *)
 
-Inductive progHasType {prg_len : nat} : prog -> PType prg_len -> Prop :=
+Inductive progHasType {prg_len : nat} : prog -> Predicate prg_len -> Prop :=
 | Arrow_pht : forall p T1 T2, progHasSingType p T1 T2 -> progHasType p (Arrow T1 T2)
 | Cap_pht : forall p T1 T2, progHasType p T1 -> progHasType p T2 -> progHasType p (Cap T1 T2).
 
@@ -6819,7 +7501,7 @@ Notation "p :' T" := (progHasType p T).
 
 
 
-Lemma arrow_equiv : forall {n} (A A' B B' : PType n) (C : prog), A ≡ B -> A' ≡ B' -> C :' A → A' -> C :' B → B'.
+Lemma arrow_equiv : forall {n} (A A' B B' : Predicate n) (C : prog), A ≡ B -> A' ≡ B' -> C :' A → A' -> C :' B → B'.
 Proof. intros n A A' B B' C H H' G. 
        inversion H; inversion H'; subst; try discriminate; try easy; inversion G; subst. 
        - inversion H4; subst. inversion H5; subst.
@@ -6834,14 +7516,14 @@ Proof. intros n A A' B B' C H H' G.
        - inversion H3; subst. inversion H0.
 Qed.
 
-Lemma arrow_add_comm_l : forall {n} (A A' B : PType n) (c : Coef) (C : prog), C :' c .· (A .+ A') → B ->  C :' c .· (A' .+ A) → B.
+Lemma arrow_add_comm_l : forall {n} (A A' B : Predicate n) (c : Coef) (C : prog), C :' c .· (A .+ A') → B ->  C :' c .· (A' .+ A) → B.
 Proof. intros n A A' B c C H.
        apply arrow_equiv with (A:=c .·(A .+ A')) (A':=B).
        apply add_comm. apply reflexivity.
        assumption.
 Qed.
 
-Lemma arrow_add_comm_r : forall {n} (A B B' : PType n) (c : Coef) (C : prog), C :' A → c .· (B .+ B') ->  C :' A → c .· (B' .+ B).
+Lemma arrow_add_comm_r : forall {n} (A B B' : Predicate n) (c : Coef) (C : prog), C :' A → c .· (B .+ B') ->  C :' A → c .· (B' .+ B).
 Proof. intros n A B B' c C H.
        apply arrow_equiv with (A:=A) (A':=c .· (B .+ B')).
        apply reflexivity. apply add_comm.
@@ -6852,19 +7534,19 @@ Hint Resolve arrow_equiv arrow_add_comm_l arrow_add_comm_r : typing_db.
 
 
 
-Definition types_equiv {n} (A B : PType n) := forall C,  C :' A <-> C :' B.
+Definition types_equiv {n} (A B : Predicate n) := forall C,  C :' A <-> C :' B.
 
-Lemma eq_types_equiv_refl : forall {n} (A : PType n), types_equiv A A.
+Lemma eq_types_equiv_refl : forall {n} (A : Predicate n), types_equiv A A.
 Proof. intros n A. 
        easy.
 Qed.
 
-Lemma eq_types_equiv_sym : forall {n} (A B : PType n), types_equiv A B -> types_equiv B A.
+Lemma eq_types_equiv_sym : forall {n} (A B : Predicate n), types_equiv A B -> types_equiv B A.
 Proof. intros n A B H. 
        easy. 
 Qed.
 
-Lemma eq_types_equiv_trans : forall {n} (A B C : PType n),
+Lemma eq_types_equiv_trans : forall {n} (A B C : Predicate n),
     types_equiv A B -> types_equiv B C -> types_equiv A C.
 Proof.
   intros n A B C HAB HBC.
@@ -6875,20 +7557,20 @@ Proof.
   - rewrite HAB. rewrite HBC. easy.
 Qed.
 
-Add Parametric Relation n : (PType n) (@types_equiv n)
+Add Parametric Relation n : (Predicate n) (@types_equiv n)
     reflexivity proved by eq_types_equiv_refl
     symmetry proved by eq_types_equiv_sym
     transitivity proved by eq_types_equiv_trans
     as eq_types_equiv_rel.
 
 Add Parametric Morphism (n : nat) : Arrow
-  with signature @eq_PType n ==> @eq_PType n ==> @types_equiv n as PType_Arr_mor.      Proof.
+  with signature @eq_Predicate n ==> @eq_Predicate n ==> @types_equiv n as Predicate_Arr_mor.      Proof.
   intros.
   split; apply arrow_equiv; easy.
 Qed.
 
 (** rewrite H should work. **)
-Lemma test : forall n (A A' A'' B : PType n) C, A ≡ A' -> A' ≡ A'' -> C :' A'' → B -> C :' A → B.
+Lemma test : forall n (A A' A'' B : Predicate n) C, A ≡ A' -> A' ≡ A'' -> C :' A'' → B -> C :' A → B.
 Proof. intros n A A' A'' B C H H0 H1. 
        eapply arrow_equiv.
        3:{ apply H1.}
@@ -7055,7 +7737,7 @@ Proof. solve_ground_type. Qed.
 (* Proving typing lemmas *)
 (*************************)
 
-Lemma SeqTypes : forall {n} (g1 g2 : prog) (A B C : PType n),
+Lemma SeqTypes : forall {n} (g1 g2 : prog) (A B C : Predicate n),
   g1 :' A → B ->
   g2 :' B → C ->
   (g1 ;; g2) :' A → C.
@@ -7071,7 +7753,7 @@ Proof. intros.
 Qed.
 
 
-Lemma seq_assoc : forall {n} (g1 g2 g3 : prog) (T : PType n),
+Lemma seq_assoc : forall {n} (g1 g2 g3 : prog) (T : Predicate n),
     g1 ;; (g2 ;; g3) :' T <-> (g1 ;; g2) ;; g3 :' T.
 Proof. induction T as [| | |]; try easy. 
        - simpl. split. 
@@ -7116,17 +7798,17 @@ Hint Resolve TypesI TypesI2 : base_types_db.
 (** Structural rules *)
 
 (* Subtyping rules *)
-Lemma cap_elim_l : forall {n} (g : prog) (A B : PType n), g :' A ∩ B -> g :' A.
+Lemma cap_elim_l : forall {n} (g : prog) (A B : Predicate n), g :' A ∩ B -> g :' A.
 Proof. intros. inversion H; easy. Qed.
 
-Lemma cap_elim_r : forall {n} (g : prog) (A B : PType n), g :' A ∩ B -> g :' B.
+Lemma cap_elim_r : forall {n} (g : prog) (A B : Predicate n), g :' A ∩ B -> g :' B.
 Proof. intros. inversion H; easy. Qed.
 
-Lemma cap_intro : forall {n} (g : prog) (A B : PType n), g :' A -> g :' B -> g :' A ∩ B.
+Lemma cap_intro : forall {n} (g : prog) (A B : Predicate n), g :' A -> g :' B -> g :' A ∩ B.
 Proof. intros. apply Cap_pht; easy.
 Qed.
 
-Lemma cap_arrow : forall {n} (g : prog) (A B C : PType n),
+Lemma cap_arrow : forall {n} (g : prog) (A B C : Predicate n),
   g :' (A → B) ∩ (A → C) ->
   g :' A → (B ∩ C).
 Proof. intros. 
@@ -7149,7 +7831,7 @@ Qed.
 
 
 
-Lemma arrow_sub : forall {n} g (A A' B B' : PType n),
+Lemma arrow_sub : forall {n} g (A A' B B' : Predicate n),
   Cap_vt A' -> Cap_vt B' ->
   (forall l, l ;' A' -> l ;' A) ->
   (forall r, r ;' B -> r ;' B') ->
@@ -7167,11 +7849,11 @@ Qed.
 
 Hint Resolve cap_elim_l cap_elim_r cap_intro cap_arrow arrow_sub : subtype_db.
 
-Lemma cap_elim : forall {n} g (A B : PType n), g :' A ∩ B -> g :' A /\ g :' B.
+Lemma cap_elim : forall {n} g (A B : Predicate n), g :' A ∩ B -> g :' A /\ g :' B.
 Proof. eauto with subtype_db. Qed.
 
 
-Lemma input_cap_l : forall {n} g (A A' B : PType n), 
+Lemma input_cap_l : forall {n} g (A A' B : Predicate n), 
   Cap_vt A' ->  g :' A → B -> g :' (A ∩ A') → B. 
 Proof. intros. 
        inversion H0; inversion H3.
@@ -7181,7 +7863,7 @@ Proof. intros.
        eauto with subtype_db.
 Qed.
 
-Lemma input_cap_r : forall {n} g (A A' B : PType n), 
+Lemma input_cap_r : forall {n} g (A A' B : Predicate n), 
   Cap_vt A' ->  g :' A → B -> g :' (A' ∩ A) → B. 
 Proof. intros. 
        inversion H0; inversion H3.
@@ -7192,7 +7874,7 @@ Proof. intros.
 Qed.
 
 (* Full explicit proof (due to changes to arrow_sub) *)
-Lemma cap_arrow_distributes : forall {n} g (A A' B B' : PType n),
+Lemma cap_arrow_distributes : forall {n} g (A A' B B' : Predicate n),
   g :' (A → A') ∩ (B → B') ->
   g :' (A ∩ B) → (A' ∩ B').
 Proof. intros.       
@@ -7220,13 +7902,13 @@ Hint Resolve SeqTypes : typing_db.
 (***************)
 
 
-Lemma arrow_add : forall {n} g (A A' B B' : PType n),
+Lemma arrow_add : forall {n} g (A A' B B' : Predicate n),
     uni_vecType (translateP A) ->
     uni_vecType (translateP A') ->
     uni_vecType (translateP B) ->
     uni_vecType (translateP B') ->
-    WF_APType A -> WF_APType A' ->
-    WF_APType B -> WF_APType B' ->
+    WF_APredicate A -> WF_APredicate A' ->
+    WF_APredicate B -> WF_APredicate B' ->
     g :' A → A' ->
     g :' B → B' ->
     g :' A .+ B → A' .+ B'.
@@ -7241,16 +7923,16 @@ Proof. intros n g A A' B B' G G0 G1 G2 H H0 H1 H2 H3 H4;  simpl in *.
        rewrite fgt_conv.
        apply Heisenberg.arrow_add; 
        try (apply unit_prog);
-         try (apply unit_PType); try easy.
+         try (apply unit_Predicate); try easy.
 Qed.
 
-Lemma arrow_mul : forall {n} g (A A' B B' : PType n),
+Lemma arrow_mul : forall {n} g (A A' B B' : Predicate n),
     uni_vecType (translateP A) ->
     uni_vecType (translateP A') ->
     uni_vecType (translateP B) ->
     uni_vecType (translateP B') ->
-    WF_APType A -> WF_APType A' ->
-    WF_APType B -> WF_APType B' ->
+    WF_APredicate A -> WF_APredicate A' ->
+    WF_APredicate B -> WF_APredicate B' ->
     g :' A → A' ->
     g :' B → B' ->
     g :' A .* B → A' .* B'.
@@ -7263,7 +7945,7 @@ Proof. intros n g A A' B B' G G0 G1 G2 H H0 H1 H2 H3 H4;  simpl in *.
        rewrite fgt_conv.
        apply Heisenberg.arrow_mul; 
        try (apply unit_prog);
-       try (apply unit_PType); try easy.
+       try (apply unit_Predicate); try easy.
 Qed. 
   
 
@@ -7287,7 +7969,7 @@ Qed.
 
 
 
-Lemma arrow_scale : forall {n} (p : prog) (A A' : PType n) (c : Coef),
+Lemma arrow_scale : forall {n} (p : prog) (A A' : Predicate n) (c : Coef),
   c <> C0 -> p :' A → A' -> p :' (scale c A) → (scale c A').
 Proof.  intros n p A A' c G H. 
        inversion H; inversion H2; subst.
@@ -7300,7 +7982,7 @@ Proof.  intros n p A A' c G H.
 Qed.
 
 
-Lemma arrow_scale_eq : forall n (p : prog) (A A' : PType n) (c : Coef),
+Lemma arrow_scale_eq : forall n (p : prog) (A A' : Predicate n) (c : Coef),
   c <> C0 -> p :' A → A' <-> p :' (scale c A) → (scale c A').
 Proof. intros n p A A' c G. split.
   - apply arrow_scale; assumption.
@@ -7327,7 +8009,7 @@ Proof. intros n p A A' c G. split.
     rewrite H0 in H. rewrite H1 in H. assumption.
 Qed.
 
-Lemma arrow_scale_eq' : forall n (p : prog) (A A' : PType n) (c : Coef),
+Lemma arrow_scale_eq' : forall n (p : prog) (A A' : Predicate n) (c : Coef),
   c <> C0 -> p :' (scale c A) → A' <-> p :' A → (scale (/c) A').
 Proof. intros n p A A' c G.
        rewrite arrow_scale_eq with (c:=/c); try apply nonzero_div_nonzero; try assumption.
@@ -7342,7 +8024,7 @@ Proof. intros n p A A' c G.
 Qed.
 
 
-Lemma arrow_i : forall {n} (p : prog) (A A' : PType n),
+Lemma arrow_i : forall {n} (p : prog) (A A' : Predicate n),
   p :' A → -i A' ->
   p :' i A → A'.
 Proof. intros.
@@ -7366,7 +8048,7 @@ Proof. intros.
 Qed.
 
 
-Lemma arrow_neg : forall n (p : prog) (A A' : PType n),
+Lemma arrow_neg : forall n (p : prog) (A A' : Predicate n),
   p :' A → - A' ->
   p :' -A → A'.
 Proof. intros.
@@ -7377,7 +8059,7 @@ Qed.
 
 
 
-Lemma arrow_neg_eq : forall n (p : prog) (A A' : PType n),
+Lemma arrow_neg_eq : forall n (p : prog) (A A' : Predicate n),
     p :' -A → A' <-> p :' A → -A'.
 Proof. intros n p A A'. split; intros;
          rewrite arrow_scale_eq with (c := Copp C1);
@@ -7387,7 +8069,7 @@ Proof. intros n p A A'. split; intros;
 Qed.
 
 
-Lemma arrow_neg_eq' : forall n (p : prog) (A A' : PType n),
+Lemma arrow_neg_eq' : forall n (p : prog) (A A' : Predicate n),
     p :' A → A' <-> p :' -A → -A'.
 Proof. intros n p A A'. split; intros;
     [apply arrow_scale | apply arrow_scale with (c := Copp C1) in H];
@@ -7399,7 +8081,7 @@ Qed.
 
 
 (* basically just eq_type_conv_output but with different order hypotheses *)
-Lemma eq_arrow_r : forall {n} (g : prog) (A B B' : PType n),
+Lemma eq_arrow_r : forall {n} (g : prog) (A B B' : Predicate n),
     g :' A → B ->
        B = B' ->
        g :' A → B'.
@@ -8363,8 +9045,8 @@ Qed.
 
 (** old version lemma
 
-Lemma WFS_nth_PType : forall {n} (A : PType n) (bit : nat),
-  WF_TPType A -> WF_TPType (nth_PType bit A).
+Lemma WFS_nth_Predicate : forall {n} (A : Predicate n) (bit : nat),
+  WF_TPredicate A -> WF_TPredicate (nth_Predicate bit A).
 Proof. intros.
        inversion H; subst. 
        destruct A; try easy.
@@ -8375,8 +9057,8 @@ Proof. intros.
 Qed.       
 
 
-Lemma WFS_switch_PType : forall {n} (A : PType n) (a : PType 1) (bit : nat),
-  WF_TPType A -> WF_TPType a -> WF_TPType (switch_PType A a bit).
+Lemma WFS_switch_Predicate : forall {n} (A : Predicate n) (a : Predicate 1) (bit : nat),
+  WF_TPredicate A -> WF_TPredicate a -> WF_TPredicate (switch_Predicate A a bit).
 Proof. intros.
        inversion H; inversion H0; subst. 
        destruct A; destruct a; try easy.
@@ -8389,16 +9071,16 @@ Proof. intros.
 Qed.       
 
 
-Hint Resolve WFS_nth_PType WFS_switch_PType : wfpt_db.
+Hint Resolve WFS_nth_Predicate WFS_switch_Predicate : wfpt_db.
 
 
 
 Lemma tensor_smpl : forall (prg_len bit : nat) (p : nat -> prog)
-                           (A : PType prg_len) (a : PType 1),
-    WF_TPType a -> WF_TPType A -> 
+                           (A : Predicate prg_len) (a : Predicate 1),
+    WF_TPredicate a -> WF_TPredicate A -> 
     smpl_prog p -> bit < prg_len ->
-    (p 0) :' (nth_PType bit A) → a ->
-    (p bit) :'  A → (switch_PType A a bit).
+    (p 0) :' (nth_Predicate bit A) → a ->
+    (p bit) :'  A → (switch_Predicate A a bit).
 Proof. intros. 
        inversion H; inversion H0; subst. 
        inversion H5; inversion H8; subst; try easy. 
@@ -8412,11 +9094,11 @@ Qed.
 
 
 Lemma tensor_ctrl : forall (prg_len ctrl targ : nat)   
-                           (A : PType prg_len) (a b : PType 1),
-  WF_TPType A -> WF_TPType a -> WF_TPType b -> 
+                           (A : Predicate prg_len) (a b : Predicate 1),
+  WF_TPredicate A -> WF_TPredicate a -> WF_TPredicate b -> 
   ctrl < prg_len -> targ < prg_len -> ctrl <> targ -> 
-  (CNOT 0 1) :' (nth_PType ctrl A) .⊗ (nth_PType targ A) → a .⊗ b ->
-  (CNOT ctrl targ) :'  A → switch_PType (switch_PType A a ctrl) b targ.
+  (CNOT 0 1) :' (nth_Predicate ctrl A) .⊗ (nth_Predicate targ A) → a .⊗ b ->
+  (CNOT ctrl targ) :'  A → switch_Predicate (switch_Predicate A a ctrl) b targ.
 Proof. intros. 
        inversion H; inversion H0; inversion H1; subst.
        inversion H7; inversion H10; inversion H13; subst; try easy. 
@@ -8531,14 +9213,14 @@ Fixpoint nth_AType {n} (bit : nat) (A : AType n) : AType 1 :=
   end.
 
 
-Definition nth_PType {n} (bit : nat) (A : PType n) : PType 1 :=
+Definition nth_Predicate {n} (bit : nat) (A : Predicate n) : Predicate 1 :=
   match A with 
   | G a => G (nth_AType bit a)
   | _ => Err
   end. 
 
 (** original
-Definition nth_PType {n} (bit : nat) (A : PType n) : PType 1 :=
+Definition nth_Predicate {n} (bit : nat) (A : Predicate n) : Predicate 1 :=
   match A with 
   | G g => G ([ (C1, [nth bit (snd g) gI]) ])
   | _ => Err
@@ -8584,7 +9266,7 @@ Admitted.
   
 
 (* length of g must match with g0 *)
-Definition switch_PType {n} (A : PType n) (a : PType 1) (bit : nat) : PType n :=
+Definition switch_Predicate {n} (A : Predicate n) (a : Predicate 1) (bit : nat) : Predicate n :=
   match A with 
   | G g =>
     match a with
@@ -8595,7 +9277,7 @@ Definition switch_PType {n} (A : PType n) (a : PType 1) (bit : nat) : PType n :=
   end.
 
 (** original
-Definition switch_PType {n} (A : PType n) (a : PType 1) (bit : nat) : PType n :=
+Definition switch_Predicate {n} (A : Predicate n) (a : Predicate 1) (bit : nat) : Predicate n :=
   match A with 
   | G g =>
     match a with
@@ -8614,8 +9296,8 @@ Definition switch_PType {n} (A : PType n) (a : PType 1) (bit : nat) : PType n :=
 
 
 
-Lemma WFS_nth_PType : forall {n} (A : PType n) (bit : nat),
-  WF_TPType A -> WF_TPType (nth_PType bit A).
+Lemma WFS_nth_Predicate : forall {n} (A : Predicate n) (bit : nat),
+  WF_TPredicate A -> WF_TPredicate (nth_Predicate bit A).
 Proof. intros.
        inversion H; inversion H0; subst. 
        constructor.
@@ -8629,8 +9311,8 @@ Proof. intros.
 Qed.       
 
 
-Lemma WFS_switch_PType : forall {n} (A : PType n) (a : PType 1) (bit : nat),
-  WF_TPType A -> WF_TPType a -> WF_TPType (switch_PType A a bit).
+Lemma WFS_switch_Predicate : forall {n} (A : Predicate n) (a : Predicate 1) (bit : nat),
+  WF_TPredicate A -> WF_TPredicate a -> WF_TPredicate (switch_Predicate A a bit).
 Proof. intros.
   inversion H; inversion H0; inversion H1; inversion H4; subst.
   constructor.
@@ -8646,20 +9328,20 @@ Proof. intros.
 Qed.       
 
 
-Hint Resolve WFS_nth_PType WFS_switch_PType : wfpt_db.
+Hint Resolve WFS_nth_Predicate WFS_switch_Predicate : wfpt_db.
 
 
-Inductive Norm_is_one {n} : PType n -> Prop :=
+Inductive Norm_is_one {n} : Predicate n -> Prop :=
 | NIO : forall (c : Coef) (l : list Pauli), (c * c ^* )%C = C1 -> Norm_is_one (G ([(c,l)])).
 
 
 Lemma single_tensor_smpl' : forall (prg_len bit : nat) (p : nat -> prog)
-                             (A : PType prg_len) (c : Coef) (x : Pauli),
+                             (A : Predicate prg_len) (c : Coef) (x : Pauli),
     (c * c^* )%C = C1 ->
-    WF_TPType A -> 
+    WF_TPredicate A -> 
     smpl_prog p -> bit < prg_len ->
-    (p 0) :' (nth_PType bit A) → (G ([(c, [x])])) ->
-    (p bit) :'  A → (switch_PType A (G([(c,[x])])) bit).
+    (p 0) :' (nth_Predicate bit A) → (G ([(c, [x])])) ->
+    (p bit) :'  A → (switch_Predicate A (G([(c,[x])])) bit).
 Proof. intros prg_len bit p A c x H H0 H1 H2 H3.
        inversion H0. subst.
        inversion H4. subst.
@@ -8681,8 +9363,8 @@ U n : T -> update_P n P' T
 Additive: 
 
 
-    (p 0) :' (nth_PType bit A) → a ->
-    (p bit) :'  A → (switch_PType A a bit).
+    (p 0) :' (nth_Predicate bit A) → a ->
+    (p bit) :'  A → (switch_Predicate A a bit).
 
 
 (f : Pauli -> Pauli) ->
@@ -8698,10 +9380,10 @@ Y => -Y (-Y is ill defined for Paulis: it only works for TTypes and above.)
  *)
 Check (H' 0 :' (X → Z) ∩ (Z → X)).
 
-(*** typing determinism does not work for PTypes because Arithpauli types (additive types) are implemented as lists ***)
+(*** typing determinism does not work for Predicates because Arithpauli types (additive types) are implemented as lists ***)
 (**
 (* This is probably too general and should be about Paulis only *)
-Lemma typing_determinism : forall {n} U (A B B' : PType n),
+Lemma typing_determinism : forall {n} U (A B B' : Predicate n),
   U :' A → B ->
   U :' A → B' ->
     translateP(B) = translateP(B').
@@ -8917,15 +9599,15 @@ Proof. intros U c c1 c2 P P1 P2 NormOne NormOne1 NormOne2 H H0.
        clear -H11. easy.
 Qed.
 
-Lemma tensor_add : forall {n} U m (A B C : PType 1) (T : PType n),
+Lemma tensor_add : forall {n} U m (A B C : Predicate 1) (T : Predicate n),
     uni_vecType (translateP T) ->
     uni_vecType (translateP A) ->
     uni_vecType (translateP (B .+ C)) ->
     smpl_prog U -> m < n ->
-    WF_TPType T -> WF_TPType A -> WF_TPType B -> WF_TPType C ->
-    nth_PType m T = A ->
+    WF_TPredicate T -> WF_TPredicate A -> WF_TPredicate B -> WF_TPredicate C ->
+    nth_Predicate m T = A ->
     (U 0) :' A → B .+ C ->
-    (U m) :' T → (switch_PType T B m) .+ (switch_PType T C m).
+    (U m) :' T → (switch_Predicate T B m) .+ (switch_Predicate T C m).
 Proof. intros n U m A B C T unitransT unitransA unitransBpC spU mn WFST WFSA WFSB WFSC nthTA H. 
        inversion WFSA; subst. inversion H0; subst. rewrite <- H3 in *.
        inversion WFSB; subst. inversion H2; subst.
@@ -9007,8 +9689,8 @@ Qed.
 (** 
 Additive : 
 
-    (p 0) :' (nth_PType bit A) → a ->
-    (p bit) :'  A → (switch_PType A a bit).
+    (p 0) :' (nth_Predicate bit A) → a ->
+    (p bit) :'  A → (switch_Predicate A a bit).
 
 (f : Pauli -> Pauli) ->
 (forall P, U :: A -> f A) -> 
@@ -9063,12 +9745,12 @@ Qed.
 
 (** bad with automation?, doesn't scale with AType types **) 
 Lemma single_tensor_smpl : forall (prg_len bit : nat) (p : nat -> prog)
-                             (A : PType prg_len) (a : PType 1),
+                             (A : Predicate prg_len) (a : Predicate 1),
     Norm_is_one a ->
-    WF_TPType a -> WF_TPType A -> 
+    WF_TPredicate a -> WF_TPredicate A -> 
     smpl_prog p -> bit < prg_len ->
-    (p 0) :' (nth_PType bit A) → a ->
-    (p bit) :'  A → (switch_PType A a bit).
+    (p 0) :' (nth_Predicate bit A) → a ->
+    (p bit) :'  A → (switch_Predicate A a bit).
 Proof. intros prg_len bit p A a G' H H0 H1 H2 H3.  
        inversion H; inversion H0; subst. 
        inversion H4; inversion H7; subst.
@@ -9090,12 +9772,12 @@ Proof. intros prg_len bit p A a G' H H0 H1 H2 H3.
 Qed.
 
 Lemma single_tensor_ctrl : forall (prg_len ctrl targ : nat)   
-                             (A : PType prg_len) (a b : PType 1),
+                             (A : Predicate prg_len) (a b : Predicate 1),
   Norm_is_one A -> Norm_is_one (a .⊗ b) ->
-  WF_TPType A -> WF_TPType a -> WF_TPType b -> 
+  WF_TPredicate A -> WF_TPredicate a -> WF_TPredicate b -> 
   ctrl < prg_len -> targ < prg_len -> ctrl <> targ -> 
-  (CNOT' 0 1) :' (nth_PType ctrl A) .⊗ (nth_PType targ A) → a .⊗ b ->
-  (CNOT' ctrl targ) :'  A → switch_PType (switch_PType A a ctrl) b targ.
+  (CNOT' 0 1) :' (nth_Predicate ctrl A) .⊗ (nth_Predicate targ A) → a .⊗ b ->
+  (CNOT' ctrl targ) :'  A → switch_Predicate (switch_Predicate A a ctrl) b targ.
 Proof. intros prg_len ctrl targ A a b G' G'' H H0 H1 H2 H3 H4 H5. 
        inversion H; inversion H0; inversion H1; subst.
        inversion H6; inversion H9; inversion H12; subst.
@@ -9292,8 +9974,8 @@ Qed.
 
 
 (** 
-Lemma WFA_nth_PType : forall {n} (A : PType n) (bit : nat),
-  WF_APType A -> WF_APType (nth_PType bit A).
+Lemma WFA_nth_Predicate : forall {n} (A : Predicate n) (bit : nat),
+  WF_APredicate A -> WF_APredicate (nth_Predicate bit A).
 Proof. intros.
        inversion H; subst. 
        destruct A; try easy.
@@ -9309,13 +9991,13 @@ Proof. intros.
 Qed.       
 
 
-Inductive equal_len {n m : nat} : PType n -> PType m -> Prop :=
+Inductive equal_len {n m : nat} : Predicate n -> Predicate m -> Prop :=
 | Eq_len : forall (A : AType n) (a : AType m), length A = length a -> equal_len (G A) (G a).
 
 (*** Admitted ***)
-Lemma WFA_switch_PType : forall {n} (A : PType n) (a : PType 1) (bit : nat),
+Lemma WFA_switch_Predicate : forall {n} (A : Predicate n) (a : Predicate 1) (bit : nat),
   equal_len A a ->
-  WF_APType A -> WF_APType a -> WF_APType (switch_PType A a bit).
+  WF_APredicate A -> WF_APredicate a -> WF_APredicate (switch_Predicate A a bit).
 Proof. intros n A a bit G H H0.
 
        inversion G; subst.
@@ -9357,33 +10039,33 @@ Proof. intros n A a bit G H H0.
 
 Admitted.
 
-Hint Resolve WFA_nth_PType WFA_switch_PType : wfpt_db.
+Hint Resolve WFA_nth_Predicate WFA_switch_Predicate : wfpt_db.
 **)
 
 
 
 
 (*
-Inductive equal_len {n m : nat} : PType n -> PType m -> Prop :=
+Inductive equal_len {n m : nat} : Predicate n -> Predicate m -> Prop :=
 | Eq_len : forall (A : AType n) (a : AType m), length A = length a -> equal_len (G A) (G a).
 (*** Admitted ***)
 Lemma tensor_smpl : forall (prg_len bit : nat) (p : nat -> prog)
-                      (A : PType prg_len) (a : PType 1),
+                      (A : Predicate prg_len) (a : Predicate 1),
    (* Norm_is_one a -> *) equal_len A a -> 
-    WF_APType a -> WF_APType A -> 
+    WF_APredicate a -> WF_APredicate A -> 
     smpl_prog p -> bit < prg_len ->
-    (p 0) :' (nth_PType bit A) → a ->
-    (p bit) :' A → (switch_PType A a bit).
+    (p 0) :' (nth_Predicate bit A) → a ->
+    (p bit) :' A → (switch_Predicate A a bit).
 (* 
 
-(p 0) :' (nth_PType bit A) → a ->
-(H 0) :' (nth_PType 1 (X ⊗ X + Y ⊗ X)) → (Z + Z)
-where (nth_PType 1 (X ⊗ X + Y ⊗ X)) = (X + X)
+(p 0) :' (nth_Predicate bit A) → a ->
+(H 0) :' (nth_Predicate 1 (X ⊗ X + Y ⊗ X)) → (Z + Z)
+where (nth_Predicate 1 (X ⊗ X + Y ⊗ X)) = (X + X)
 
 
-(p bit) :' A → (switch_PType A a bit).
-(H 1) :' (X ⊗ X + Y ⊗ X) → (switch_PType (X ⊗ X + Y ⊗ X) (Z + Z) 1)
-where (switch_PType (X ⊗ X + Y ⊗ X) (Z + Z) 1) = (X ⊗ Z + Y ⊗ Z) 
+(p bit) :' A → (switch_Predicate A a bit).
+(H 1) :' (X ⊗ X + Y ⊗ X) → (switch_Predicate (X ⊗ X + Y ⊗ X) (Z + Z) 1)
+where (switch_Predicate (X ⊗ X + Y ⊗ X) (Z + Z) 1) = (X ⊗ Z + Y ⊗ Z) 
 
 
 
@@ -9401,7 +10083,7 @@ Proof. intros prg_len bit p A a (*G'*) E H H0 H1 H2 H3.
        inversion H; inversion H0; subst. 
        inversion H5; inversion H8; subst; try easy.
        inversion E; subst.
-       unfold switch_PType.
+       unfold switch_Predicate.
        simpl in *.
 (*
        constructor.
@@ -9467,11 +10149,11 @@ Admitted.
 
 (* original
 Lemma tensor_smpl : forall (prg_len bit : nat) (p : nat -> prog)
-                           (A : PType prg_len) (a : PType 1),
-    WF_APType a -> WF_APType A -> 
+                           (A : Predicate prg_len) (a : Predicate 1),
+    WF_APredicate a -> WF_APredicate A -> 
     smpl_prog p -> bit < prg_len ->
-    (p 0) :' (nth_PType bit A) → a ->
-    (p bit) :'  A → (switch_PType A a bit).
+    (p 0) :' (nth_Predicate bit A) → a ->
+    (p bit) :'  A → (switch_Predicate A a bit).
 Proof. intros. 
        inversion H; inversion H0; subst. 
        inversion H5; inversion H8; subst; try easy. 
@@ -9484,11 +10166,11 @@ Qed.
 
 (*** Admitted ***)
 Lemma tensor_ctrl : forall (prg_len ctrl targ : nat)   
-                           (A : PType prg_len) (a b : PType 1),
-  WF_APType A -> WF_APType a -> WF_APType b -> 
+                           (A : Predicate prg_len) (a b : Predicate 1),
+  WF_APredicate A -> WF_APredicate a -> WF_APredicate b -> 
   ctrl < prg_len -> targ < prg_len -> ctrl <> targ -> 
-  (CNOT' 0 1) :' (nth_PType ctrl A) .⊗ (nth_PType targ A) → a .⊗ b ->
-  (CNOT' ctrl targ) :'  A → switch_PType (switch_PType A a ctrl) b targ.
+  (CNOT' 0 1) :' (nth_Predicate ctrl A) .⊗ (nth_Predicate targ A) → a .⊗ b ->
+  (CNOT' ctrl targ) :'  A → switch_Predicate (switch_Predicate A a ctrl) b targ.
 Proof. intros. 
        inversion H; inversion H0; inversion H1; subst.
        inversion H7; inversion H10; inversion H13; subst; try easy. 
@@ -9548,9 +10230,9 @@ Qed.
 (***************)
 
 
-Lemma arrow_mul : forall {n} g (A A' B B' : PType n),
-    WF_APType A -> WF_APType A' ->
-    WF_APType B -> WF_APType B' ->
+Lemma arrow_mul : forall {n} g (A A' B B' : Predicate n),
+    WF_APredicate A -> WF_APredicate A' ->
+    WF_APredicate B -> WF_APredicate B' ->
     g :' A → A' ->
     g :' B → B' ->
     g :' A .* B → A' .* B'.
@@ -9563,7 +10245,7 @@ Proof. intros; simpl in *.
        rewrite fgt_conv.
        apply Heisenberg.arrow_mul; 
        try (apply unit_prog);
-       try (apply unit_PType); try easy.
+       try (apply unit_Predicate); try easy.
 Qed. 
   
 
@@ -9587,7 +10269,7 @@ Qed.
 
 
 
-Lemma arrow_scale : forall {n} (p : prog) (A A' : PType n) (c : Coef),
+Lemma arrow_scale : forall {n} (p : prog) (A A' : Predicate n) (c : Coef),
   p :' A → A' -> p :' (scale c A) → (scale c A').
 Proof. intros. 
        inversion H; inversion H2; subst.
@@ -9601,7 +10283,7 @@ Proof. intros.
 Qed.
 
 
-Lemma arrow_i : forall {n} (p : prog) (A A' : PType n),
+Lemma arrow_i : forall {n} (p : prog) (A A' : Predicate n),
   p :' A → A' ->
   p :' i A → i A'.
 Proof. intros;
@@ -9610,7 +10292,7 @@ Proof. intros;
 Qed.
 
 
-Lemma arrow_neg : forall {n} (p : prog) (A A' : PType n),
+Lemma arrow_neg : forall {n} (p : prog) (A A' : Predicate n),
   p :' A → A' ->
   p :' -A → -A'.
 Proof. intros;
@@ -9630,7 +10312,7 @@ Hint Resolve SeqTypes : typing_db.
 
 
 (* basically just eq_type_conv_output but with different order hypotheses *)
-Lemma eq_arrow_r : forall {n} (g : prog) (A B B' : PType n),
+Lemma eq_arrow_r : forall {n} (g : prog) (A B B' : Predicate n),
     g :' A → B ->
     B = B' ->
     g :' A → B'.
@@ -9729,9 +10411,9 @@ Ltac type_check_base :=
   repeat apply cap_intro;
   repeat expand_prog; (* will automatically unfold compound progs *)
   repeat match goal with
-         | |- TPType ?A       => tryif is_evar A then fail else auto 50 with svt_db
-         | |- WF_PType ?A       => tryif is_evar A then fail else auto with wfpt_db
-         | |- WF_APType ?A       => tryif is_evar A then fail else auto with wfpt_db
+         | |- TPredicate ?A       => tryif is_evar A then fail else auto 50 with svt_db
+         | |- WF_Predicate ?A       => tryif is_evar A then fail else auto with wfpt_db
+         | |- WF_APredicate ?A       => tryif is_evar A then fail else auto with wfpt_db
          | |- ?g :' ?A → ?B      => tryif is_evar B then fail else eapply eq_arrow_r
          | |- ?g :' - ?A → ?B    => apply arrow_neg
          | |- ?g :' i ?A → ?B    => apply arrow_i
@@ -9806,9 +10488,9 @@ Qed.
 
 
 match goal with
-         | |- TPType ?A       => tryif is_evar A then fail else auto 50 with svt_db
-         | |- WF_PType ?A       => tryif is_evar A then fail else auto with wfpt_db
-         | |- WF_APType ?A       => tryif is_evar A then fail else auto with wfpt_db
+         | |- TPredicate ?A       => tryif is_evar A then fail else auto 50 with svt_db
+         | |- WF_Predicate ?A       => tryif is_evar A then fail else auto with wfpt_db
+         | |- WF_APredicate ?A       => tryif is_evar A then fail else auto with wfpt_db
          | |- ?g :' ?A → ?B      => tryif is_evar B then fail else eapply eq_arrow_r
          | |- ?g :' - ?A → ?B    => apply arrow_neg
          | |- ?g :' i ?A → ?B    => apply arrow_i
@@ -9841,9 +10523,9 @@ match goal with
             try reflexivity
          end.
 6 : match goal with
-         | |- TPType ?A       => tryif is_evar A then fail else auto 50 with svt_db
-         | |- WF_PType ?A       => tryif is_evar A then fail else auto with wfpt_db
-         | |- WF_APType ?A       => tryif is_evar A then fail else auto with wfpt_db
+         | |- TPredicate ?A       => tryif is_evar A then fail else auto 50 with svt_db
+         | |- WF_Predicate ?A       => tryif is_evar A then fail else auto with wfpt_db
+         | |- WF_APredicate ?A       => tryif is_evar A then fail else auto with wfpt_db
          | |- ?g :' ?A → ?B      => tryif is_evar B then fail else eapply eq_arrow_r
          | |- ?g :' - ?A → ?B    => apply arrow_neg
          | |- ?g :' i ?A → ?B    => apply arrow_i
@@ -9878,9 +10560,9 @@ match goal with
 
 
 6 : match goal with
-         | |- TPType ?A       => tryif is_evar A then fail else auto 50 with svt_db
-         | |- WF_PType ?A       => tryif is_evar A then fail else auto with wfpt_db
-         | |- WF_APType ?A       => tryif is_evar A then fail else auto with wfpt_db
+         | |- TPredicate ?A       => tryif is_evar A then fail else auto 50 with svt_db
+         | |- WF_Predicate ?A       => tryif is_evar A then fail else auto with wfpt_db
+         | |- WF_APredicate ?A       => tryif is_evar A then fail else auto with wfpt_db
          | |- ?g :' ?A → ?B      => tryif is_evar B then fail else eapply eq_arrow_r
          | |- ?g :' - ?A → ?B    => apply arrow_neg
          | |- ?g :' i ?A → ?B    => apply arrow_i
@@ -9916,9 +10598,9 @@ match goal with
        6 : {  rewrite mul_tensor_dist; auto with wfpt_db.
                rewrite mul_tensor_dist; auto with wfpt_db.
 match goal with
-         | |- TPType ?A       => tryif is_evar A then fail else auto 50 with svt_db
-         | |- WF_PType ?A       => tryif is_evar A then fail else auto with wfpt_db
-         | |- WF_APType ?A       => tryif is_evar A then fail else auto with wfpt_db
+         | |- TPredicate ?A       => tryif is_evar A then fail else auto 50 with svt_db
+         | |- WF_Predicate ?A       => tryif is_evar A then fail else auto with wfpt_db
+         | |- WF_APredicate ?A       => tryif is_evar A then fail else auto with wfpt_db
          | |- ?g :' ?A → ?B      => tryif is_evar B then fail else eapply eq_arrow_r
          | |- ?g :' - ?A → ?B    => apply arrow_neg
          | |- ?g :' i ?A → ?B    => apply arrow_i
@@ -9946,9 +10628,9 @@ match goal with
          end.
 
 match goal with
-         | |- TPType ?A       => tryif is_evar A then fail else auto 50 with svt_db
-         | |- WF_PType ?A       => tryif is_evar A then fail else auto with wfpt_db
-         | |- WF_APType ?A       => tryif is_evar A then fail else auto with wfpt_db
+         | |- TPredicate ?A       => tryif is_evar A then fail else auto 50 with svt_db
+         | |- WF_Predicate ?A       => tryif is_evar A then fail else auto with wfpt_db
+         | |- WF_APredicate ?A       => tryif is_evar A then fail else auto with wfpt_db
          | |- ?g :' ?A → ?B      => tryif is_evar B then fail else eapply eq_arrow_r
          | |- ?g :' - ?A → ?B    => apply arrow_neg
          | |- ?g :' i ?A → ?B    => apply arrow_i
@@ -9965,9 +10647,9 @@ rewrite decompose_tensor_mult_r.
 
 
 match goal with
-         | |- TPType ?A       => tryif is_evar A then fail else auto 50 with svt_db
-         | |- WF_PType ?A       => tryif is_evar A then fail else auto with wfpt_db
-         | |- WF_APType ?A       => tryif is_evar A then fail else auto with wfpt_db
+         | |- TPredicate ?A       => tryif is_evar A then fail else auto 50 with svt_db
+         | |- WF_Predicate ?A       => tryif is_evar A then fail else auto with wfpt_db
+         | |- WF_APredicate ?A       => tryif is_evar A then fail else auto with wfpt_db
          | |- ?g :' ?A → ?B      => tryif is_evar B then fail else eapply eq_arrow_r
          | |- ?g :' - ?A → ?B    => apply arrow_neg
          | |- ?g :' i ?A → ?B    => apply arrow_i
@@ -9995,9 +10677,9 @@ match goal with
          end.
 
 match goal with
-         | |- TPType ?A       => tryif is_evar A then fail else auto 50 with svt_db
-         | |- WF_PType ?A       => tryif is_evar A then fail else auto with wfpt_db
-         | |- WF_APType ?A       => tryif is_evar A then fail else auto with wfpt_db
+         | |- TPredicate ?A       => tryif is_evar A then fail else auto 50 with svt_db
+         | |- WF_Predicate ?A       => tryif is_evar A then fail else auto with wfpt_db
+         | |- WF_APredicate ?A       => tryif is_evar A then fail else auto with wfpt_db
          | |- ?g :' ?A → ?B      => tryif is_evar B then fail else eapply eq_arrow_r
          | |- ?g :' - ?A → ?B    => apply arrow_neg
          | |- ?g :' i ?A → ?B    => apply arrow_i
@@ -10041,8 +10723,8 @@ match goal with
        kill_switch2.
 
 
-       repeat (repeat (rewrite switch_PType_inc; auto with gt_db); 
-         try rewrite switch_PType_base; try rewrite switch_PType_base_one;
+       repeat (repeat (rewrite switch_Predicate_inc; auto with gt_db); 
+         try rewrite switch_Predicate_base; try rewrite switch_Predicate_base_one;
            auto with gt_db).
 
 
@@ -10059,7 +10741,7 @@ match goal with
 
 
 apply evSuper_ev; auto 50 with wfpt_db.
-       unfold eq_PType; simpl.
+       unfold eq_Predicate; simpl.
        apply hd_inj; unfold uncurry; simpl. 
        apply TType_compare; auto; simpl.
        repeat (split; try lma').
@@ -10074,13 +10756,13 @@ apply evSuper_ev; auto 50 with wfpt_db.
 
 Check hd_inj.
 
-       repeat (apply WFA_switch_PType'; auto 50 with wfpt_db).
-       apply WFA_switch_PType'; auto 50 with wfpt_db.
-       apply WFA_switch_PType'; auto with wfpt_db.
+       repeat (apply WFA_switch_Predicate'; auto 50 with wfpt_db).
+       apply WFA_switch_Predicate'; auto 50 with wfpt_db.
+       apply WFA_switch_Predicate'; auto with wfpt_db.
 
 
 3 : {
-         unfold eq_PType. simpl. 
+         unfold eq_Predicate. simpl. 
          unfold translate. simpl. 
          unfold translateP
 
@@ -10128,8 +10810,8 @@ pushA.
               all : auto with wfpt_db. }
         all : auto with gt_db.
         type_check_base'.
-        unfold eq_PType.
-        simpl switch_PType'.
+        unfold eq_Predicate.
+        simpl switch_Predicate'.
         unfold translate. simpl.
         apply hd_inj.
         crunch_matrix.
@@ -10145,25 +10827,25 @@ try easy.
   repeat (rewrite nth_vswitch_miss; try easy; try lia; auto with gt_db). 
 
 match goal with
-         | |- ?g :' nth_PType ?n (switch_PType' _ _ ?n) → _ => 
+         | |- ?g :' nth_Predicate ?n (switch_Predicate' _ _ ?n) → _ => 
                 rewrite nth_vswitch_hit; try easy; try lia; auto with gt_db 
-         | |- ?g :' nth_PType ?n (switch_PType' _ _ ?m) → _ => 
+         | |- ?g :' nth_Predicate ?n (switch_Predicate' _ _ ?m) → _ => 
                 rewrite nth_vswitch_miss; try easy; try nia; auto with gt_db
 end.
 match goal with
-         | |- ?g :' nth_PType ?n (switch_PType' _ _ ?n) → _ => 
+         | |- ?g :' nth_Predicate ?n (switch_Predicate' _ _ ?n) → _ => 
                 rewrite nth_vswitch_hit; try easy; try lia; auto with gt_db 
-         | |- ?g :' nth_PType ?n (switch_PType' _ _ ?m) → _ => 
+         | |- ?g :' nth_Predicate ?n (switch_Predicate' _ _ ?m) → _ => 
                 rewrite nth_vswitch_miss; try easy; try nia; auto with gt_db
 end.
 
 
 
-nth_PType bit (switch_PType' A a bit) = a.
+nth_Predicate bit (switch_Predicate' A a bit) = a.
 
 
        => tryif is_evar A then fail else auto 50 with svt_db
-         | |- WF_PType ?A       => tryif is_evar A then fail else auto with wfpt_db
+         | |- WF_Predicate ?A       => tryif is_evar A then fail else auto with wfpt_db
          | |- ?g :' ?A → ?B      => tryif is_evar B then fail else eapply eq_arrow_r
          | |- ?g :' - ?A → ?B    => apply arrow_neg
          | |- ?g :' i ?A → ?B    => apply arrow_i
@@ -10182,12 +10864,12 @@ nth_PType bit (switch_PType' A a bit) = a.
 rewrite nth_vswitch_hit; try easy; try lia; auto with gt_db. 
 
 
-       simpl nth_PType.
+       simpl nth_Predicate.
        apply arrow_mul_1.
        solve [eauto with base_types_db].  
        solve [eauto with base_types_db].
        eapply tensor_ctrl. 
-       simpl nth_PType. 
+       simpl nth_Predicate. 
        type_check_base'.
 
        2 : { simp_switch.
@@ -10208,7 +10890,7 @@ solve [eauto with base_types_db].  type_check_base'. }
 
        type_check_base.
 
-       simpl nth_PType. 
+       simpl nth_Predicate. 
        assert (H : G 1 (p_1, [gMul gX gZ]) = X .* Z). 
        { easy. }
        rewrite H.
@@ -10217,13 +10899,13 @@ solve [eauto with base_types_db].  type_check_base'. }
        apply prog_decompose_tensor; auto with wfpt_db.
        eapply eq_arrow_r.
        apply arrow_mul; auto with wfpt_db; try solve [eauto with base_types_db].
-       5 : { simpl nth_PType.
+       5 : { simpl nth_Predicate.
 
        type_check_base.
 
 repeat match goal with
-         | |- TPType ?A       => tryif is_evar A then fail else auto 50 with svt_db
-         | |- WF_PType ?A       => tryif is_evar A then fail else auto with wfpt_db
+         | |- TPredicate ?A       => tryif is_evar A then fail else auto 50 with svt_db
+         | |- WF_Predicate ?A       => tryif is_evar A then fail else auto with wfpt_db
          | |- ?g :' ?A → ?B      => tryif is_evar B then fail else eapply eq_arrow_r
          | |- ?g :' - ?A → ?B    => apply arrow_neg
          | |- ?g :' i ?A → ?B    => apply arrow_i
@@ -10249,7 +10931,7 @@ repeat match goal with
 
 
        match goal with
-         | |- TPType _       => auto 50 with svt_db
+         | |- TPredicate _       => auto 50 with svt_db
          | |- ?g :' ?A → ?B      => tryif is_evar B then fail else eapply eq_arrow_r
          | |- ?g :' - ?A → ?B    => apply arrow_neg
          | |- ?g :' i ?A → ?B    => apply arrow_i
@@ -10271,7 +10953,7 @@ repeat match goal with
          | |- ?A ≡ ?B => try easy
          end.
 match goal with
-         | |- TPType _       => auto 50 with svt_db
+         | |- TPredicate _       => auto 50 with svt_db
          | |- ?g :' ?A → ?B      => tryif is_evar B then fail else eapply eq_arrow_r
          | |- ?g :' - ?A → ?B    => apply arrow_neg
          | |- ?g :' i ?A → ?B    => apply arrow_i
@@ -10295,7 +10977,7 @@ match goal with
 
 
 match goal with
-         | |- TPType _       => auto 50 with svt_db
+         | |- TPredicate _       => auto 50 with svt_db
          | |- ?g :' ?A → ?B      => tryif is_evar B then fail else eapply eq_arrow_r
          | |- ?g :' - ?A → ?B    => apply arrow_neg
          | |- ?g :' i ?A → ?B    => apply arrow_i
@@ -10318,8 +11000,8 @@ match goal with
  
 
 match goal with
-         | |- TPType ?A       => tryif is_evar A then fail else auto 50 with svt_db
-         | |- WF_PType ?A       => tryif is_evar A then fail else auto with wfpt_db
+         | |- TPredicate ?A       => tryif is_evar A then fail else auto 50 with svt_db
+         | |- WF_Predicate ?A       => tryif is_evar A then fail else auto with wfpt_db
          | |- ?g :' ?A → ?B      => tryif is_evar B then fail else eapply eq_arrow_r
          | |- ?g :' - ?A → ?B    => apply arrow_neg
          | |- ?g :' i ?A → ?B    => apply arrow_i
@@ -10341,8 +11023,8 @@ match goal with
          end;
 
 try match goal with
-         | |- TPType ?A       => tryif is_evar A then fail else auto 50 with svt_db
-         | |- WF_PType ?A       => tryif is_evar A then fail else auto with wfpt_db
+         | |- TPredicate ?A       => tryif is_evar A then fail else auto 50 with svt_db
+         | |- WF_Predicate ?A       => tryif is_evar A then fail else auto with wfpt_db
          | |- ?g :' ?A → ?B      => tryif is_evar B then fail else eapply eq_arrow_r
          | |- ?g :' - ?A → ?B    => apply arrow_neg
          | |- ?g :' i ?A → ?B    => apply arrow_i
@@ -10364,8 +11046,8 @@ try match goal with
          end; 
 
 match goal with
-         | |- TPType ?A       => tryif is_evar A then fail else auto 50 with svt_db
-         | |- WF_PType ?A       => tryif is_evar A then fail else auto with wfpt_db
+         | |- TPredicate ?A       => tryif is_evar A then fail else auto 50 with svt_db
+         | |- WF_Predicate ?A       => tryif is_evar A then fail else auto with wfpt_db
          | |- ?g :' ?A → ?B      => tryif is_evar B then fail else eapply eq_arrow_r
          | |- ?g :' - ?A → ?B    => apply arrow_neg
          | |- ?g :' i ?A → ?B    => apply arrow_i
@@ -10388,7 +11070,7 @@ match goal with
  
 
 match goal with
-         | |- TPType _       => tryif is_evar A then fail else auto 50 with svt_db
+         | |- TPredicate _       => tryif is_evar A then fail else auto 50 with svt_db
          | |- ?g :' ?A → ?B      => tryif is_evar B then fail else eapply eq_arrow_r
          | |- ?g :' - ?A → ?B    => apply arrow_neg
          | |- ?g :' i ?A → ?B    => apply arrow_i
@@ -10466,7 +11148,7 @@ Proof. repeat expand_prog.
        
   repeat expand_prog.
   repeat match goal with
-         | |- TPType _       => auto 50 with svt_db
+         | |- TPredicate _       => auto 50 with svt_db
          | |- ?g :' ?A → ?B      => tryif is_evar B then fail else eapply eq_arrow_r
          | |- ?g :' - ?A → ?B    => apply arrow_neg
          | |- ?g :' i ?A → ?B    => apply arrow_i
@@ -10489,7 +11171,7 @@ Proof. repeat expand_prog.
          end.
   eapply (tensor_ctrl 2 3 _ _ _). 
  match goal with
-         | |- TPType _       => auto 50 with svt_db
+         | |- TPredicate _       => auto 50 with svt_db
          | |- ?g :' ?A → ?B      => tryif is_evar B then fail else eapply eq_arrow_r
          | |- ?g :' - ?A → ?B    => apply arrow_neg
          | |- ?g :' i ?A → ?B    => apply arrow_i
@@ -10521,7 +11203,7 @@ Proof. repeat expand_prog.
 repeat apply cap_intro;
   repeat expand_prog; (* will automatically unfold compound progs *)
   repeat match goal with
-         | |- TPType _       => auto 50 with svt_db
+         | |- TPredicate _       => auto 50 with svt_db
          | |- ?g :' ?A → ?B      => tryif is_evar B then fail else eapply eq_arrow_r
          | |- ?g :' - ?A → ?B    => apply arrow_neg
          | |- ?g :' i ?A → ?B    => apply arrow_i
@@ -10550,7 +11232,7 @@ repeat match goal with
        eapply (tensor_smpl 2 _ _ _).
        solve [eauto with base_types_db]. 
        eapply (tensor_ctrl 4 2 3 _ _ _).
-       simpl nth_PType.
+       simpl nth_Predicate.
        apply prog_decompose_tensor; try easy.
        eapply eq_arrow_r.
        apply arrow_mul; 
@@ -10590,9 +11272,9 @@ try easy.
 
 
 
-emma prog_decompose_tensor : forall (p : prog) (A B : PType 1) (T : PType 2),
-  TPType A -> WF_PType A ->
-  TPType B -> WF_PType B ->
+emma prog_decompose_tensor : forall (p : prog) (A B : Predicate 1) (T : Predicate 2),
+  TPredicate A -> WF_Predicate A ->
+  TPredicate B -> WF_Predicate B ->
   p :' ((A .⊗ I) .* (I .⊗ B)) → T -> p :' (A .⊗ B) → T.
 Proof. intros. 
        apply (eq_type_conv_input p ((A .⊗ I) .* (I .⊗ B)) (A .⊗ B) T); try easy.

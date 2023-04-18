@@ -393,7 +393,7 @@ Proof. unfold CZ.
 Qed.
 
 (* Heisenberg.v line 2709 *)
-Hint Resolve WF_CZ : wf_db.
+#[export] Hint Resolve WF_CZ : wf_db.
 
 (* Heisenberg.v line 2711 *)
 Lemma unit_CZ : WF_Unitary CZ. 
@@ -401,7 +401,7 @@ Proof. split; auto with wf_db.
        lma'. Qed.
 
 (* Heisenberg.v line 2716 *)
-Hint Resolve unit_CZ : unit_db.
+#[export] Hint Resolve unit_CZ : unit_db.
                 
 
 (* Heisenberg.v line 2720 *)
@@ -493,7 +493,7 @@ Proof. unfold WF_Matrix; intros.
 Qed.
 
 (* Heisenberg.v line 2805 *)
-Hint Resolve WF_sko : wf_db.
+#[export] Hint Resolve WF_sko : wf_db.
 
 (* Heisenberg.v line 2807 *)
 Lemma sko_twice_id : forall (A : Square 4), 

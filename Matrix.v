@@ -263,7 +263,7 @@ Notation "Σ^ n f" := (Csum f n) (at level 60) : matrix_scope.
 Notation "n ⨂ A" := (kron_n n A) (at level 30, no associativity) : matrix_scope.
 Notation "⨂ A" := (big_kron A) (at level 60): matrix_scope.
 Notation "n ⨉ A" := (Mmult_n n A) (at level 30, no associativity) : matrix_scope.
-Hint Unfold Zero I trace dot Mplus scale Mmult kron mat_equiv transpose 
+#[export] Hint Unfold Zero I trace dot Mplus scale Mmult kron mat_equiv transpose 
             adjoint : U_db.
   
 Ltac destruct_m_1 :=
@@ -864,10 +864,10 @@ Ltac show_wf :=
   try lca.
 
 (* Create HintDb wf_db. *)
-Hint Resolve WF_Zero WF_I WF_I1 WF_mult WF_plus WF_scale WF_transpose 
+#[export] Hint Resolve WF_Zero WF_I WF_I1 WF_mult WF_plus WF_scale WF_transpose 
      WF_adjoint WF_outer_product WF_big_kron WF_kron_n WF_kron 
      WF_Mmult_n WF_Msum : wf_db.
-Hint Extern 2 (_ = _) => unify_pows_two : wf_db.
+#[export] Hint Extern 2 (_ = _) => unify_pows_two : wf_db.
 
 (* Hint Resolve WF_Matrix_dim_change : wf_db. *)
 
@@ -1979,11 +1979,11 @@ Proof. intros.
 Qed.
 
 
-Hint Resolve WF_get_vec WF_get_row WF_reduce_row WF_reduce_col WF_reduce_vecn WF_reduce : wf_db.
-Hint Resolve WF_col_swap WF_row_swap WF_col_scale WF_row_scale WF_col_add WF_row_add  : wf_db.
-Hint Resolve WF_gen_new_vec WF_gen_new_row WF_col_add_many WF_row_add_many : wf_db.
-Hint Resolve WF_col_append WF_row_append WF_row_wedge WF_col_wedge WF_smash : wf_db.
-Hint Resolve WF_col_add_each WF_row_add_each WF_make_col_zero WF_make_row_zero : wf_db.
+#[export] Hint Resolve WF_get_vec WF_get_row WF_reduce_row WF_reduce_col WF_reduce_vecn WF_reduce : wf_db.
+#[export] Hint Resolve WF_col_swap WF_row_swap WF_col_scale WF_row_scale WF_col_add WF_row_add  : wf_db.
+#[export] Hint Resolve WF_gen_new_vec WF_gen_new_row WF_col_add_many WF_row_add_many : wf_db.
+#[export] Hint Resolve WF_col_append WF_row_append WF_row_wedge WF_col_wedge WF_smash : wf_db.
+#[export] Hint Resolve WF_col_add_each WF_row_add_each WF_make_col_zero WF_make_row_zero : wf_db.
  
 
 Lemma get_vec_reduce_col : forall {n m} (i col : nat) (A : Matrix n m),
@@ -3420,7 +3420,7 @@ Proof. unfold WF_Matrix, e_i.
        bdestruct (x =? i); bdestruct (x <? n); bdestruct (y =? 0); try lia; easy.
 Qed.
 
-Hint Resolve WF_e_i : wf_db.
+#[export] Hint Resolve WF_e_i : wf_db.
 
 Lemma I_is_eis : forall {n} (i : nat),
   get_vec i (I n) = e_i i. 
@@ -5379,16 +5379,16 @@ Hint Rewrite kron_1_l kron_1_r Mmult_1_l Mmult_1_r id_kron id_adjoint_eq
 *)
 
 (* eauto will cause major choking... *)
-Hint Rewrite  @kron_1_l @kron_1_r @Mmult_1_l @Mmult_1_r @Mscale_1_l 
+#[export] Hint Rewrite  @kron_1_l @kron_1_r @Mmult_1_l @Mmult_1_r @Mscale_1_l 
      @id_adjoint_eq @id_transpose_eq using (auto 100 with wf_db) : M_db_light.
-Hint Rewrite @kron_0_l @kron_0_r @Mmult_0_l @Mmult_0_r @Mplus_0_l @Mplus_0_r
+#[export] Hint Rewrite @kron_0_l @kron_0_r @Mmult_0_l @Mmult_0_r @Mplus_0_l @Mplus_0_r
      @Mscale_0_l @Mscale_0_r @zero_adjoint_eq @zero_transpose_eq using (auto 100 with wf_db) : M_db_light.
 
 (* I don't like always doing restore_dims first, but otherwise sometimes leaves 
    unsolvable WF_Matrix goals. *)
 Ltac Msimpl_light := try restore_dims; autorewrite with M_db_light.
 
-Hint Rewrite @Mmult_adjoint @Mplus_adjoint @kron_adjoint @kron_mixed_product
+#[export] Hint Rewrite @Mmult_adjoint @Mplus_adjoint @kron_adjoint @kron_mixed_product
      @adjoint_involutive using (auto 100 with wf_db) : M_db.
 
 Ltac Msimpl := try restore_dims; autorewrite with M_db_light M_db.

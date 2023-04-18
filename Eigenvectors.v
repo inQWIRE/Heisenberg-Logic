@@ -457,7 +457,7 @@ Proof. intros x. unfold bra. destruct (x =? 0). show_wf. show_wf.
 Qed. 
 
 
-Hint Resolve WF_Phase WF_Phase' WF_Tgate WF_notc WF_ket WF_bra : wf_db.
+#[export] Hint Resolve WF_Phase WF_Phase' WF_Tgate WF_notc WF_ket WF_bra : wf_db.
 
 (* ran into problems with hadamard. Can probably make this more general. *)
 Ltac Hhelper :=
@@ -501,7 +501,7 @@ Qed.
 Lemma H_eq_Hadjoint : hadamard† = hadamard. Proof. lma'. Qed.
 
 
-Hint Rewrite Y_eq_iXZ PEqP' H_eq_Hadjoint : id_db.
+#[export] Hint Rewrite Y_eq_iXZ PEqP' H_eq_Hadjoint : id_db.
 
 Lemma ItimesIid : I 2 × I 2 = I 2. Proof. lma'. Qed.      
 Lemma XtimesXid : σx × σx = I 2. Proof. lma'. Qed.      
@@ -509,7 +509,7 @@ Lemma YtimesYid : σy × σy = I 2. Proof. lma'. Qed.
 Lemma ZtimesZid : σz × σz = I 2. Proof. lma'. Qed.
 Lemma HtimesHid : hadamard × hadamard = I 2. Proof. lma'; Hhelper. Qed.
 
-Hint Resolve ItimesIid XtimesXid YtimesYid ZtimesZid HtimesHid : id_db.
+#[export] Hint Resolve ItimesIid XtimesXid YtimesYid ZtimesZid HtimesHid : id_db.
 
 Lemma ZH_eq_HX : σz × hadamard = hadamard × σx. Proof. lma'. Qed.
 Lemma XH_eq_HZ : σx × hadamard = hadamard × σz. Proof. lma'. Qed.
@@ -521,7 +521,7 @@ Lemma cnotX2 : cnot × (I 2 ⊗ σx) = (I 2 ⊗ σx) × cnot. Proof. lma'. Qed.
 Lemma cnotZ1 : cnot × (σz ⊗ I 2) = (σz ⊗ I 2) × cnot. Proof. lma'. Qed.
 Lemma cnotZ2 : cnot × (I 2 ⊗ σz) = (σz ⊗ σz) × cnot. Proof. lma'. Qed.
 
-Hint Resolve ZH_eq_HX XH_eq_HZ PX_eq_YP PZ_eq_ZP cnotX1 cnotX2 cnotZ1 cnotZ2 : id_db.
+#[export] Hint Resolve ZH_eq_HX XH_eq_HZ PX_eq_YP PZ_eq_ZP cnotX1 cnotX2 cnotZ1 cnotZ2 : id_db.
 
 
 
@@ -2165,8 +2165,8 @@ Proof. intros. induction ls as [| h].
 Qed.
 
 
-Hint Resolve σx_unitary σy_unitary σz_unitary P_unitary H_unitary T_unitary : unit_db.
-Hint Resolve cnot_unitary notc_unitary id_unitary Mmult_unitary kron_unitary transpose_unitary unit_scale unit_big_kron: unit_db.
+#[export] Hint Resolve σx_unitary σy_unitary σz_unitary P_unitary H_unitary T_unitary : unit_db.
+#[export] Hint Resolve cnot_unitary notc_unitary id_unitary Mmult_unitary kron_unitary transpose_unitary unit_scale unit_big_kron: unit_db.
 
 
 
@@ -3187,7 +3187,7 @@ Lemma WF_qubitP : WF_Matrix ∣+⟩. Proof. show_wf. Qed.
 Lemma WF_qubitM : WF_Matrix ∣-⟩. Proof. show_wf. Qed.
 Lemma WF_EPRpair : WF_Matrix ∣Φ+⟩. Proof. unfold EPRpair. auto with wf_db.  Qed.
 
-Hint Resolve WF_qubitP WF_qubitM WF_EPRpair : wf_db. 
+#[export] Hint Resolve WF_qubitP WF_qubitM WF_EPRpair : wf_db. 
 
 Lemma EigenXp : Eigenpair σx (∣+⟩, C1).
 Proof. unfold Eigenpair. lma'.
@@ -3210,5 +3210,5 @@ Proof. unfold Eigenpair. lma'.
 Qed.
 
 
-Hint Resolve EigenXp EigenXm EigenZ0 EigenZ1 EigenXXB all_v_eigen_I : eig_db.
+#[export] Hint Resolve EigenXp EigenXm EigenZ0 EigenZ1 EigenXXB all_v_eigen_I : eig_db.
 

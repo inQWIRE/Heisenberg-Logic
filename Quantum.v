@@ -180,7 +180,7 @@ Definition swap : Matrix (2*2) (2*2) :=
           | _, _ => C0
           end.
 
-Hint Unfold qubit0 qubit1 hadamard σx σy σz control cnot swap bra ket : U_db.
+#[export] Hint Unfold qubit0 qubit1 hadamard σx σy σz control cnot swap bra ket : U_db.
 
 (** ** Rotation Matrices *)
                               
@@ -441,10 +441,10 @@ Proof.
   Msimpl; reflexivity.
 Qed.
 
-Hint Rewrite Mmult00 Mmult01 Mmult10 Mmult11 Mmult0X MmultX0 Mmult1X MmultX1 : Q_db.
-Hint Rewrite MmultXX MmultYY MmultZZ MmultHH Mplus01 Mplus10 : Q_db.
-Hint Rewrite σx_on_right0 σx_on_right1 σx_on_left0 σx_on_left1 : Q_db.
-Hint Rewrite cancel00 cancel01 cancel10 cancel11 using (auto with wf_db) : Q_db.
+#[export] Hint Rewrite Mmult00 Mmult01 Mmult10 Mmult11 Mmult0X MmultX0 Mmult1X MmultX1 : Q_db.
+#[export] Hint Rewrite MmultXX MmultYY MmultZZ MmultHH Mplus01 Mplus10 : Q_db.
+#[export] Hint Rewrite σx_on_right0 σx_on_right1 σx_on_left0 σx_on_left1 : Q_db.
+#[export] Hint Rewrite cancel00 cancel01 cancel10 cancel11 using (auto with wf_db) : Q_db.
 
 Lemma swap_swap : swap × swap = I (2*2). Proof. solve_matrix. Qed.
 
@@ -459,7 +459,7 @@ Proof.
   reflexivity.
 Qed.
 
-Hint Rewrite swap_swap swap_swap_r using (auto 100 with wf_db): Q_db.
+#[export] Hint Rewrite swap_swap swap_swap_r using (auto 100 with wf_db): Q_db.
 
 
 
@@ -559,9 +559,9 @@ Proof.
   apply IHl.
 Qed.
 
-Hint Resolve WF_bra0 WF_bra1 WF_qubit0 WF_qubit1 WF_bra WF_ket WF_braqubit0 WF_braqubit1 : wf_db.
-Hint Resolve WF_bool_to_ket WF_bool_to_matrix WF_bool_to_matrix' : wf_db.
-Hint Resolve WF_bools_to_matrix : wf_db.
+#[export] Hint Resolve WF_bra0 WF_bra1 WF_qubit0 WF_qubit1 WF_bra WF_ket WF_braqubit0 WF_braqubit1 : wf_db.
+#[export] Hint Resolve WF_bool_to_ket WF_bool_to_matrix WF_bool_to_matrix' : wf_db.
+#[export] Hint Resolve WF_bools_to_matrix : wf_db.
 
 Lemma WF_hadamard : WF_Matrix hadamard. Proof. show_wf. Qed.
 Lemma WF_σx : WF_Matrix σx. Proof. show_wf. Qed.
@@ -585,11 +585,11 @@ Proof.
   all: rewrite WFU; [reflexivity|lia].
 Qed.
 
-Hint Resolve WF_hadamard WF_σx WF_σy WF_σz WF_cnot WF_swap WF_phase : wf_db.
-Hint Resolve WF_rotation : wf_db.
+#[export] Hint Resolve WF_hadamard WF_σx WF_σy WF_σz WF_cnot WF_swap WF_phase : wf_db.
+#[export] Hint Resolve WF_rotation : wf_db.
 
-Hint Extern 2 (WF_Matrix (phase_shift _)) => apply WF_phase : wf_db.
-Hint Extern 2 (WF_Matrix (control _)) => apply WF_control : wf_db.
+#[export] Hint Extern 2 (WF_Matrix (phase_shift _)) => apply WF_phase : wf_db.
+#[export] Hint Extern 2 (WF_Matrix (control _)) => apply WF_control : wf_db.
 
 (***************************)
 (** Unitaries are unitary **)
@@ -601,7 +601,7 @@ Hint Extern 2 (WF_Matrix (control _)) => apply WF_control : wf_db.
 Definition WF_Unitary {n: nat} (U : Matrix n n): Prop :=
   WF_Matrix U /\ U † × U = I n.
 
-Hint Unfold WF_Unitary : U_db.
+#[export] Hint Unfold WF_Unitary : U_db.
 
 (* More precise *)
 (* Definition unitary_matrix' {n: nat} (A : Matrix n n): Prop := Minv A A†. *)
@@ -1069,7 +1069,7 @@ Qed.
 Lemma braqubit0_sa : ∣0⟩⟨0∣† = ∣0⟩⟨0∣. Proof. lma. Qed.
 Lemma braqubit1_sa : ∣1⟩⟨1∣† = ∣1⟩⟨1∣. Proof. lma. Qed.
 
-Hint Rewrite hadamard_sa σx_sa σy_sa σz_sa cnot_sa swap_sa braqubit1_sa braqubit0_sa control_adjoint phase_adjoint rotation_adjoint : Q_db.
+#[export] Hint Rewrite hadamard_sa σx_sa σy_sa σz_sa cnot_sa swap_sa braqubit1_sa braqubit0_sa control_adjoint phase_adjoint rotation_adjoint : Q_db.
 
 (* Rather use control_adjoint :
 Hint Rewrite control_sa using (autorewrite with M_db; reflexivity) : M_db. *)
@@ -1139,7 +1139,7 @@ Proof.
 Qed.
 
 
-Hint Rewrite phase_0 phase_2pi phase_pi phase_neg_pi : Q_db.
+#[export] Hint Rewrite phase_0 phase_2pi phase_pi phase_neg_pi : Q_db.
 
 
 (*****************************)
@@ -1207,11 +1207,11 @@ Inductive Mixed_State {n} : Matrix n n -> Prop :=
  
 Lemma WF_Pure : forall {n} (ρ : Density n), Pure_State ρ -> WF_Matrix ρ.
 Proof. intros. destruct H as [φ [[WFφ IP1] Eρ]]. rewrite Eρ. auto with wf_db. Qed.
-Hint Resolve WF_Pure : wf_db.
+#[export] Hint Resolve WF_Pure : wf_db.
 
 Lemma WF_Mixed : forall {n} (ρ : Density n), Mixed_State ρ -> WF_Matrix ρ. 
 Proof. induction 1; auto with wf_db. Qed.
-Hint Resolve WF_Mixed : wf_db.
+#[export] Hint Resolve WF_Mixed : wf_db.
 
 Lemma pure0 : Pure_State ∣0⟩⟨0∣. 
 Proof. exists ∣0⟩. intuition. split. auto with wf_db. solve_matrix. Qed.
@@ -1514,7 +1514,7 @@ Proof.
   auto with wf_db.
 Qed.
 
-Hint Resolve WF_super : wf_db.
+#[export] Hint Resolve WF_super : wf_db.
 
 Lemma super_outer_product : forall m (φ : Matrix m 1) (U : Matrix m m), 
     super U (outer_product φ φ) = outer_product (U × φ) (U × φ).
@@ -1538,7 +1538,7 @@ Proof.
   auto.
 Qed.
 
-Hint Resolve WF_compose_super : wf_db.
+#[export] Hint Resolve WF_compose_super : wf_db.
 
 
 Lemma compose_super_correct : forall {m n p} 
@@ -1687,7 +1687,7 @@ Proof.
     lca.
 Qed.  
 
-Hint Rewrite swap_spec using (auto 100 with wf_db) : Q_db.
+#[export] Hint Rewrite swap_spec using (auto 100 with wf_db) : Q_db.
 
 Example swap_to_0_test_24 : forall (q0 q1 q2 q3 : Vector 2), 
   WF_Matrix q0 -> WF_Matrix q1 -> WF_Matrix q2 -> WF_Matrix q3 ->

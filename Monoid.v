@@ -23,7 +23,7 @@ Class PCM_Laws A `{PCM A} :=
   ; M_absorb : forall a, a ∘ ⊥ = ⊥ 
   }.
 
-Hint Resolve M_unit M_assoc M_comm M_absorb : core.
+#[export] Hint Resolve M_unit M_assoc M_comm M_absorb : core.
 
 (****************************)
 (* Interpretable type class *)
@@ -45,14 +45,14 @@ Class PPCM_Laws A `{PPCM A} :=
     PMonoid_comm : forall a b, m' a b = m' b a 
   }.
 
-Instance PPCM_to_PCM A `{PPCM A} : PCM (option A) :=
+#[export] Instance PPCM_to_PCM A `{PPCM A} : PCM (option A) :=
   { one := Some one'
   ; zero := None
   ; m := fun a b => do x ← a;
                     do y ← b;
                     m' x y
   }.
-Instance PPCM_to_PCM_Laws A `{PPCM_Laws A} : PCM_Laws (option A).
+#[export] Instance PPCM_to_PCM_Laws A `{PPCM_Laws A} : PCM_Laws (option A).
 Proof.
   split.
   - destruct a; simpl; auto. apply PMonoid_unit.
@@ -108,14 +108,14 @@ Section CMonoid.
   Open Scope list_scope.
 
 
-  Global Instance TranslateA : Translate A A := {translate := fun x => x}.
+  #[export] Instance TranslateA : Translate A A := {translate := fun x => x}.
 
   Definition translate_option {X} `{Translate X A} (x : option X) : A :=
     match x with
     | Some x' => ⟨x'⟩
     | None    => ⊥
     end.
-  Global Instance Translate_option (X : Type) `{Translate X A} : Translate (option X) A :=
+  #[export] Instance Translate_option (X : Type) `{Translate X A} : Translate (option X) A :=
     { translate := translate_option }.
 
   Lemma translate_Some : forall {X} `{Translate X A} (x : A), 
@@ -129,7 +129,7 @@ Section CMonoid.
     | nil => ⊤
     | b :: ls' => ⟨b⟩ ∘ translate_list ls'
     end.
-  Global Instance Translate_list (X : Type) `{Translate X A} : Translate (list X) A :=
+  #[export] Instance Translate_list (X : Type) `{Translate X A} : Translate (list X) A :=
     { translate := translate_list }.
 
 
@@ -150,7 +150,7 @@ Section CMonoid.
     | M_var a => a
     | M_m e1 e2 => translate_M_exp e1 ∘ translate_M_exp e2
     end.
-  Global Instance Translate_M_exp : Translate M_exp A := {translate := translate_M_exp}.
+  #[export] Instance Translate_M_exp : Translate M_exp A := {translate := translate_M_exp}.
 
 
   (****************)
@@ -218,7 +218,7 @@ Section CMonoid.
     | i :: indices' => index values i :: index_wrt values indices'
     end.
 
-  Instance Translate_nat_list : Translate (list A * list nat) A :=
+  #[export] Instance Translate_nat_list : Translate (list A * list nat) A :=
     { translate := fun x => match x with
                             | (values, idx) => ⟨index_wrt values idx⟩
                             end }.
@@ -256,7 +256,7 @@ Section CMonoid.
     | Some a :: ls' => fmap (m a) (translate_list_option ls')
     | None :: _ => None
     end.
-  Instance Translate_list_option : Translate (option A) (list (option A)) :=
+  #[export] Instance Translate_list_option : Translate (option A) (list (option A)) :=
     { translate := translate_list_option }.
 *)
 
