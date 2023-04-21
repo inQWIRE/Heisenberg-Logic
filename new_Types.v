@@ -670,7 +670,7 @@ Proof. easy. Qed.
 (* Well Formedness Lemmas *)
 (**************************)
 
-(** can be commented out
+(** can be commented out: anticommute_TType defined below
 Definition Anticommutative_direct {n} (t1 t2 : TType n) : Prop :=
   cBigMul (zipWith gMul_Coef (snd t1) (snd t2)) = Copp (cBigMul (zipWith gMul_Coef (snd t2) (snd t1))).
 **)
@@ -2682,6 +2682,49 @@ Proof. intros n m a B0 H H0.
          lca.
 Qed.
 
+Lemma restricted_addition_syntactic_map_gTensorT : forall {n m} (a : TType n) (B : AType m),
+    WF_TType n a -> restricted_addition_syntactic B -> restricted_addition_syntactic (map (fun x : TType m => gTensorT a x) B).
+Proof. intros n m a B0 H H0.
+  destruct H. simpl in *.
+  induction H0; simpl in *.
+  - destruct a, t, H0. simpl in *.
+    do 2 constructor; simpl in *.
+    + constructor; destruct H, H0; simpl in *; try lia.
+      rewrite app_length. subst. reflexivity.
+    + destruct H1, H3; subst; autorewrite with C_db; [left | right | right | left]; reflexivity.
+    + constructor. assumption.
+  -  rewrite map_gTensorT_gScaleA.
+     rewrite map_app.
+     constructor; auto.
+     
+     clear -H0.
+     induction a1.
+     + simpl. auto.
+     + simpl in *. destruct H0.
+       split.
+       2: apply IHa1; auto.
+       clear IHa1.
+       induction a2.
+       * simpl. auto.
+       * simpl in *. destruct H.
+         apply anticommute_AType_syntactic_comm in H0.
+         simpl in *.
+         destruct H0.
+         apply anticommute_AType_syntactic_comm in H2.
+         split.
+         2: apply IHa2; auto.
+         clear IHa2.
+         clear -H.
+         destruct a, a0, a2.
+         simpl in *.
+         rewrite <- ! zipWith_app_product with (n:=length l); auto.
+         unfold cBigMul in *.
+         rewrite ! fold_left_Cmult_app.
+         Search fold_left.
+         rewrite H.
+         lca.
+Qed.
+
 Lemma anticommute_TType_AType_app_dist : forall {n} (a : TType n) (A B : AType n),
     anticommute_TType_AType a (A ++ B) <-> anticommute_TType_AType a A /\ anticommute_TType_AType a B.
 Proof. intros n a A B.
@@ -2701,42 +2744,134 @@ Proof. intros n a A B.
       specialize (IHA H1).
       auto.
 Qed.
-
-
-Lemma  anticommute_AType_syntactic_gTensorA_comm : forall {m n} (a0 : AType n) (a1 a2 : AType m),
-anticommute_AType_syntactic (gTensorA a1 a0) (gTensorA a2 a0)
-<-> anticommute_AType_syntactic (gTensorA a0 a1) (gTensorA a0 a2).
-Proof. intros m n a0 a1 a2.
-  split.
-  - intro. induction a0.
-    + simpl. auto.
-    + simpl. rewrite ! anticommute_AType_syntactic_app_dist_l.
-      rewrite ! anticommute_AType_syntactic_app_dist_r.
-      repeat split.
-      4: apply IHa0.
-      induction a1.
-      * simpl. auto.
-      * Admitted.
   
 
-(** (a1 + a2)⊗(b1 + b2) **)
+
+
+
+
+
+
+
+
+
+
+
+(** 
+
+1/√2(a1+a2) ⊗ 1/√2(b1+b2)
+
+suppose a1*a2=-a2*a1 and b1*b2=-b2*b1
+
+(a1+a2)⊗(b1+b2)
+= ((a1+a2)⊗b1)+((a1+a2)⊗b2)
+= a1⊗b1+a2⊗b1+a1⊗b2+a2⊗b2
+
+((a1+a2)⊗b1)*((a1+a2)⊗b2)
+= ((a1+a2)^2⊗(b1*b2))
+
+((a1+a2)⊗b2)*((a1+a2)⊗b1)
+= ((a1+a2)^2⊗(b2*b1))
+
+
+((a1+a2)⊗(b1+b2))*((a1+a2)⊗(b1+b2))
+=((a1+a2)⊗(b1+b2))^2
+=((a1+a2)^2)⊗((b1+b2)^2)
+
+
+
+
+-----------------------
+a1 = X
+a2 = Z
+a0 = 1/√2(X+Z)
+
+1/√2(X+Z) : X anticommutes with Z
+1/√2(X+Z) ⊗ 1/√2(X+Z)
+
+1/2(XX+XZ+ZX+ZZ)
+= 1/√2(1/√2(XX+XZ)+1/√2(ZX+ZZ))
+
+1/2(XX+XZ+ZX+ZZ)*1/2(XX+XZ+ZX+ZZ)
+=1/4(XX*XX+XX*XZ+XX*ZX+XX*ZZ+
+     XZ*XX+XZ*XZ+XZ*ZX+XZ*ZZ+
+     ZX*XX+ZX*XZ+ZX*ZX+ZX*ZZ+
+     ZZ*XX+ZZ*XZ+ZZ*ZX+ZZ*ZZ)
+=1/4(+II -iIY-iYI-YY
+     +iIY+II +YY -iYI
+     +iYI+YY +II -iIY
+     -YY +iYI+iIY+II)
+=1/4(4*II)
+=II
+
+a1 = X
+a2 = Z
+a0 = X+Z
+a1⊗a0 = XX+XZ
+a2⊗a0 = ZX+ZZ
+
+a1⊗a0 * a2⊗a0 = (XX+XZ)*(ZX+ZZ)
+= XX*ZX+XX*ZZ+XZ*ZX+XZ*ZZ
+= -iYI -YY   +YY   -iYI
+
+a2⊗a0 * a1⊗a0 = (ZX+ZZ)*(XX+XZ)
+= ZX*XX+ZZ*XX+ZX*XZ+ZZ*XZ
+= iYI  -YY   +YY   +iYI
+
+*)
 Lemma WF_AType_tensor : forall {n m} (A : AType n) (B : AType m),
     WF_AType n A -> WF_AType m B -> WF_AType (n+m) (gTensorA A B).
 Proof. intros n m A0 B0 H H0.
   destruct H, H0.
-  ... 
-  induction H.
+  constructor.
+
+  dependent induction H.
   - simpl. rewrite <- app_nil_end.
-    apply WF_AType_map_gTensorT; auto.
-    constructor; auto.
+    apply restricted_addition_syntactic_map_gTensorT; auto.
   - rewrite gTensorA_gScaleA_comm.
-    constructor.
     rewrite gTensorA_app_dist.
-    constructor.
-    1-2: destruct IHrestricted_addition_syntactic1, IHrestricted_addition_syntactic2; auto.
+    apply add_restrict_inductive_syntactic.
+    + apply IHrestricted_addition_syntactic1; auto.
+    + apply IHrestricted_addition_syntactic2; auto.
+    + 
+    subst.
+    (* inversion H3; subst. *)
     
+    restricted_addition_syntactic
+    
+    .................
+    .................
+    .................
+    .................
+    .................
 (* gMul_Coef *)
-(** not true: 
+(** 
+anticommute_AType_syntactic (gTensorA a1 a0) (gTensorA a2 a0)
+
+syntactically not true:
+
+a1 = X
+a2 = Z
+a0 = X+Z
+a1⊗a0 = XX+XZ
+a2⊗a0 = ZX+ZZ
+
+XX commutes with ZZ
+
+but semantically true:
+
+a1⊗a0 * a2⊗a0 = (XX+XZ)*(ZX+ZZ)
+= XX*ZX+XX*ZZ+XZ*ZX+XZ*ZZ
+= -iYI -YY   +YY   -iYI
+
+a2⊗a0 * a1⊗a0 = (ZX+ZZ)*(XX+XZ)
+= ZX*XX+ZZ*XX+ZX*XZ+ZZ*XZ
+= iYI  -YY   +YY   +iYI
+
+----------------------------------------------------
+
+NOT TRUE: 
+
 a1 = X+Y
 a2 = Z
 a0 = X+Z
@@ -2756,6 +2891,16 @@ ZX*XX+ZX*XZ+ZX*YX+ZX*YZ
 
 semantically anticommutes
 
+--------------------------
+a1 = X+Y
+a2 = Z
+a0 = X+Z
+
+1/√2(X+Y) : X anticommutes with Y
+1/√2(1/√2(X+Y)+Z) : Z anticommutes with X and Y
+1/√2(X+Z) : Z anticommutes with X
+
+1/√2(1/√2(X+Y)+Z) ⊗ 1/√2(X+Z)
 **)
 
     (*
