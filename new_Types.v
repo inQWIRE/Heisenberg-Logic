@@ -978,7 +978,19 @@ Fixpoint anticommute_AType_syntactic {n : nat} (a1 a2 : AType n) : Prop :=
   | nil => True
   end.
 
-Inductive restricted_addition_syntactic {n : nat}: AType n -> Prop :=
+(* not needed?
+Inductive restricted_addition_syntactic : forall (n : nat), AType n -> Prop :=
+| add_restrict_base_syntactic : forall n (t : TType n), WF_TType n t -> restricted_addition_syntactic n [t]
+| add_restrict_inductive_syntactic : forall n (a1 a2 : AType n),
+    restricted_addition_syntactic n a1 -> restricted_addition_syntactic n a2 ->
+    anticommute_AType_syntactic a1 a2  ->
+    restricted_addition_syntactic n (gScaleA (1/√2) (a1 ++ a2))
+| add_restrict_tensor_syntactic : forall n m (a1 : AType n) (a2 : AType m),
+    restricted_addition_syntactic n a1 -> restricted_addition_syntactic m a2 ->
+    restricted_addition_syntactic (n+m) (gTensorA a1 a2).
+*)
+
+Inductive restricted_addition_syntactic {n : nat} : AType n -> Prop :=
 | add_restrict_base_syntactic : forall (t : TType n), WF_TType n t -> restricted_addition_syntactic [t]
 | add_restrict_inductive_syntactic : forall (a1 a2 : AType n),
     restricted_addition_syntactic a1 -> restricted_addition_syntactic a2 ->
@@ -1906,7 +1918,7 @@ Qed.
 
 
 Lemma eq_implies_JMeq : forall (A : Type) (x y : A), 
-    x = y -> x ~= y.
+    x = y -> JMeq x y.
 Proof. intros A x y H. rewrite H. reflexivity. Qed.
 
 Lemma restricted_addition_semantic_non_nil : forall {n : nat},
@@ -1979,7 +1991,7 @@ Proof. intros. induction H; constructor; try easy; constructor. Qed.
 
 
 
-(** ** Failed attempt *)
+(** ** Failed attempt: non-working definition *)
 (* 
 Definition RA {n : nat} (a : AType n) := restricted_addition_syntactic a.
 Definition RA_semantic {n : nat} (a : AType n) := restricted_addition_semantic a.
@@ -2322,10 +2334,15 @@ Proof. intros. gen l0 n.  induction l.
       * rewrite cons_conc. do 2 constructor.
 Qed.
   
-                                                                                      
+(** Precondition : commute -> a <> b
+**)
+Lemma WF_TType_mul_commute : forall {n} (a b : TType n),
+    commute_TType a b -> a <> b ->
+    WF_TType n a -> WF_TType n b -> WF_TType n (gMulT a b).
+Proof. Admitted.
 (** Precondition: Commute -> gMulT a b <> (c, gI^n) <- use repeat function
 Precondition : Anticommute **)
-Lemma WF_TType_mul_commute : forall {n} (a b : TType n),
+(* Lemma WF_TType_mul_commute : forall {n} (a b : TType n),
     proper_length_TType n a -> proper_length_TType n b ->  (** this is line is not needed **)
     commute_TType a b -> (snd (gMulT a b) <> repeat gI n) ->
     WF_TType n a -> WF_TType n b -> WF_TType n (gMulT a b).
@@ -2345,7 +2362,7 @@ Proof. intros n a b H H0 H1 H2 H3 H4.
     [ left | right | right | left | right | left | left | right ]; reflexivity.
   apply trace_zero_syntax_zipWith_gMul_base_comm with (n := n);
     try assumption.
-Qed.
+Qed. *)
 
 
 
@@ -2406,7 +2423,273 @@ Proof. intros n a b H H0 H1.
     apply trace_zero_syntax_zipWith_gMul_base_anticomm; auto.
 Qed.
 
-Lemma WF_AType_imul : forall {n} (A B : AType n),
+
+Lemma anticommute_TType_gScaleT : forall {n} (c : Coef) (t1 t2 : TType n),
+    anticommute_TType t1 (gScaleT c t2) <->  anticommute_TType t1 t2.
+Proof. intros n c t1 t2.
+  split; intros; destruct t1, t2; easy.
+Qed.
+  
+Lemma anticommute_TType_AType_gScaleA : forall {n} (c : Coef) (t : TType n) (a : AType n),
+    anticommute_TType_AType t (gScaleA c a) <-> anticommute_TType_AType t a.
+Proof. intros n c t a.
+  split; intros.
+  - induction a; auto.
+    simpl in *. destruct H.
+    specialize (IHa H0).
+    split; auto.
+    rewrite anticommute_TType_gScaleT in H.
+    easy.
+  - induction a; auto.
+    simpl in *. destruct H.
+    specialize (IHa H0).
+    split; auto.
+    rewrite anticommute_TType_gScaleT.
+    easy.
+Qed.
+
+Lemma anticommute_AType_syntactic_gScaleA : forall {n} (c : Coef) (a b : AType n),
+    anticommute_AType_syntactic a (gScaleA c b) <-> anticommute_AType_syntactic a b.
+Proof. intros n c a b.
+  split; intros.
+  - induction a; auto.
+    simpl in *. destruct H.
+    specialize (IHa H0).
+    split; auto.
+    rewrite anticommute_TType_AType_gScaleA in H.
+    auto.
+  - induction a; auto.
+    simpl in *. destruct H.
+    specialize (IHa H0).
+    split; auto.
+    rewrite anticommute_TType_AType_gScaleA.
+    auto.
+Qed.
+
+Lemma anticommute_AType_syntactic_nil_r : forall {n} (a : AType n), anticommute_AType_syntactic a [] <-> True.
+Proof. intros n a.
+  split.
+  - intro.
+    induction a; auto.
+  - intro.
+    induction a; auto.
+    simpl.
+    rewrite and_comm.
+    rewrite kill_true.
+    apply IHa.
+Qed.
+
+Lemma anticommute_TType_comm : forall {n} (a b : TType n), anticommute_TType a b -> anticommute_TType b a.
+Proof. intros n a b H.
+  destruct a,b; simpl in *.
+  rewrite H.
+  lca.
+Qed.
+
+Lemma anticommute_AType_syntactic_comm : forall {n} (a b : AType n), anticommute_AType_syntactic a b -> anticommute_AType_syntactic b a.
+Proof. intros n a b H.
+  induction a.
+  - apply anticommute_AType_syntactic_nil_r. auto.
+  - simpl in *.
+    destruct H. specialize (IHa H0).
+    clear H0.
+    induction b.
+    + simpl. auto.
+    + simpl in *.
+      destruct H, IHa.
+      specialize (IHb H0 H2).
+      repeat split; auto.
+      apply anticommute_TType_comm.
+      auto.
+Qed.
+
+Lemma anticommute_TType_AType_app_dist : forall {n} (t : TType n) (a1 a2 : AType n),
+    anticommute_TType_AType t (a1 ++ a2) <-> anticommute_TType_AType t a1 /\ anticommute_TType_AType t a2.
+Proof. intros n t a1 a2.
+  split.
+  - intro. split.
+    + induction a1.
+      * simpl. auto.
+      * simpl in *. destruct H.
+        specialize (IHa1 H0).
+        split; auto.
+    + induction a1.
+      * simpl in *. auto.
+      * simpl in *. destruct H.
+        specialize (IHa1 H0).
+        auto.
+  - intro. destruct H.
+    induction a1; auto.
+    simpl in *. destruct H.
+    specialize (IHa1 H1).
+    split; auto.
+Qed.
+
+Lemma anticommute_TType_AType_app_comm : forall {n} (t : TType n) (a1 a2 : AType n),
+    anticommute_TType_AType t (a1 ++ a2) <->  anticommute_TType_AType t (a2 ++ a1).
+Proof. intros n t a1 a2.
+  split; intro;
+    rewrite anticommute_TType_AType_app_dist;
+    rewrite and_comm;
+    rewrite <- anticommute_TType_AType_app_dist;
+    auto.
+Qed.
+
+Lemma anticommute_AType_syntactic_app_dist_l : forall {n} (a b c : AType n), anticommute_AType_syntactic (a ++ b) c <-> anticommute_AType_syntactic a c /\ anticommute_AType_syntactic b c.
+Proof. intros n a b c.
+  split.
+  - intro. split.
+    + induction a.
+      * simpl. auto.
+      * simpl in *. destruct H.
+        specialize (IHa H0).
+        split; auto.
+    + induction a.
+      * simpl in *. auto.
+      * simpl in *. destruct H.
+        apply (IHa H0).
+  - intro. destruct H.
+    induction a; auto.
+    simpl in *. destruct H.
+    specialize (IHa H1).
+    split; auto.
+Qed.
+
+Lemma anticommute_AType_syntactic_app_comm_l : forall {n} (a b c : AType n), anticommute_AType_syntactic (a ++ b) c <-> anticommute_AType_syntactic (b ++ a) c.
+Proof. intros n a b c. rewrite ! anticommute_AType_syntactic_app_dist_l. rewrite and_comm.
+  split; auto.
+Qed.
+
+Lemma anticommute_AType_syntactic_app_dist_r : forall {n} (a b c : AType n), anticommute_AType_syntactic a (b ++ c) <-> anticommute_AType_syntactic a b /\ anticommute_AType_syntactic a c.
+Proof. intros n a b c.
+  split.
+  - intros.
+    apply anticommute_AType_syntactic_comm in H.
+    rewrite anticommute_AType_syntactic_app_dist_l in H.
+    destruct H.
+    split; apply anticommute_AType_syntactic_comm; auto.
+  - intros [H H0].
+    apply anticommute_AType_syntactic_comm.
+    rewrite anticommute_AType_syntactic_app_dist_l.
+    apply anticommute_AType_syntactic_comm in H.
+    apply anticommute_AType_syntactic_comm in H0.
+    split; auto.
+Qed.
+
+Lemma anticommute_AType_syntactic_app_comm_r : forall {n} (a b c : AType n), anticommute_AType_syntactic a (b ++ c) <-> anticommute_AType_syntactic a (c ++ b).
+Proof. intros n a b c. rewrite ! anticommute_AType_syntactic_app_dist_r. rewrite and_comm.
+  split; auto.
+Qed.
+
+Lemma gMulA_dist_app_l : forall {n} (a a1 a2 : AType n),
+    gMulA (a1 ++ a2) a = (gMulA a1 a) ++ (gMulA a2 a).
+Proof. intros n a a1 a2.
+  induction a1; auto.
+  simpl. rewrite IHa1.
+  rewrite app_assoc.
+  auto.
+Qed.
+
+(** counterexample
+
+YYYYYZ, XXYYZZ, 
+XXXXXI, ZZZIII
+
+1/√2 (a1 + a2)* 1/√2 (b1 + b2) = 1/2 (a1 b1 + a1 b2 + a2 b1 + a2 b2) =
+1/√2 ( 1/√2 (a1 b1 + a1 b2) + 1/√2 (a2 b1 + a2 b2) )
+
+a1 b1 a2 b1 + a1 b1 a2 b2 + a1 b2 a2 b1 + a1 b2 a2 b2
+- a2 b1 a1 b1 + a2 b2 a1 b1 + a2 b1 a1 b2 - a2 b2 a1 b2
+- a2 b1 a1 b1 + a2 b2 a1 b1 - a2 a1 b1 b2 - a2 b2 a1 b2
+- a2 b1 a1 b1 + a2 b2 a1 b1 - a2 b2 a1 b1 - a2 b2 a1 b2
+- a2 b1 a1 b1 - a2 b2 a1 b2
+
+a2 b1 a1 b1 + a2 b2 a1 b1 + a2 b1 a1 b2 + a2 b2 a1 b2
+a2 b1 a1 b1 + a2 b2 a1 b1 - a2 a1 b1 b2 + a2 b2 a1 b2
+a2 b1 a1 b1 + a2 b2 a1 b1 - a2 b2 a1 b1 + a2 b2 a1 b2
+a2 b1 a1 b1 + a2 b2 a1 b2
+
+
+Inductive restricted_addition_syntactic (n : nat) : AType n -> Prop :=
+    add_restrict_base_syntactic : forall t : TType n,
+                                  WF_TType n t -> restricted_addition_syntactic [t]
+  | add_restrict_inductive_syntactic : forall a1 a2 : AType n,
+                                       restricted_addition_syntactic a1 ->
+                                       restricted_addition_syntactic a2 ->
+                                       anticommute_AType_syntactic a1 a2 ->
+                                       restricted_addition_syntactic
+                                         (gScaleA (C1 / √ 2) (a1 ++ a2)).
+ **)
+
+Lemma WF_AType_dist_app : forall {n} (a1 a2 : AType n),
+    WF_AType n a1 -> WF_AType n a2 -> anticommute_AType_syntactic a1 a2 ->
+    WF_AType n (gScaleA (C1 / √ 2) (a1 ++ a2)).
+Proof. intros n a1 a2 H H0 H1. 
+  do 2 constructor; inversion H; inversion H0; auto.
+Qed.
+
+(* not needed?
+(** prove for the simple tensored Paulis case of multiplication **)
+Lemma WF_AType_mul_anticommutative_l : forall {n} (t : TType n) (A : AType n),
+    anticommute_TType_AType t A ->
+    WF_TType n t -> WF_AType n A -> WF_AType n (gScaleA (Ci)%C (map (fun (a : TType n) => gMulT t a) A)).
+Proof. intros n t A H H0 H1.
+  destruct H1.
+  induction H1; simpl in *.
+  - inversion H0. inversion H2.
+    inversion H1. inversion H7.
+    destruct t, t0. simpl in *.
+    destruct H. clear H12. do 3 constructor. 
+    + constructor; simpl; auto.
+      rewrite zipWith_len_pres with (n:=n); auto.
+    + simpl. rewrite <- H11 in H6.
+      apply cBigMul_zipWith_gMul_Coef_anticomm_plus_minus_i in H; auto.
+      destruct H, H3, H8; rewrite H, H3, H8;
+        [ right | left | left | right | left | right | right | left ]; lca.
+    + simpl. rewrite <- H11 in H6.
+      apply trace_zero_syntax_zipWith_gMul_base_anticomm; auto.
+  - assert (  (gScaleA Ci (map (fun a : TType n => gMulT t a) (gScaleA (C1 / √ 2) (a1 ++ a2)))) =
+                (gScaleA (C1 / √ 2) ((gScaleA Ci (map (fun a : TType n => gMulT t a) a1)) ++
+                  (gScaleA Ci (map (fun a : TType n => gMulT t a) a2)))) ).
+    { unfold gScaleA. rewrite <- ! map_app.
+      rewrite ! map_map. f_equal.
+      apply functional_extensionality. intro.
+      destruct t, x. simpl. f_equal. lca. }
+    rewrite H2. clear H2.
+    rewrite anticommute_TType_AType_gScaleA in H.
+    rewrite anticommute_TType_AType_app_dist in H.
+    destruct H.
+    apply WF_AType_dist_app.
+    + apply IHrestricted_addition_syntactic1; auto.
+    + apply IHrestricted_addition_syntactic2; auto.
+    + rewrite anticommute_AType_syntactic_gScaleA.
+      apply anticommute_AType_syntactic_comm.
+      rewrite anticommute_AType_syntactic_gScaleA.
+      apply anticommute_AType_syntactic_comm.
+      clear IHrestricted_addition_syntactic1 IHrestricted_addition_syntactic2.
+      clear H1_ H1_0.
+      induction a1; auto.
+      simpl in *.
+      destruct H, H1.
+      specialize (IHa1 H3 H4).
+      split; auto.
+      clear IHa1.
+      clear H3 H4.
+      induction a2; auto.
+      simpl in *.
+      destruct H2, H1.
+      specialize (IHa2 H3 H4).
+      split; auto.
+      clear IHa2.
+      clear H3 H4.
+      
+      unfold gMulT, anticommute_TType in *.
+      destruct t, a, a0.
+      (* don't know how to proceed *)
+      *)
+
+(* does not work
+Lemma WF_AType_mul_anticommutative : forall {n} (A B : AType n),
     anticommute_AType_syntactic A B ->
     WF_AType n A -> WF_AType n B -> WF_AType n (gScaleA (Ci)%C (gMulA A B)).
 Proof. intros n A B H H0 H1.
@@ -2424,54 +2707,241 @@ Proof. intros n A B H H0 H1.
           apply trace_zero_syntax_zipWith_gMul_base_anticomm; assumption. }
       1:{ apply proper_length_TType_zipWith_gMul_base with (c:=c) (c0:=c0);
           destruct H0; destruct H1; assumption. }
-      admit.
+      destruct H0, H1. simpl in *.
+      destruct H0, H1. simpl in *.
+      apply cBigMul_zipWith_gMul_Coef_anticomm_plus_minus_i in H.
+      2: subst; auto.
+      destruct H, H4, H6; rewrite H, H4, H6;
+      [ right | left | left | right | left | right | right | left ]; lca.
     + Search gScaleA.
       unfold gScaleA.
       rewrite ! map_map.
       assert ((fun x : TType n => gScaleT Ci (gMulT t (gScaleT (C1 / √ 2) x)))
               = (fun x : TType n => gScaleT (C1 / √ 2) (gMulT t (gScaleT Ci x)))).
-      { apply functional_extensionality. intros. (*
-      rewrite gMulT_gScaleT_l.
+      { apply functional_extensionality. intros.
+        destruct x, t. simpl in *. f_equal. lca. }
+      rewrite H3. rewrite <- map_map.
+      assert ( (map (gScaleT (C1 / √ 2)) (map (fun x : TType n => gMulT t (gScaleT Ci x)) (a1 ++ a2))) = gScaleA (C1 / √ 2) (map (fun x : TType n => gMulT t (gScaleT Ci x)) (a1 ++ a2)) ).
+      { unfold gScaleA. easy. }
+      rewrite H4.
+      rewrite map_app.
+      constructor;
+      clear H2;
+      clear H3; clear H4;
+      rewrite anticommute_TType_AType_gScaleA in H;
+      rewrite anticommute_TType_AType_app_dist in H;
+      destruct H.
+      assert ( (map (fun x : TType n => gMulT t (gScaleT Ci x)) a1) =
+                 (gScaleA Ci (map (fun x : TType n => gMulT t x) a1)) ).
+      { unfold gScaleA.
+        rewrite map_map. f_equal.
+        apply functional_extensionality. intro.
+        destruct x, t. simpl.
+        f_equal. lca. }
+      rewrite H3. 
+      apply IHrestricted_addition_syntactic1. auto.
+      assert ( (map (fun x : TType n => gMulT t (gScaleT Ci x)) a2) =
+                 (gScaleA Ci (map (fun x : TType n => gMulT t x) a2)) ).
+      { unfold gScaleA.
+        rewrite map_map. f_equal.
+        apply functional_extensionality. intro.
+        destruct x, t. simpl.
+        f_equal. lca. }
+      rewrite H3.
+      apply IHrestricted_addition_syntactic2. auto.
+      assert ( (map (fun x : TType n => gMulT t (gScaleT Ci x)) a1) =
+                 (gScaleA Ci (map (fun x : TType n => gMulT t x) a1)) ).
+      { unfold gScaleA.
+        rewrite map_map. f_equal.
+        apply functional_extensionality. intro.
+        destruct x, t. simpl.
+        f_equal. lca. }
+      rewrite H3.
+      assert ( (map (fun x : TType n => gMulT t (gScaleT Ci x)) a2) =
+                 (gScaleA Ci (map (fun x : TType n => gMulT t x) a2)) ).
+      { unfold gScaleA.
+        rewrite map_map. f_equal.
+        apply functional_extensionality. intro.
+        destruct x, t. simpl.
+        f_equal. lca. }
+      rewrite H4.
+      clear H3. clear H4.
+      rewrite anticommute_AType_syntactic_gScaleA.
+      apply anticommute_AType_syntactic_comm.
+      rewrite anticommute_AType_syntactic_gScaleA.
+      apply anticommute_AType_syntactic_comm.
+      specialize (IHrestricted_addition_syntactic1 H).
+      specialize (IHrestricted_addition_syntactic2 H2).
+      clear IHrestricted_addition_syntactic1.
+      clear IHrestricted_addition_syntactic2.
+      clear H1_. clear H1_0. 
+      induction a1; auto.
+      simpl in *. destruct H, H1.
+      specialize (IHa1 H3 H4).
+      split; auto.
+      clear IHa1.
+      induction a2; auto.
+      apply anticommute_AType_syntactic_comm in H4.
+      simpl in *. destruct H2, H1, H4.
+      apply anticommute_AType_syntactic_comm in H7.
+      specialize (IHa2 H5 H6 H7).
+      split; auto.
+      clear IHa2.
+      clear -H0 H H2 H1. (** anticommute_TType (gMulT t a) (gMulT t a0) **)
+      destruct t, a, a0.
+      simpl in *.
+      admit.
+  - rewrite gScaleA_dist_app.
+    rewrite gMulA_dist_app_l.
+    rewrite gScaleA_dist_app.
+    rewrite ! gMulA_gScaleA_l.
+    setoid_rewrite gScaleA_comm at 1.
+    setoid_rewrite gScaleA_comm at 2.
+    rewrite <- gScaleA_dist_app.
+    apply anticommute_AType_syntactic_comm in H.
+    rewrite anticommute_AType_syntactic_gScaleA in H.
+    apply anticommute_AType_syntactic_comm in H.
+    rewrite anticommute_AType_syntactic_app_dist_l in H.
+    destruct H.
+    specialize (IHrestricted_addition_syntactic1 H).
+    specialize (IHrestricted_addition_syntactic2 H2).
+    constructor; auto.
+    rewrite anticommute_AType_syntactic_gScaleA.
+    apply anticommute_AType_syntactic_comm.
+    rewrite anticommute_AType_syntactic_gScaleA.
 
-
-      
-
-
-      
-
-      
-  - 
-  
-  induction a.
-  - simpl. assumption.
-  - simpl in *. rewrite gScaleA_dist_app.
-
-    induction H1.
-    + simpl in *.
-    constructor.
-    Search gScaleA. 
     
-  
-  induction H0, H1.
-  - constructor. destruct H0, H1. constructor.
-    + apply proper_length_TType_gScaleT.
-      unfold proper_length_TType in *.
-      destruct H0, H1. split; try easy.
-      destruct t, t0.
-      unfold gMulT; simpl in *.
-      apply zipWith_len_pres; try easy.
-    + unfold gMulT. destruct t, t0. simpl in *.
-      do 2 destruct H.
-      
-      assert (@anticommute_AType_syntactic n [(c,l)] [(c0,l0)]).
-      2:{ induction l; simpl in *. do 2 destruct H6.
-          unfold cBigMul, gMul_Coef; simpl in *. Admitted.
-                                                  *)
+(** second try **)
+    clear - H H2 H0 H1.
+    
+    induction a2; auto.
+    apply anticommute_AType_syntactic_comm in H0.
+    simpl in *.
+    destruct H2, H0.
+    apply anticommute_AType_syntactic_comm in H4.
+    specialize (IHa2 H3 H4).
+    rewrite anticommute_AType_syntactic_app_dist_l.
+    split; auto.
+    apply anticommute_AType_syntactic_comm.
+    clear IHa2.
 
-Admitted.
+    induction a1; auto.
+    simpl in *.
+    destruct H, H0, H4.
+    specialize (IHa1 H5 H6 H7).
+    rewrite anticommute_AType_syntactic_app_dist_l.
+    split; auto.
+    clear IHa1.
+    clear - H H2 H0 H1.
+
+    induction H1; simpl in *.
+    + destruct H, H2. clear H3 H4.
+      repeat split; auto.
+      admit.
+    + rewrite anticommute_TType_AType_gScaleA in H, H2.
+      rewrite anticommute_TType_AType_app_dist in H, H2.
+      destruct H, H2.
+      specialize (IHrestricted_addition_syntactic1 H H2).
+      specialize (IHrestricted_addition_syntactic2 H3 H4).
+      assert ( (map (fun x : TType n => gMulT a1 x) (gScaleA (C1 / √ 2) (a0 ++ a2)))
+               = (gScaleA (C1 / √ 2) (map (fun x : TType n => gMulT a1 x) (a0 ++ a2))) ).
+      { unfold gScaleA. rewrite ! map_map.
+        f_equal. apply functional_extensionality. intro.
+        destruct a1, x. simpl. f_equal. lca. }
+      rewrite H5. clear H5.
+      assert ( (map (fun x : TType n => gMulT a x) (gScaleA (C1 / √ 2) (a0 ++ a2)))
+               = (gScaleA (C1 / √ 2) (map (fun x : TType n => gMulT a x) (a0 ++ a2))) ).
+      { unfold gScaleA. rewrite ! map_map.
+        f_equal. apply functional_extensionality. intro.
+        destruct a, x. simpl. f_equal. lca. }
+      rewrite H5. clear H5.
+      rewrite anticommute_AType_syntactic_gScaleA.
+      apply anticommute_AType_syntactic_comm.
+      rewrite anticommute_AType_syntactic_gScaleA.
+      apply anticommute_AType_syntactic_comm.
+      rewrite ! map_app.
+      rewrite ! anticommute_AType_syntactic_app_dist_l.
+      rewrite ! anticommute_AType_syntactic_app_dist_r.
+      repeat split; auto.
+      clear IHrestricted_addition_syntactic1 IHrestricted_addition_syntactic2.
+      clear H1_ H1_0.
+
+      * induction a0; auto.
+        simpl in *. destruct H, H2, H1.
+        specialize (IHa0 H5 H6 H7).
+        split; auto.
+        clear IHa0 H5 H6 H7.
+
+        induction a2; auto.
+        simpl in *. destruct H3, H4, H1.
+        specialize (IHa2 H5 H6 H7).
+        split; auto.
+        clear IHa2 H5 H6 H7.
 
 
-        
+                            
+    (* first try
+    clear - H H2 H0.
+
+
+    
+    induction a2; auto.
+    apply anticommute_AType_syntactic_comm in H0.
+    simpl in *.
+    destruct H2, H0.
+    apply anticommute_AType_syntactic_comm in H3.
+    specialize (IHa2 H2 H3).
+    rewrite anticommute_AType_syntactic_app_dist_l.
+    split; auto.
+    apply anticommute_AType_syntactic_comm.
+    clear IHa2.
+
+    
+    induction a1; auto.
+    simpl in *.
+    destruct H, H0, H3.
+    specialize (IHa1 H4 H5 H6).
+    rewrite anticommute_AType_syntactic_app_dist_l.
+    split; auto.
+    clear IHa1.
+    clear - H H1 H0.
+     
+
+    induction a0; auto.
+    simpl in *.
+    destruct H, H1.
+    specialize (IHa0 H2 H3).
+    repeat split.
+    3: apply anticommute_AType_syntactic_comm; simpl; split.
+    4: apply anticommute_AType_syntactic_comm; auto.
+    all: clear IHa0.
+    clear H2 H3.
+
+    
+    2-3: induction a2; auto; simpl in *.
+    2: destruct H2, H3; specialize (IHa2 H4 H5); split; auto; clear IHa2;
+    clear - H H2 H1 H3 H0.
+    3: destruct H2, H3; specialize (IHa2 H4 H5); split; auto; clear IHa2;
+    clear - H H2 H1 H3 H0.
+    2:{ destruct   }
+         (* a1 a0 a a2 = - a1 a a0 a2 = a a1 a0 a2 = 
+a0 a2 comm: a a1 a2 a0 = - a a2 a1 a0
+a0 a2 anticomm : - a a1 a2 a0 = a a2 a1 a0
+            a a2 a1 a0 *)
+*)
+*)
+
+(* not needed?
+(** prove for the simple tensored Paulis case of multiplication **)
+(** commute_AType_syntactic, anticommute_AType_syntactic mutually define? **)
+(** commute_AType_syntactic term-wise definition of commuttivity **)
+(** permutation : vol3 software foundations, or monoid.v **)
+Lemma WF_AType_mul_commutative : forall {n} (A B : AType n),
+    commute_AType_syntactic A B -> A not a permutation of B ->
+    WF_AType n A -> WF_AType n B -> WF_AType n (gMulA A B).
+Proof. Admitted. *)
+
+
 
 Lemma WF_TType_tensor : forall {n m} (a : TType n) (b : TType m), WF_TType n a -> WF_TType m b -> WF_TType (n+m) (gTensorT a b).
 Proof. intros n m a b H H0.
@@ -2541,91 +3011,6 @@ Proof. intros n m a.
   - auto.
   - simpl.
     apply IHa.
-Qed.
-
-Lemma anticommute_AType_syntactic_nil_r : forall {n} (a : AType n), anticommute_AType_syntactic a [] <-> True.
-Proof. intros n a.
-  split.
-  - intro.
-    induction a; auto.
-  - intro.
-    induction a; auto.
-    simpl.
-    rewrite and_comm.
-    rewrite kill_true.
-    apply IHa.
-Qed.
-
-Lemma anticommute_TType_comm : forall {n} (a b : TType n), anticommute_TType a b -> anticommute_TType b a.
-Proof. intros n a b H.
-  destruct a,b; simpl in *.
-  rewrite H.
-  lca.
-Qed.
-
-Lemma anticommute_AType_syntactic_comm : forall {n} (a b : AType n), anticommute_AType_syntactic a b -> anticommute_AType_syntactic b a.
-Proof. intros n a b H.
-  induction a.
-  - apply anticommute_AType_syntactic_nil_r. auto.
-  - simpl in *.
-    destruct H. specialize (IHa H0).
-    clear H0.
-    induction b.
-    + simpl. auto.
-    + simpl in *.
-      destruct H, IHa.
-      specialize (IHb H0 H2).
-      repeat split; auto.
-      apply anticommute_TType_comm.
-      auto.
-Qed.
-
-      
-Lemma anticommute_AType_syntactic_app_dist_l : forall {n} (a b c : AType n), anticommute_AType_syntactic (a ++ b) c <-> anticommute_AType_syntactic a c /\ anticommute_AType_syntactic b c.
-Proof. intros n a b c.
-  split.
-  - intro. split.
-    + induction a.
-      * simpl. auto.
-      * simpl in *. destruct H. split.
-        -- auto.
-        -- apply (IHa H0).
-    + induction a.
-      * simpl in *. auto.
-      * simpl in *. destruct H.
-        apply (IHa H0).
-  - intro. destruct H.
-    induction a.
-    + simpl. auto.
-    + simpl in *. destruct H. split.
-      * auto.
-      * apply (IHa H1).
-Qed.
-
-Lemma anticommute_AType_syntactic_app_comm_l : forall {n} (a b c : AType n), anticommute_AType_syntactic (a ++ b) c <-> anticommute_AType_syntactic (b ++ a) c.
-Proof. intros n a b c. rewrite ! anticommute_AType_syntactic_app_dist_l. rewrite and_comm.
-  split; auto.
-Qed.
-
-Lemma anticommute_AType_syntactic_app_dist_r : forall {n} (a b c : AType n), anticommute_AType_syntactic a (b ++ c) <-> anticommute_AType_syntactic a b /\ anticommute_AType_syntactic a c.
-Proof. intros n a b c.
-  split.
-  - intros.
-    apply anticommute_AType_syntactic_comm in H.
-    rewrite anticommute_AType_syntactic_app_dist_l in H.
-    destruct H.
-    split; apply anticommute_AType_syntactic_comm; auto.
-  - intros [H H0].
-    apply anticommute_AType_syntactic_comm.
-    rewrite anticommute_AType_syntactic_app_dist_l.
-    apply anticommute_AType_syntactic_comm in H.
-    apply anticommute_AType_syntactic_comm in H0.
-    split; auto.
-Qed.
-
-Lemma anticommute_AType_syntactic_app_comm_r : forall {n} (a b c : AType n), anticommute_AType_syntactic a (b ++ c) <-> anticommute_AType_syntactic a (c ++ b).
-Proof. intros n a b c. rewrite ! anticommute_AType_syntactic_app_dist_r. rewrite and_comm.
-  split; auto.
 Qed.
 
 Lemma fold_left_Cmult_app : forall {l l0}, fold_left Cmult (l ++ l0) C1 = (fold_left Cmult l C1) * (fold_left Cmult l0 C1).
@@ -2725,26 +3110,6 @@ Proof. intros n m a B0 H H0.
          lca.
 Qed.
 
-Lemma anticommute_TType_AType_app_dist : forall {n} (a : TType n) (A B : AType n),
-    anticommute_TType_AType a (A ++ B) <-> anticommute_TType_AType a A /\ anticommute_TType_AType a B.
-Proof. intros n a A B.
-  split.
-  - intros.
-    induction A.
-    + simpl in *. auto.
-    + simpl in *. destruct H.
-      specialize (IHA H0) as [HA HB].
-      repeat split; auto.
-  - intros.
-    destruct H.
-    induction A.
-    + simpl. auto.
-    + simpl in *.
-      destruct H.
-      specialize (IHA H1).
-      auto.
-Qed.
-  
 
 
 
@@ -2757,7 +3122,12 @@ Qed.
 
 
 
-(** 
+
+
+
+
+
+(** counterexample
 
 1/√2(a1+a2) ⊗ 1/√2(b1+b2)
 
@@ -2777,8 +3147,6 @@ suppose a1*a2=-a2*a1 and b1*b2=-b2*b1
 ((a1+a2)⊗(b1+b2))*((a1+a2)⊗(b1+b2))
 =((a1+a2)⊗(b1+b2))^2
 =((a1+a2)^2)⊗((b1+b2)^2)
-
-
 
 
 -----------------------
@@ -2818,7 +3186,8 @@ a2⊗a0 * a1⊗a0 = (ZX+ZZ)*(XX+XZ)
 = ZX*XX+ZZ*XX+ZX*XZ+ZZ*XZ
 = iYI  -YY   +YY   +iYI
 
-*)
+ *)
+(* not needed?
 Lemma WF_AType_tensor : forall {n m} (A : AType n) (B : AType m),
     WF_AType n A -> WF_AType m B -> WF_AType (n+m) (gTensorA A B).
 Proof. intros n m A0 B0 H H0.
@@ -2835,16 +3204,7 @@ Proof. intros n m A0 B0 H H0.
     + apply IHrestricted_addition_syntactic2; auto.
     + 
     subst.
-    (* inversion H3; subst. *)
-    
-    restricted_addition_syntactic
-    
-    .................
-    .................
-    .................
-    .................
-    .................
-(* gMul_Coef *)
+    Admitted. *)
 (** 
 anticommute_AType_syntactic (gTensorA a1 a0) (gTensorA a2 a0)
 
@@ -2903,149 +3263,8 @@ a0 = X+Z
 1/√2(1/√2(X+Y)+Z) ⊗ 1/√2(X+Z)
 **)
 
-    (*
-    induction H0.
-    + rewrite anticommute_AType_syntactic_gTensorA_comm. simpl. admit.
-    + 
     
-    clear -H2.
-    rewrite anticommute_AType_syntactic_gTensorA_comm.
-    induction a0.
-    + simpl. auto.
-    + simpl.
-      rewrite ! anticommute_AType_syntactic_app_dist_l.
-      rewrite ! anticommute_AType_syntactic_app_dist_r.
-      repeat split; auto.
-      *)
-
-
-    dependent induction H.
-    + simpl. rewrite <- app_nil_end. admit.
-    +
-      inversion IHrestricted_addition_syntactic0. subst.
-      rewrite gTensorA_gScaleA_comm in H5.
-      inversion H5. subst.
-      * admit.
-      * 
-
- anticommute_AType_syntactic (gTensorA a1 a3) (gTensorA a2 a3)
-/\  anticommute_AType_syntactic (gTensorA a0 a3) (gTensorA a2 a3)
-      
-      
-
-    
-    induction a1.
-    + simpl. auto.
-    + simpl in *.
-      destruct H2.
-      rewrite anticommute_AType_syntactic_app_dist_l.
-      split.
-      2: apply IHa1; auto.
-      clear IHa1.
-      apply anticommute_AType_syntactic_comm.
-      induction a2.
-      * simpl. auto.
-      * simpl in *. destruct H.
-        rewrite cons_conc in H0.
-        apply anticommute_AType_syntactic_app_dist_r in H0.
-        destruct H0.
-        apply anticommute_AType_syntactic_comm in H0.
-        simpl in *.
-        destruct H0.
-        apply anticommute_AType_syntactic_app_dist_l.
-        split.
-        2: apply IHa2; auto.
-        clear IHa2.
-        induction a0.
-        -- simpl. auto.
-        -- simpl in *.
-           repeat split.
-           3: rewrite cons_conc; 
-           apply anticommute_AType_syntactic_app_dist_r; split.
-           3: apply anticommute_AType_syntactic_comm; simpl in *; split; auto.
-           4: apply IHa0.
-           ++ destruct a, a2, a0; simpl in *.
-              Search zipWith.
-              rewrite <- ! zipWith_app_product with (n:=length l); auto.
-              unfold cBigMul in *.
-              rewrite ! fold_left_Cmult_app.
-      *)
-
-
-
-
-
-
-
-
-
-
-
-    clear -H2.
-    induction a1.
-    + simpl. auto.
-    + simpl in *.
-      destruct H2.
-      rewrite anticommute_AType_syntactic_app_dist_l.
-      split.
-      2: apply IHa1; auto.
-      apply anticommute_AType_syntactic_comm.
-      specialize (IHa1 H0).
-      
-      induction a2.
-      * simpl. auto.
-      * simpl in *. destruct H.
-        rewrite cons_conc in H0.
-        apply anticommute_AType_syntactic_app_dist_r in H0.
-        destruct H0.
-        apply anticommute_AType_syntactic_comm in H0.
-        simpl in *.
-        destruct H0.
-        apply anticommute_AType_syntactic_app_dist_r in IHa1.
-        destruct IHa1.
-        apply anticommute_AType_syntactic_app_dist_l.
-        split.
-        2: apply IHa2; auto.
-        specialize (IHa2 H1 H2 H5).
-        
-        
-        clear H4 H5.
-          
-        induction a0.
-        -- simpl. auto.
-        -- simpl in *.
-           setoid_rewrite cons_conc in H4 at 2.
-           apply anticommute_AType_syntactic_app_dist_r in H4.
-           destruct H4.
-           apply anticommute_AType_syntactic_comm in H4.
-           simpl in *. destruct H4.
-           setoid_rewrite cons_conc in IHa2 at 2.
-           apply anticommute_AType_syntactic_app_dist_r in IHa2.
-           destruct IHa2.
-           apply anticommute_AType_syntactic_comm in H8.
-           simpl in *. destruct H8.
-           clear H3 H7 H10.
-           
-           repeat split.
-           3: rewrite cons_conc; 
-           apply anticommute_AType_syntactic_app_dist_r; split.
-           3: apply anticommute_AType_syntactic_comm; simpl in *; split; auto.
-           
-           4: apply IHa0.
-           ++ destruct a, a2, a0; simpl in *.
-              Search zipWith.
-              rewrite <- ! zipWith_app_product with (n:=length l); auto.
-              unfold cBigMul in *.
-              rewrite ! fold_left_Cmult_app.
-              Search fold_left.
-              rewrite H.
-              lca.
-              admit.
-              admit.
-           ++  admit.
-           ++ admit.
-Admitted.
-
+(* not needed?
 Lemma WF_Predicate_tensor : forall {n m} (A : Predicate n) (B : Predicate m),
   APredicate A -> APredicate B -> 
   WF_Predicate A -> WF_Predicate B ->
@@ -3054,6 +3273,7 @@ Proof. intros n m A B H H0 H1 H2.
   induction H, H0. inversion H1; inversion H2; subst.
   constructor. apply WF_AType_tensor; easy.
 Qed.
+*)
 
 
 Lemma WF_AType_add : forall {n} (A B : AType n),
@@ -3100,8 +3320,15 @@ Proof. intros n A H H0.
 Qed.
 *)
 Lemma WF_Y : WF_Predicate pY.
-Proof. rewrite Y_is_iXZ. (*apply WF_Predicate_i. easy. apply WF_Predicate_mul. easy. easy. apply WF_X. apply WF_Z. Qed. *) Admitted.
+Proof. rewrite Y_is_iXZ. constructor. compute. autorewrite with R_db. do 3 constructor.
+  - constructor.
+    + lia.
+    + simpl. lia.
+  - left. simpl. lca.
+  - constructor.
+Qed.
 
+#[export] Hint Resolve WF_I WF_X WF_Z WF_Y WF_AType_scale WF_Predicate_scale WF_AType_add WF_Predicate_add WF_AType_neg WF_Predicate_neg : wfpt_db.
 (** 
 Hint Resolve WF_AType_implies_WF_AType_nil WF_I WF_X WF_Z WF_Y WF_AType_mul WF_Predicate_mul WF_AType_scale WF_Predicate_scale WF_AType_tensor WF_Predicate_tensor WF_AType_add WF_Predicate_add WF_AType_neg WF_Predicate_neg WF_AType_i WF_Predicate_i : wfpt_db. *)
 
@@ -3113,33 +3340,26 @@ Proof. intros n a A. apply (fold_left_Mplus (translate a) Zero (map translate A)
 Qed.
 
 Lemma WF_Matrix_AType : forall {n} (A : AType n), WF_AType n A -> WF_Matrix (translateA A). 
-Proof. intros. induction H.
-  - unfold translateA; simpl. rewrite Mplus_0_l. induction a. induction b.
-    + inversion H. simpl in H1. symmetry in H1. contradiction.
-    + unfold translate. simpl. apply (@Matrix.WF_scale (2^n) (2^n) a _).
-      apply (Matrix.WF_kron _ _).
-      * inversion H. simpl in H1. rewrite <- H1. simpl. clear H IHb H1. induction b.
-        -- simpl. reflexivity.
-        -- simpl. rewrite IHb. reflexivity.
-      * inversion H. simpl in H1. rewrite <- H1. simpl. clear H IHb H1. induction b.
-        -- simpl. reflexivity.
-        -- simpl. rewrite IHb. reflexivity.
-      * induction a0; auto with wf_db.
-      * apply (@Matrix.WF_big_kron 2 2 _ (translate_P gI)).
-        intros i0.
-        rewrite map_nth.
-        apply WF_Matrix_Pauli.
-  - unfold translateA in *. simpl. rewrite fold_left_WF_Matrix_AType.
-    apply Matrix.WF_plus; try assumption.
-    unfold translate. induction a. simpl. apply (@Matrix.WF_scale (2^n) (2^n) a _).
-    pose (@Matrix.WF_big_kron 2 2 (map translate_P b0) (translate_P gI)) as w.
-    pose (@length (Square 2) (@map Pauli (Square 2) translate_P b0)) as l.
-    rewrite map_length in *. inversion H; subst.
-    apply w. intros i0. rewrite (map_nth translate_P b0 _ i0). apply WF_Matrix_Pauli.
+Proof. intros n A H. destruct H.
+  induction H.
+  - destruct H.
+    unfold translateA. simpl.
+    rewrite Mplus_0_l.
+    apply WF_Matrix_translate; auto.
+  - apply restricted_addition_syntactic_implies_proper_length_AType in H.
+    apply restricted_addition_syntactic_implies_proper_length_AType in H0.
+    rewrite translateA_gScaleA.
+    2: apply proper_length_AType_App; auto.
+    apply WF_scale.
+    apply WF_Matrix_translateA.
+    apply proper_length_AType_App; auto.
 Qed.
 
-Hint Resolve WF_Matrix_AType : wfpt_db.
+#[export] Hint Resolve WF_Matrix_AType : wfpt_db.
 
+
+
+(** ** Probably not needed
 (*************)
 (* WFT types *)
 (*************)
@@ -3148,21 +3368,47 @@ Inductive WF_TPredicate {n} : Predicate n -> Prop :=
 | WFT : forall T : Predicate n, TPredicate T -> WF_Predicate T -> WF_TPredicate T.
 
 Lemma WFT_all : forall (c : Coef) (l : list Pauli),
-    length l <> 0%nat -> @WF_TPredicate (length l) (G ([(c,l)])).
-Proof. intros c l. do 4 constructor. assumption. simpl. reflexivity. Qed.
+    length l <> 0%nat -> ( c = C1 \/ c = (- C1)%C ) ->  trace_zero_syntax l ->
+    @WF_TPredicate (length l) (G ([(c,l)])).
+Proof. intros. do 5 constructor; auto. constructor; auto. Qed.
+
+#[export] Hint Resolve WFT_all : wfpt_db.
  
-Lemma WFT_I : WF_TPredicate pI. Proof. apply WFT; auto with wfpt_db. Qed.
 Lemma WFT_X : WF_TPredicate pX. Proof. apply WFT; auto with wfpt_db. Qed.
 Lemma WFT_Z : WF_TPredicate pZ. Proof. apply WFT; auto with wfpt_db. Qed.
-Lemma WFT_Y : WF_TPredicate pY. Proof. rewrite Y_is_iXZ. apply WFT; auto with wfpt_db. Qed.
+Lemma WFT_Y : WF_TPredicate pY. Proof. apply WFT; auto with wfpt_db. Qed.
 
 
 Lemma WFT_mul : forall {n} (A B : Predicate n),
   WF_TPredicate A -> WF_TPredicate B -> 
   WF_TPredicate (A *' B). 
 Proof. intros n A B H H0. 
-       inversion H; inversion H0.
+  inversion H; inversion H0.
+  inversion H1; inversion H4.
+  simpl in *. constructor.
+  - destruct t, t0. simpl. constructor.
+  - do 4 constructor; subst.
+    + inversion H2; inversion H5; subst.
+      inversion H6; inversion H8; subst.
+      apply restricted_addition_syntactic_implies_proper_length_AType in H3, H9.
+      inversion H3; subst. 2: inversion H12.
+      inversion H9; subst. 2: inversion H13.
+      inversion H10; inversion H11.
+      constructor; auto.
+      destruct t, t0. simpl in *.
+      apply zipWith_len_pres; auto.
+    + inversion H1.
+      inversion H2; inversion H5; subst.
+      inversion H6; inversion H8; subst.
+      destruct t, t0; simpl in *.
+      
+      
+    
+    
+    inversion H3; inversion H9; subst.
+    4:{ constructor. 2:{ destruct t, t0. simpl. 
        apply WFT; auto with wfpt_db.
+       constructor.
 Qed.
 
 
@@ -3283,6 +3529,12 @@ Qed.
 
 
 Hint Resolve WFA_I WFA_X WFA_Z  WFA_Y WFT_implies_WFA WFA_scale WFA_mul WFA_tensor WFA_neg WFA_i WFA_G_sing WFA_G_cons WFA_G_cons' : wfpt_db.
+ *)
+
+
+
+
+
 
 
 (******************)
