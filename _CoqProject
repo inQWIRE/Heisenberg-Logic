@@ -1,22 +1,5 @@
 -R . Top
 
-Complex.v
-Eigenvectors.v
-Matrix.v
-Monad.v
-Monoid.v
-Polynomial.v
-Prelim.v
-Quantum.v
-RealAux.v
-
 new_Helper.v
 
 new_Types.v
-
-Heisenberg.v
-
-
-
-Types.v
-new_Heisenberg.v

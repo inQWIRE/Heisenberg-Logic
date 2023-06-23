@@ -4,15 +4,437 @@ Require Import Program.
 Require Import List.
 
  
-Require Export Complex.
-Require Export Matrix.
-Require Export Quantum.
-Require Export Eigenvectors.
+Require Export QuantumLib.Complex.
+Require Export QuantumLib.Matrix.
+Require Export QuantumLib.Quantum.
+Require Export QuantumLib.Eigenvectors.
+
+(* Some helpers *)
+
+
+
+
+
+(* From the old Eigenvectors.v file *)
+
+(* Some preliminary lemmas/additions to tactics that could be moved to other files *)
 
 
 Local Open Scope nat_scope.
 
-(* Some helpers *)
+
+(* where can I find tactics to deal with this??? *)
+Lemma easy_sub3 : forall (n k : nat), n <> 0 -> n + k - 0 - 1 = n - 0 - 1 + k. 
+Proof. intros. 
+       destruct n as [| n].
+       - easy.
+       - simpl. lia. 
+Qed.
+
+Lemma easy_sub6 : forall (a c b : nat), 
+  b < c -> a < b -> c = (a + S (b - a) + (c - b - 1)).
+Proof. intros. lia. Qed.
+
+
+
+
+Lemma easy_pow : forall (a n m : nat), a^(n + m) = a^n * a^m.
+Proof. intros. induction n as [| n'].
+       - simpl. nia.
+       - simpl. rewrite IHn'. nia.
+Qed.
+Lemma easy_pow2 : forall (a p : nat), p <> 0 -> a^p = a * a ^ (p - 0 - 1). 
+Proof. intros. destruct p as [| p']. easy. simpl. 
+       rewrite Nat.sub_0_r.  easy.
+Qed.
+Lemma easy_pow3 : forall (n m : nat), m < n -> 2^n = (2^m) * 2 * 2^(n - m - 1).
+Proof. intros. 
+       assert (H' : 2^m * 2 = 2^(m + 1)). 
+       { rewrite easy_pow. reflexivity. } 
+       rewrite H'. 
+       rewrite <- easy_pow.
+       assert (H'' : m < n -> m + 1 + (n - m - 1) = n).
+       { nia. }
+       rewrite H''. 
+       reflexivity.
+       assumption. 
+Qed.
+Lemma easy_pow4 : forall (n : nat), (0 >= 2^n) -> False. 
+Proof. intros. induction n as [| n'].
+       - simpl in *. nia.
+       - simpl in *. 
+         assert (H' : forall (a : nat), a + 0 = a). { nia. }
+         rewrite H' in H.
+         assert (H'' : forall (a : nat), a + a >= a). { nia. }
+         apply IHn'.
+         nia. 
+Qed.
+Lemma easy_pow5 : forall (a b c : nat), 
+  b < c -> a < b ->
+  2^c = (2^a * (2^(b - a) + (2^(b - a) + 0))) * 2^(c - b - 1).
+Proof. intros.
+       assert (H' : forall n, 2^n + (2^n + 0) = 2^(S n)).
+       { reflexivity. } 
+       rewrite H'.
+       do 2 (rewrite <- easy_pow).  
+       rewrite <- (easy_sub6 a c b); try easy.
+Qed.
+Lemma easy_pow5' : forall (a b c : nat), 
+  b < c ->  a < b ->
+  2^c = (2^a * (2^(b - a) * 2)) * 2^(c - b - 1).
+Proof. intros.
+       assert (H' : 2 ^ (b - a) * 2 = 2 ^ (b - a) * 2^1).
+       { reflexivity. } 
+       rewrite H'.
+       do 3 (rewrite <- easy_pow).
+       assert (H'' : b - a + 1 = S (b - a)). { nia. }
+       rewrite H''.
+       rewrite <- (easy_sub6 a c b); try easy.
+Qed.
+Lemma easy_pow6 : forall (n : nat), n <> 0 -> 2*2^n = (2*2^(n-1))*2. 
+Proof. destruct n.
+       - easy.
+       - intros. 
+         simpl.  
+         replace (n - 0) with n by lia. 
+         nia. 
+Qed.
+
+Lemma easy_pow6' : forall (n : nat), n <> 0 -> (2^n)*2 = (2*2^(n-1))*2. 
+Proof. intros. rewrite Nat.mul_comm.
+       apply easy_pow6; easy.
+Qed.
+
+
+
+(*************************)
+(* Some basic list stuff *)
+(*************************)
+
+
+Definition zipWith {X Y Z: Type} (f : X -> Y -> Z) (As : list X) (Bs : list Y) : list Z :=
+  map (uncurry f) (combine As Bs).
+
+
+Lemma zipWith_len_pres : forall {X Y Z : Type} (f : X -> Y -> Z) (n : nat) 
+                                (As : list X) (Bs : list Y),
+  length As = n -> length Bs = n -> length (zipWith f As Bs) = n.
+Proof. intros. 
+       unfold zipWith.
+       rewrite map_length.
+       rewrite combine_length.
+       rewrite H, H0; lia.
+Qed.
+
+
+Lemma zipWith_app_product : forall {X Y Z: Type} (f : X -> Y -> Z) (n : nat) 
+                               (l0s l2s : list X) (l1s l3s : list Y),
+  length l0s = n -> length l1s = n -> 
+  (zipWith f l0s l1s) ++ (zipWith f l2s l3s) = zipWith f (l0s ++ l2s) (l1s ++ l3s).
+Proof. induction n as [| n'].
+       - intros. destruct l0s; destruct l1s; easy. 
+       - intros. destruct l0s; destruct l1s; try easy.
+         unfold zipWith in *.
+         simpl in *. 
+         rewrite <- IHn'; try nia. 
+         reflexivity. 
+Qed.
+
+
+Lemma zipWith_cons : forall {X Y Z : Type} (f : X -> Y -> Z) (a : X) (b : Y) (A : list X) (B : list Y),
+  zipWith f (a :: A) (b :: B) = (f a b) :: (zipWith f A B).
+Proof. intros. 
+       unfold zipWith. simpl. 
+       unfold uncurry. 
+       simpl. easy. 
+Qed.
+
+
+Fixpoint first_n (n : nat) : list nat :=
+  match n with
+  | 0 => [0]
+  | S n' => n :: first_n n'
+  end.
+
+Lemma first_n_contains : forall (n i : nat),
+  i <= n <-> In i (first_n n).
+Proof. split.
+       - induction n as [| n'].
+         * intros. bdestruct (i =? 0). 
+           + rewrite H0. simpl. left. easy.
+           + apply Nat.le_0_r in H. rewrite H in H0. easy.
+         * intros. simpl. bdestruct (i =? S n').
+           + left. rewrite H0. easy. 
+           + right. apply IHn'. 
+             apply le_lt_eq_dec in H. destruct H.
+             ** apply Nat.lt_succ_r. apply l.
+             ** rewrite e in H0. easy.
+       - induction n as [| n'].
+         * intros [H | F]. 
+           + rewrite H. easy.
+           + simpl in F. easy.
+         * intros. simpl in H. destruct H.
+           + rewrite H. easy.
+           + apply IHn' in H. 
+             apply le_n_S in H. apply Nat.lt_le_incl.
+             apply H.
+Qed.
+
+
+(* defining switch and many lemmas having to do with switch and nth *)
+
+Fixpoint switch {X : Type} (ls : list X) (x : X) (n : nat) :=
+  match ls with
+  | [] => []
+  | (h :: ls') =>
+    match n with
+    | 0 => x :: ls'
+    | S n' => h :: (switch ls' x n')
+    end
+  end.
+
+Lemma switch_len : forall {X : Type} (n : nat) (ls : list X) (x : X),
+    length (switch ls x n) = length ls. 
+Proof. induction n as [| n'].
+       - destruct ls. easy. easy.
+       - intros. destruct ls. 
+         easy. simpl. 
+         rewrite IHn'. 
+         reflexivity. 
+Qed.
+
+
+Lemma switch_map : forall {X Y : Type} (n : nat) (ls : list X) (x : X) (f : X -> Y),
+    map f (switch ls x n) = switch (map f ls) (f x) n.
+Proof. induction n as [| n'].
+       - intros. destruct ls; easy.
+       - intros. destruct ls. easy.
+         simpl. rewrite IHn'. easy.
+Qed.
+         
+Lemma switch_switch_diff : forall {X : Type} (n m : nat) (ls : list X) (a b : X), 
+  n <> m ->
+  switch (switch ls a n) b m = switch (switch ls b m) a n.
+Proof. induction n as [| n'].
+       - intros. 
+         destruct m; destruct ls; easy. 
+       - intros. 
+         destruct m; try (destruct ls; easy). 
+         destruct ls; try easy. 
+         simpl. 
+         rewrite IHn'; try easy.
+         bdestruct (n' =? m); lia. 
+Qed.
+
+Lemma switch_base : forall {X : Type} (ls : list X) (x : X),
+    ls <> [] -> switch ls x 0 = x :: (skipn 1 ls).
+Proof. intros. 
+       destruct ls. 
+       easy. 
+       reflexivity. 
+Qed.
+
+
+
+Lemma nth_switch_hit : forall {X : Type} (n : nat) (ls : list X) (x def : X),
+    n < length ls ->
+    nth n (switch ls x n) def = x.
+Proof. induction n as [| n'].
+       - destruct ls; easy.
+       - intros. 
+         destruct ls; try easy.
+         apply IHn'. 
+         simpl in H.
+         nia. 
+Qed.
+
+
+
+Lemma nth_switch_miss : forall {X : Type} (sn n : nat) (ls : list X) (x def : X),
+    n <> sn ->
+    nth n (switch ls x sn) def = nth n ls def.
+Proof. induction sn as [| sn'].
+       - destruct ls.
+         easy.
+         destruct n; easy.
+       - intros. 
+         destruct n.
+         + destruct ls; easy.
+         + assert (H' : n <> sn'). { nia. }
+           destruct ls.                                   
+           easy. simpl.  
+           apply IHsn'.
+           apply H'.
+Qed.
+
+
+Lemma switch_inc_helper : forall {X : Type} (n : nat) (l1 l2 : list X) (x : X),
+    length l1 = n -> 
+    switch (l1 ++ l2) x n = l1 ++ switch l2 x 0.
+Proof. induction n as [| n'].
+       - destruct l1. 
+         reflexivity. 
+         easy.
+       - intros. destruct l1.  
+         easy. 
+         simpl. 
+         rewrite <- IHn'.
+         reflexivity. 
+         simpl in H. 
+         injection H. 
+         easy. 
+Qed.
+
+
+Lemma switch_inc_helper2 : forall {X : Type} (n : nat) (ls : list X) (x : X),
+    n < length ls -> switch ls x n = (firstn n ls) ++ switch (skipn n ls) x 0.
+Proof. intros. 
+       assert (H' : switch ls x n = switch (firstn n ls ++ skipn n ls) x n).
+       { rewrite (firstn_skipn n ls). reflexivity. }
+       rewrite H'.
+       rewrite switch_inc_helper.
+       reflexivity. 
+       rewrite firstn_length_le.
+       reflexivity. 
+       nia.  
+Qed.
+
+
+
+Lemma skipn_nil_length : forall {X : Type} (n : nat) (ls : list X),
+    skipn n ls = [] -> length ls <= n. 
+Proof. intros. 
+       rewrite <- (firstn_skipn n ls).
+       rewrite H. 
+       rewrite <- app_nil_end.
+       apply firstn_le_length.
+Qed.
+
+
+Lemma skipskip : forall {X : Type} (ls : list X) (n : nat),
+    skipn (S n) ls = skipn 1 (skipn n ls).
+Proof. induction ls as [| h].
+       - destruct n. easy. easy. 
+       - destruct n. easy.  
+         assert (H : skipn (S n) (h :: ls) = skipn n ls). 
+         { reflexivity. } 
+         rewrite H.
+         rewrite <- IHls. 
+         reflexivity. 
+Qed.
+
+
+Lemma switch_inc_helper3 : forall {X : Type} (n : nat) (ls : list X) (x : X),
+    n < length ls -> switch (skipn n ls) x 0 = [x] ++ (skipn (S n) ls).
+Proof. intros. destruct (skipn n ls) as [| h] eqn:E.
+       - apply skipn_nil_length in E. nia. 
+       - assert (H' : skipn (S n) ls = l).
+         { rewrite skipskip. 
+           rewrite E.
+           reflexivity. }
+         rewrite H'.
+         reflexivity.
+Qed.
+
+
+Lemma switch_inc : forall {X : Type} (n : nat) (ls : list X) (x : X),
+    n < length ls -> switch ls x n = (firstn n ls) ++ [x] ++ (skipn (S n) ls). 
+Proof. intros. 
+       rewrite switch_inc_helper2.
+       rewrite switch_inc_helper3.
+       reflexivity. 
+       apply H. apply H.
+Qed.
+
+
+Lemma nth_base : forall {X : Type} (ls : list X) (x : X),
+    ls <> [] -> ls = (nth 0 ls x) :: (skipn 1 ls).
+Proof. intros.
+       destruct ls.
+       easy. 
+       reflexivity. 
+Qed.
+
+
+Lemma nth_helper : forall {X : Type} (n : nat) (ls : list X) (x : X),
+    n < length ls -> skipn n ls = [nth n ls x] ++ skipn (S n) ls.
+Proof. induction n as [| n']. 
+       - destruct ls. easy. easy. 
+       - intros. destruct ls. 
+         assert (H' : forall (n : nat), S n < 0 -> False). { nia. }
+         apply H' in H. easy.
+         rewrite skipn_cons.
+         assert (H'' : nth (S n') (x0 :: ls) x = nth n' ls x). { easy. }
+         rewrite H''.
+         rewrite (IHn' ls x). 
+         easy. 
+         simpl in H. 
+         assert (H''' : forall (n m : nat), S m < S n -> m < n). { nia. } 
+         apply H''' in H.
+         easy.
+Qed.
+         
+
+
+Lemma nth_inc : forall {X : Type} (n : nat) (ls : list X) (x : X),
+    n < length ls -> ls = (firstn n ls) ++ [nth n ls x] ++ (skipn (S n) ls). 
+Proof. intros.
+       rewrite <- nth_helper.  
+       rewrite (firstn_skipn n ls).
+       reflexivity. easy. 
+Qed.
+
+
+
+
+
+
+
+
+Lemma length_change : forall {X : Type} (A B : list X) (x : X),
+  2 ^ (length (A ++ [x] ++ B)) = (2 ^ (length A)) * (2 * (2 ^ (length B))).
+Proof. intros. 
+       do 2 (rewrite app_length).
+       simpl. 
+       rewrite easy_pow.
+       reflexivity. 
+Qed.
+
+
+
+
+(* a similar lemma to the one defined by Coq, but better for our purposes *)
+Lemma skipn_length' : forall {X : Type} (n : nat) (ls : list X),
+    length (skipn (S n) ls) = length ls - n - 1.
+Proof. intros. 
+       rewrite skipn_length.
+       nia. 
+Qed.
+
+
+Lemma firstn_subset : forall {X : Type} (n : nat) (ls : list X),
+    firstn n ls ⊆ ls.
+Proof. induction n as [| n']. 
+       - easy.
+       - intros. destruct ls. 
+         easy. simpl. 
+         unfold subset_gen in *.
+         intros. 
+         destruct H as [H | H].
+         left; easy. 
+         right; apply IHn'; apply H.
+Qed.
+
+Lemma skipn_subset : forall {X : Type} (n : nat) (ls : list X),
+    skipn n ls ⊆ ls.
+Proof. induction n as [| n']. 
+       - easy.
+       - intros. destruct ls. 
+         easy. simpl. 
+         unfold subset_gen in *.
+         intros. 
+         right; apply IHn'; apply H.
+Qed.
 
 
 (* this is trivial but helps shorten proofs and Ltacs *)
@@ -57,8 +479,9 @@ Ltac pauli_matrix_computation :=
                                          let y := fresh "y" in
                                          let H := fresh "H" in
                                          intros x y [H| H];
-                                         apply le_plus_minus in H;
-                                         rewrite H; compute; destruct_m_eq))
+                                         apply Nat.sub_add in H;
+                                         rewrite Nat.add_comm in H;
+                                         rewrite <- H; compute; destruct_m_eq))
     | |- (?A ≡ ?B)%M => by_cell
     | |- _ => autounfold with U_db;
                   simpl;
@@ -123,7 +546,7 @@ Proof. intros.
        assert (H2 : (2 * 2^(n - 1) = 2^n)%nat).
        { rewrite (easy_pow3 n 0%nat); try nia.
          rewrite H'. simpl. nia. }
-       assert (H2' : (2^(n - 1)*2 = 2^n)%nat). { rewrite mult_comm. apply H2. }
+       assert (H2' : (2^(n - 1)*2 = 2^n)%nat). { rewrite Nat.mul_comm. apply H2. }
        assert (H3 : ( ∣1⟩⟨1∣ ⊗ I (2 ^ (n - 1)) ⊗ U ) † = ∣1⟩⟨1∣ ⊗ I (2 ^ (n - 1)) ⊗ U † ).
        { rewrite H2.
          rewrite kron_adjoint.
@@ -179,7 +602,7 @@ Proof. intros.
        assert (H2 : (2 * 2^(n - 1) = 2^n)%nat).
        { rewrite (easy_pow3 n 0); try nia.
          rewrite H'. simpl. nia. }
-       assert (H2' : (2^(n - 1)*2 = 2^n)%nat). { rewrite mult_comm. apply H2. }
+       assert (H2' : (2^(n - 1)*2 = 2^n)%nat). { rewrite Nat.mul_comm. apply H2. }
        assert (H3 :  (U ⊗ I (2 ^ (n - 1)) ⊗ ∣1⟩⟨1∣) † = U † ⊗ I (2 ^ (n - 1)) ⊗ ∣1⟩⟨1∣).
        { rewrite H2.
          rewrite kron_adjoint.
@@ -265,7 +688,7 @@ Proof. intros a a' b b' H H0 H1 H2 H3 i j k l.
        assert (H' : ((a ⊗ b) (k + i*2) (l + j*2) = (a' ⊗ b') (k + i*2) (l + j*2))%nat).
        rewrite H3; easy. 
        unfold kron in H'. 
-       do 2 rewrite Nat.div_add, Nat.mod_add, Nat.div_small, Nat.mod_small in H'; auto.
+       do 2 rewrite Nat.div_add, Nat.Div0.mod_add, Nat.div_small, Nat.mod_small in H'; auto.
 Qed.
 
 (* Heisenberg.v line 2903 *)
@@ -283,7 +706,7 @@ Proof. intros a a' b b' c c' d d' H H0 H1 H2 H3 H4 H5 H6 H7 i j k l.
                     (a' ⊗ b' .+ c' ⊗ d') (k + i*2) (l + j*2))%nat).
        rewrite H7; easy. 
        unfold kron, Mplus in H'. 
-       do 2 rewrite Nat.div_add, Nat.mod_add, Nat.div_small, Nat.mod_small in H'; auto.
+       do 2 rewrite Nat.div_add, Nat.Div0.mod_add, Nat.div_small, Nat.mod_small in H'; auto.
 Qed.
 
 (* Heisenberg.v line 2921 *)
@@ -599,10 +1022,10 @@ Lemma n_plus_m_zero_n_zero : forall (n m : nat), (n + m = 0 -> n = 0)%nat.
   - rewrite Nat.add_comm in H. simpl in H. discriminate.
 Qed.
 
-(* Types.v line 947 *)
-Lemma fold_left_Mplus : forall {n} (a b : Square n) (A : list (Square n)),  
+(* Types.v line 947 : edited from Square n to Matrix n m *)
+Lemma fold_left_Mplus : forall {n m} (a b : Matrix n m) (A : list (Matrix n m)),  
     fold_left Mplus (A) (b .+ a)%M =  (fold_left Mplus A (b) .+  a)%M.
-Proof. intros n a b A.  generalize dependent a. simpl. induction A.
+Proof. intros n m a b A.  generalize dependent a. simpl. induction A.
   - simpl. reflexivity.
   - simpl. intros a0. rewrite (Mplus_assoc _ _ b a0 a).
     rewrite (Mplus_comm _ _ a0 a).  rewrite IHA. symmetry. rewrite IHA.
@@ -708,10 +1131,10 @@ Proof. intros n A B UA UB HA HB AC.
     lma'.
 Qed.
 
-(* Types.v line 1689 *)
-Lemma fold_left_Mplus_app_Zero : forall {n : nat} (A B : list (Square n)),
+(* Types.v line 1689 : edited from Square n to Matrix n m  *)
+Lemma fold_left_Mplus_app_Zero : forall {n m : nat} (A B : list (Matrix n m)),
     fold_left Mplus (A++B) Zero%M = ((fold_left Mplus A Zero) .+ (fold_left Mplus B Zero))%M.
-Proof. intros n A B. induction A.
+Proof. intros n m A B. induction A.
   - simpl. rewrite Mplus_0_l. reflexivity.
   - simpl. rewrite 2 fold_left_Mplus. rewrite IHA.
     symmetry. do 2 (rewrite Mplus_assoc; rewrite Mplus_comm).
@@ -870,8 +1293,8 @@ Proof.
   apply f_equal_inv with (x := p * j + l) in G0.
   assert (R1: (o * i + k) / o = i). { rewrite Nat.mul_comm. rewrite Nat.div_add_l. rewrite Nat.div_small. rewrite Nat.add_0_r. reflexivity. assumption. lia. }
   assert (R2: (p * j + l) / p = j). { rewrite Nat.mul_comm. rewrite Nat.div_add_l. rewrite Nat.div_small. rewrite Nat.add_0_r. reflexivity. assumption. lia. }
-  assert (R3: (o * i + k) mod o = k). { rewrite Nat.add_comm. rewrite Nat.mul_comm. rewrite Nat.mod_add. rewrite Nat.mod_small. reflexivity. assumption. lia. }
-  assert (R4: (p * j + l) mod p = l). { rewrite Nat.add_comm. rewrite Nat.mul_comm. rewrite Nat.mod_add. rewrite Nat.mod_small. reflexivity. assumption. lia. }
+  assert (R3: (o * i + k) mod o = k). { rewrite Nat.add_comm. rewrite Nat.mul_comm. rewrite Nat.Div0.mod_add. rewrite Nat.mod_small. reflexivity. assumption. }
+  assert (R4: (p * j + l) mod p = l). { rewrite Nat.add_comm. rewrite Nat.mul_comm. rewrite Nat.Div0.mod_add. rewrite Nat.mod_small. reflexivity. assumption. }
 
 
   rewrite R1, R2, R3, R4 in G0.
@@ -888,8 +1311,8 @@ Proof.
   apply f_equal_inv with (x := o * w + y) in G5. apply f_equal_inv with (x := p * x + z) in G5.
   assert (R1': (o * w + y) / o = w). { rewrite Nat.mul_comm. rewrite Nat.div_add_l. rewrite Nat.div_small. rewrite Nat.add_0_r. reflexivity. assumption. lia. }
   assert (R2': (p * x + z) / p = x). { rewrite Nat.mul_comm. rewrite Nat.div_add_l. rewrite Nat.div_small. rewrite Nat.add_0_r. reflexivity. assumption. lia. }
-  assert (R3': (o * w + y) mod o = y). { rewrite Nat.add_comm. rewrite Nat.mul_comm. rewrite Nat.mod_add. rewrite Nat.mod_small. reflexivity. assumption. lia. }
-  assert (R4': (p * x + z) mod p = z). { rewrite Nat.add_comm. rewrite Nat.mul_comm. rewrite Nat.mod_add. rewrite Nat.mod_small. reflexivity. assumption. lia. }
+  assert (R3': (o * w + y) mod o = y). { rewrite Nat.add_comm. rewrite Nat.mul_comm. rewrite Nat.Div0.mod_add. rewrite Nat.mod_small. reflexivity. assumption. }
+  assert (R4': (p * x + z) mod p = z). { rewrite Nat.add_comm. rewrite Nat.mul_comm. rewrite Nat.Div0.mod_add. rewrite Nat.mod_small. reflexivity. assumption. }
   
   rewrite R1', R2', R3', R4' in G5. assumption. }
 
@@ -1079,8 +1502,8 @@ Proof. intros.
 
     assert (R1: (o * i + k) / o = i). { rewrite Nat.mul_comm. rewrite Nat.div_add_l. rewrite Nat.div_small. rewrite Nat.add_0_r. reflexivity. assumption. lia. }
   assert (R2: (p * j + l) / p = j). { rewrite Nat.mul_comm. rewrite Nat.div_add_l. rewrite Nat.div_small. rewrite Nat.add_0_r. reflexivity. assumption. lia. }
-  assert (R3: (o * i + k) mod o = k). { rewrite Nat.add_comm. rewrite Nat.mul_comm. rewrite Nat.mod_add. rewrite Nat.mod_small. reflexivity. assumption. lia. }
-    assert (R4: (p * j + l) mod p = l). { rewrite Nat.add_comm. rewrite Nat.mul_comm. rewrite Nat.mod_add. rewrite Nat.mod_small. reflexivity. assumption. lia. }
+  assert (R3: (o * i + k) mod o = k). { rewrite Nat.add_comm. rewrite Nat.mul_comm. rewrite Nat.Div0.mod_add. rewrite Nat.mod_small. reflexivity. assumption. }
+    assert (R4: (p * j + l) mod p = l). { rewrite Nat.add_comm. rewrite Nat.mul_comm. rewrite Nat.Div0.mod_add. rewrite Nat.mod_small. reflexivity. assumption. }
 
     rewrite R1, R2, R3, R4 in H3.
 
@@ -1162,8 +1585,8 @@ Proof. intros.
 
     assert (R1: (o * i + k) / o = i). { rewrite Nat.mul_comm. rewrite Nat.div_add_l. rewrite Nat.div_small. rewrite Nat.add_0_r. reflexivity. assumption. lia. }
   assert (R2: (p * j + l) / p = j). { rewrite Nat.mul_comm. rewrite Nat.div_add_l. rewrite Nat.div_small. rewrite Nat.add_0_r. reflexivity. assumption. lia. }
-  assert (R3: (o * i + k) mod o = k). { rewrite Nat.add_comm. rewrite Nat.mul_comm. rewrite Nat.mod_add. rewrite Nat.mod_small. reflexivity. assumption. lia. }
-    assert (R4: (p * j + l) mod p = l). { rewrite Nat.add_comm. rewrite Nat.mul_comm. rewrite Nat.mod_add. rewrite Nat.mod_small. reflexivity. assumption. lia. }
+  assert (R3: (o * i + k) mod o = k). { rewrite Nat.add_comm. rewrite Nat.mul_comm. rewrite Nat.Div0.mod_add. rewrite Nat.mod_small. reflexivity. assumption. }
+    assert (R4: (p * j + l) mod p = l). { rewrite Nat.add_comm. rewrite Nat.mul_comm. rewrite Nat.Div0.mod_add. rewrite Nat.mod_small. reflexivity. assumption. }
 
     rewrite R1, R2, R3, R4 in H3.
 
