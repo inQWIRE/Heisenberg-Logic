@@ -21,6 +21,12 @@ Open Scope Predicate_scope.
 (* Helper Lemmas *)
 (************************)
 
+Lemma WF_Unitary_implies_WF_Matrix : forall {n} (U : Square n),
+    WF_Unitary U -> WF_Matrix U.
+Proof. intros. unfold WF_Unitary in H. destruct H. assumption. Qed.
+
+#[export] Hint Resolve WF_Unitary_implies_WF_Matrix : wf_db unit_db.
+ 
 Lemma Copp_opp : forall (a b : C), -a = b <-> a = -b. Proof. split; intros; [rewrite <- H | rewrite H]; lca. Qed. 
 
 Lemma Cplus_opp_r : forall c : C, c + - c = 0. Proof. intros; lca. Qed.
@@ -66,17 +72,56 @@ Lemma adjoint_inj : forall {j k : nat} (A B : Matrix j k),
     A = B -> A † = B †.
 Proof. intros. rewrite H. reflexivity. Qed.
 
-Lemma Mmult_inj_l : forall {i j k : nat} (m : Matrix i j) (m1 m2 : Matrix j k),
+Lemma Mmult_inj_l : forall (i j : nat) {k : nat} (m : Matrix i j) (m1 m2 : Matrix j k),
     m1 = m2 -> m × m1 = m × m2.
 Proof. intros. rewrite H. reflexivity. Qed.
 
-Lemma Mmult_inj_r : forall {i j k : nat} (m : Matrix j k) (m1 m2 : Matrix i j) ,
+Lemma Mmult_inj_r : forall {i : nat} (j k : nat) (m : Matrix j k) (m1 m2 : Matrix i j),
     m1 = m2 -> m1 × m = m2 × m.
+Proof. intros. rewrite H. reflexivity. Qed.
+
+Lemma WF_Unitary_implies_invertible : forall {n} (M : Square n),
+    WF_Unitary M -> invertible M.
+Proof. intros. unfold WF_Unitary in H. destruct H. unfold invertible.
+  exists M †. unfold Minv. split; trivial. rewrite Minv_flip; auto with wf_db. Qed.
+
+#[export] Hint Resolve WF_Unitary_implies_invertible : unit_db.
+
+Lemma Mmult_inj_square_inv_l : forall {n m} (M : Square n) (M1 M2 : Matrix n m),
+    invertible M -> WF_Matrix M1 -> WF_Matrix M2 -> M × M1 = M × M2 -> M1 = M2.
+Proof. intros. unfold invertible in H. destruct H as [M' [H3 H4]].
+  apply @Mmult_inj_l with (i := n) (m := M') in H2.
+  rewrite <- ! Mmult_assoc in H2.
+  rewrite ! H4 in H2.
+  rewrite ! Mmult_1_l in H2.
+  all : trivial.
+Qed.
+
+Lemma Mmult_inj_square_inv_r : forall {n m} (M : Square n) (M1 M2 : Matrix m n),
+    invertible M -> WF_Matrix M1 -> WF_Matrix M2 -> M1 × M = M2 × M -> M1 = M2.
+Proof. intros. unfold invertible in H. destruct H as [M' [H3 H4]].
+  apply @Mmult_inj_r with (k := n) (m := M') in H2.
+  rewrite ! Mmult_assoc in H2.
+  rewrite ! H3 in H2.
+  rewrite ! Mmult_1_r in H2.
+  all : trivial.
+Qed.
+
+Lemma Mmult_double_side : forall {i j k : nat} {m1 m1' : Matrix i j} {m2 m2' : Matrix j k} ,
+    m1 = m1' -> m2 = m2' -> m1 × m2 = m1' × m2'.
+Proof. intros. rewrite H, H0. reflexivity. Qed.
+
+Lemma Mplus_inj_l : forall {j k : nat} (m m1 m2 : Matrix j k),
+    m1 = m2 -> m .+ m1 = m .+ m2.
 Proof. intros. rewrite H. reflexivity. Qed.
 
 Lemma Mplus_inj_r : forall {j k : nat} (m m1 m2 : Matrix j k),
     m1 = m2 -> m1 .+ m = m2 .+ m.
 Proof. intros. rewrite H. reflexivity. Qed.
+
+  Lemma Mplus_double_side : forall {j k : nat} {m1 m1' m2 m2' : Matrix j k} ,
+    m1 = m1' -> m2 = m2' -> m1 .+ m2 = m1' .+ m2'.
+Proof. intros. rewrite H, H0. reflexivity. Qed.
 
 Lemma Mplus_opp_r : forall {j k : nat} (m : Matrix j k),
     WF_Matrix m -> m .+ - C1 .* m = Zero.
@@ -92,6 +137,15 @@ Proof. intros. apply Mplus_inj_r with (m := -C1.*m) in H0.
   rewrite ! Mplus_assoc in H0.
   rewrite ! Mplus_opp_r in H0; auto.
   rewrite ! Mplus_0_r in H0.
+  assumption.
+Qed. 
+
+Lemma Mplus_inv_l : forall {j k : nat} (m m1 m2 : Matrix j k),
+    WF_Matrix m -> m .+ m1 = m .+ m2 -> m1 = m2.
+Proof. intros. apply Mplus_inj_l with (m := -C1.*m) in H0.
+  rewrite <- ! Mplus_assoc in H0.
+  rewrite ! Mplus_opp_l in H0; auto.
+  rewrite ! Mplus_0_l in H0.
   assumption.
 Qed. 
 
@@ -6154,7 +6208,7 @@ Qed.
 
 
 
-
+(** matrix_by_basis also exists **)
 Lemma e_i_get_vec {n m : nat} (i : nat) (A : Matrix n m):
   WF_Matrix A -> A × e_i i = get_vec i A.
 Proof. intros. unfold get_vec. unfold Mmult, e_i.
@@ -6286,17 +6340,17 @@ Proof. intros n l H0.
         rewrite nth_overflow; easy.
 Qed.
 
-Definition matrix_column_permutation {n m} (indices_list : list nat) (M : Matrix n m) : Matrix n (length indices_list) := list_vector_to_matrix (map (fun i : nat => get_vec i M) indices_list).
+Definition matrix_column_choose {n m} (indices_list : list nat) (M : Matrix n m) : Matrix n (length indices_list) := list_vector_to_matrix (map (fun i : nat => get_vec i M) indices_list).
 
-Definition vector_permutation {n} (indices_list : list nat) (v : Vector n) : Vector (length indices_list) := (fun r c : nat => v (nth r indices_list n) c).
+Definition vector_row_choose {n} (indices_list : list nat) (v : Vector n) : Vector (length indices_list) := (fun r c : nat => v (nth r indices_list n) c).
 
-Compute ((matrix_column_permutation [] (I 3)) × (matrix_column_permutation [] (I 3)) ⊤).
+Compute ((matrix_column_choose [] (I 3)) × (matrix_column_choose [] (I 3)) ⊤).
 Compute ((I 0) 0%nat 0%nat).
 
 
 
-Lemma matrix_column_permutation_assoc : forall {n m o} (indices_list : list nat) (M1 : Matrix m n) (M2 : Matrix n o), WF_Matrix M2 -> matrix_column_permutation indices_list (M1 × M2) = M1 × (matrix_column_permutation indices_list M2).
-Proof. intros. unfold matrix_column_permutation.
+Lemma matrix_column_choose_pop : forall {n m o} (indices_list : list nat) (M1 : Matrix m n) (M2 : Matrix n o), WF_Matrix M2 -> matrix_column_choose indices_list (M1 × M2) = M1 × (matrix_column_choose indices_list M2).
+Proof. intros. unfold matrix_column_choose.
   unfold list_vector_to_matrix.
   unfold Mmult.
   do 2 (apply functional_extensionality; intros).
@@ -6334,12 +6388,12 @@ Proof. intros. unfold matrix_column_permutation.
   easy.
 Qed.
 
-Lemma   WF_Matrix_matrix_column_permutation_indices_list_I_n: forall (n : nat) (indices_list : list nat),
-    WF_Matrix (matrix_column_permutation indices_list (I n)).
+Lemma   WF_Matrix_matrix_column_choose_indices_list_I_n: forall (n : nat) (indices_list : list nat),
+    WF_Matrix (matrix_column_choose indices_list (I n)).
 Proof. intros.
   unfold WF_Matrix.
   intros.
-  unfold matrix_column_permutation.
+  unfold matrix_column_choose.
   unfold list_vector_to_matrix.
   assert (Zero = get_vec n (I n)).
   { unfold get_vec.
@@ -6355,15 +6409,65 @@ Proof. intros.
   rewrite nth_overflow in H4; lia.
 Qed.
 
-#[export] Hint Resolve WF_Matrix_matrix_column_permutation_indices_list_I_n : wf_db.
+Lemma WF_Matrix_matrix_column_choose_indices_list : forall {n m : nat} (indices_list : list nat) (M : Matrix n m), WF_Matrix M -> WF_Matrix (matrix_column_choose indices_list M).
+Proof. intros.
+  unfold WF_Matrix.
+  intros.
+  unfold matrix_column_choose.
+  unfold list_vector_to_matrix.
+  assert (Zero = get_vec m M).
+  { unfold get_vec.
+    do 2 (apply functional_extensionality; intros).
+    bdestruct_all; try easy.
+    unfold WF_Matrix in H0.
+    assert ((x0 >= n)%nat \/ (m >= m)%nat). { right. lia. }
+    specialize (H0 x0 m H3).
+    rewrite H0.
+    trivial. }
+  rewrite H2.
+  rewrite map_nth with (d := m).
+  unfold get_vec.
+  bdestruct_all.
+  destruct H1.
+  - unfold WF_Matrix in H0.
+    assert ((x >= n)%nat \/ ((nth y indices_list m) >= m)%nat). { left. assumption. }
+    specialize (H0 x (nth y indices_list m) H4).
+    assumption.
+  - rewrite nth_overflow.
+    2 : lia.
+    unfold WF_Matrix in H0.
+    assert ((x >= n)%nat \/ (m >= m)%nat). { right. lia. }
+    specialize (H0 x m H4).
+    assumption.
+Qed.
+
+Lemma  WF_Matrix_vector_row_choose_indices_list : forall {n : nat} (indices_list : list nat) (v : Vector n), WF_Matrix v -> WF_Matrix (vector_row_choose indices_list v).
+Proof. intros.
+  unfold WF_Matrix.
+  intros.
+  unfold vector_row_choose.
+  destruct H1.
+  - rewrite nth_overflow.
+    2 : lia.
+    unfold WF_Matrix in H0.
+    assert ((n >= n)%nat \/ (y >= 1)%nat). { left. lia. }
+    specialize (H0 n y H2).
+    apply H0.
+  - unfold WF_Matrix in H0.
+    assert (((nth x indices_list n) >= n)%nat \/ (y >= 1)%nat). { right. assumption. }
+    specialize (H0 (nth x indices_list n) y H2).
+    apply H0.
+Qed.
+
+#[export] Hint Resolve WF_Matrix_matrix_column_choose_indices_list_I_n WF_Matrix_matrix_column_choose_indices_list WF_Matrix_vector_row_choose_indices_list : wf_db.
 
   
-Lemma matrix_column_permutation_inverse_r' : forall (n : nat) (indices_list : list nat),
+Lemma matrix_column_choose_inverse_r' : forall (n : nat) (indices_list : list nat),
     Permutation (List.seq 0 n) indices_list ->
-    (matrix_column_permutation indices_list (I n)) × (matrix_column_permutation indices_list (I n)) ⊤ = I n.
+    (matrix_column_choose indices_list (I n)) × (matrix_column_choose indices_list (I n)) ⊤ = I n.
 Proof. intros.
   remember H0 as Perm. clear HeqPerm.
-  unfold matrix_column_permutation.
+  unfold matrix_column_choose.
   unfold transpose. unfold Mmult.
   do 2 (apply functional_extensionality; intros).
   unfold list_vector_to_matrix.
@@ -6517,42 +6621,42 @@ Proof. intros.
     bdestruct_all; simpl; lca.
 Qed.
 
-Lemma matrix_column_permutation_inverse_l' : forall (n : nat) (indices_list : list nat),
+Lemma matrix_column_choose_inverse_l' : forall (n : nat) (indices_list : list nat),
     Permutation (List.seq 0 n) indices_list ->
-    (matrix_column_permutation indices_list (I n)) ⊤ × (matrix_column_permutation indices_list (I n)) = I (length indices_list).
+    (matrix_column_choose indices_list (I n)) ⊤ × (matrix_column_choose indices_list (I n)) = I (length indices_list).
 Proof. intros.
   remember H0 as Perm. clear HeqPerm.
   apply Permutation_length in H0.
   rewrite seq_length in H0. rewrite <- ! H0.
   apply Minv_flip.
-  assert (@WF_Matrix n n (matrix_column_permutation indices_list (I n)) =
-            @WF_Matrix n (length indices_list) (matrix_column_permutation indices_list (I n))).
+  assert (@WF_Matrix n n (matrix_column_choose indices_list (I n)) =
+            @WF_Matrix n (length indices_list) (matrix_column_choose indices_list (I n))).
   { rewrite <- H0. easy. }
-  rewrite H1. apply WF_Matrix_matrix_column_permutation_indices_list_I_n.
+  rewrite H1. apply WF_Matrix_matrix_column_choose_indices_list_I_n.
   apply WF_transpose.
-  assert (@WF_Matrix n n (matrix_column_permutation indices_list (I n)) =
-            @WF_Matrix n (length indices_list) (matrix_column_permutation indices_list (I n))).
+  assert (@WF_Matrix n n (matrix_column_choose indices_list (I n)) =
+            @WF_Matrix n (length indices_list) (matrix_column_choose indices_list (I n))).
   { rewrite <- H0. easy. }
-  rewrite H1. apply WF_Matrix_matrix_column_permutation_indices_list_I_n.
+  rewrite H1. apply WF_Matrix_matrix_column_choose_indices_list_I_n.
   assert (@eq (Matrix n n)
             (@Mmult n (@length nat indices_list) n
-               (@matrix_column_permutation n n indices_list (I n))
+               (@matrix_column_choose n n indices_list (I n))
                (@transpose n (@length nat indices_list)
-                  (@matrix_column_permutation n n indices_list (I n)))) 
+                  (@matrix_column_choose n n indices_list (I n)))) 
             (I n) =
             @eq (Matrix n n)
-              (@Mmult n n n (@matrix_column_permutation n n indices_list (I n))
-                 (@transpose n n (@matrix_column_permutation n n indices_list (I n)))) 
+              (@Mmult n n n (@matrix_column_choose n n indices_list (I n))
+                 (@transpose n n (@matrix_column_choose n n indices_list (I n)))) 
               (I n)).
   { rewrite <- H0. easy. }
   rewrite <- H1.
-  apply matrix_column_permutation_inverse_r'.
+  apply matrix_column_choose_inverse_r'.
   easy.
 Qed.
 
-Lemma matrix_column_permutation_I_n_transpose_adjoint : forall (n : nat) (indices_list : list nat),
-    (matrix_column_permutation indices_list (I n)) † =  (matrix_column_permutation indices_list (I n)) ⊤.
-Proof. intros. unfold matrix_column_permutation.
+Lemma matrix_column_choose_I_n_adjoint_transpose : forall (n : nat) (indices_list : list nat),
+    (matrix_column_choose indices_list (I n)) † =  (matrix_column_choose indices_list (I n)) ⊤.
+Proof. intros. unfold matrix_column_choose.
   unfold list_vector_to_matrix.
   unfold transpose, adjoint.
   do 2 (apply functional_extensionality; intros).
@@ -6570,21 +6674,21 @@ Proof. intros. unfold matrix_column_permutation.
   bdestruct_all; simpl; lca.
 Qed.
 
-Lemma matrix_column_permutation_inverse_r : forall (n : nat) (indices_list : list nat),
+Lemma matrix_column_choose_inverse_r : forall (n : nat) (indices_list : list nat),
     Permutation (List.seq 0 n) indices_list ->
-    (matrix_column_permutation indices_list (I n)) × (matrix_column_permutation indices_list (I n)) † = I n.
+    (matrix_column_choose indices_list (I n)) × (matrix_column_choose indices_list (I n)) † = I n.
 Proof. intros.
-  rewrite matrix_column_permutation_I_n_transpose_adjoint.
-  apply matrix_column_permutation_inverse_r'.
+  rewrite matrix_column_choose_I_n_adjoint_transpose.
+  apply matrix_column_choose_inverse_r'.
   easy.
 Qed.
 
-Lemma matrix_column_permutation_inverse_l : forall (n : nat) (indices_list : list nat),
+Lemma matrix_column_choose_inverse_l : forall (n : nat) (indices_list : list nat),
     Permutation (List.seq 0 n) indices_list ->
-    (matrix_column_permutation indices_list (I n)) † × (matrix_column_permutation indices_list (I n)) = I (length indices_list).
+    (matrix_column_choose indices_list (I n)) † × (matrix_column_choose indices_list (I n)) = I (length indices_list).
 Proof. intros.
-  rewrite matrix_column_permutation_I_n_transpose_adjoint.
-  apply matrix_column_permutation_inverse_l'.
+  rewrite matrix_column_choose_I_n_adjoint_transpose.
+  apply matrix_column_choose_inverse_l'.
   easy.
 Qed.
 
@@ -6596,8 +6700,8 @@ Qed.
 *)
 
 
-Lemma matrix_column_permutation_app_smash : forall {n m} (list1 list2 : list nat) (M : Matrix n m), WF_Matrix M -> matrix_column_permutation (list1 ++ list2) M = smash (matrix_column_permutation list1 M) (matrix_column_permutation list2 M).
-Proof. intros. unfold matrix_column_permutation. unfold smash.
+Lemma matrix_column_choose_app_smash : forall {n m} (list1 list2 : list nat) (M : Matrix n m), WF_Matrix M -> matrix_column_choose (list1 ++ list2) M = smash (matrix_column_choose list1 M) (matrix_column_choose list2 M).
+Proof. intros. unfold matrix_column_choose. unfold smash.
   unfold list_vector_to_matrix.
   do 2 (apply functional_extensionality; intros).
   assert (Zero = get_vec m M).
@@ -6647,15 +6751,15 @@ Proof. intros.
 Qed.  
 
 
-Lemma matrix_column_permutation_vector_permutation_original : forall {n m} (indices_list : list nat) (M : Matrix n m) (v : Vector m),
+Lemma matrix_column_choose_vector_row_choose_original : forall {n m} (indices_list : list nat) (M : Matrix n m) (v : Vector m),
     WF_Matrix M ->
     Permutation (List.seq 0 m) indices_list ->
-    (matrix_column_permutation indices_list M)
-      × (vector_permutation indices_list v) = M × v. (** = Σ_i M_i v_i **)
+    (matrix_column_choose indices_list M)
+      × (vector_row_choose indices_list v) = M × v. (** = Σ_i M_i v_i **)
 Proof. intros.
-  unfold matrix_column_permutation.
+  unfold matrix_column_choose.
   unfold list_vector_to_matrix.
-  unfold vector_permutation.
+  unfold vector_row_choose.
   unfold Mmult.
   do 2 (apply functional_extensionality; intros).
 
@@ -6698,20 +6802,20 @@ Proof. intros.
 Qed.
 
 
-Lemma matrix_column_permutation_assoc_square : forall {n} (indices_list : list nat) (M1 M2 : Square n), WF_Matrix M2 -> matrix_column_permutation indices_list (M1 × M2) = M1 × (matrix_column_permutation indices_list M2).
-Proof. intros. rewrite <- matrix_column_permutation_assoc; auto with wf_db.
+Lemma matrix_column_choose_pop_square : forall {n} (indices_list : list nat) (M1 M2 : Square n), WF_Matrix M2 -> matrix_column_choose indices_list (M1 × M2) = M1 × (matrix_column_choose indices_list M2).
+Proof. intros. rewrite <- matrix_column_choose_pop; auto with wf_db.
 Qed.
 
-Lemma matrix_column_permutation_assoc_square_id : forall {n} (indices_list : list nat) (M : Square n), WF_Matrix M -> matrix_column_permutation indices_list M = M × (matrix_column_permutation indices_list (I n)).
-Proof. intros. rewrite <- matrix_column_permutation_assoc; auto with wf_db.
+Lemma matrix_column_choose_pop_square_id : forall {n} (indices_list : list nat) (M : Square n), WF_Matrix M -> matrix_column_choose indices_list M = M × (matrix_column_choose indices_list (I n)).
+Proof. intros. rewrite <- matrix_column_choose_pop; auto with wf_db.
   rewrite Mmult_1_r; auto with wf_db.
 Qed.
 
-Lemma vector_permutation_matrix_column_permutation : forall (n : nat) (v : Vector n) (indices_list : list nat),
+Lemma vector_row_choose_matrix_column_choose : forall (n : nat) (v : Vector n) (indices_list : list nat),
     WF_Matrix v ->
-    (vector_permutation indices_list v) = (matrix_column_permutation indices_list (I n)) ⊤ × v.
-Proof. intros. unfold vector_permutation.
-  unfold matrix_column_permutation.
+    (vector_row_choose indices_list v) = (matrix_column_choose indices_list (I n)) ⊤ × v.
+Proof. intros. unfold vector_row_choose.
+  unfold matrix_column_choose.
   unfold list_vector_to_matrix.
   unfold transpose, Mmult.
   do 2 (apply functional_extensionality; intros).
@@ -6747,13 +6851,29 @@ Proof. intros. unfold vector_permutation.
     bdestruct_all; simpl; lca.
 Qed.
 
+
 Definition is_in_nat_list (n : nat) (listN : list nat) : bool :=
   existsb (fun m : nat => Nat.eqb n m) listN.
 
 Definition selective_diagonal (n : nat) (indices_list : list nat): Square n :=
   fun x y => if (x =? y)%nat && (x <? n) && (is_in_nat_list x indices_list) then C1 else 0.
 
-Lemma diagonal_is_selective_diagonal : forall (n : nat) (indices_list : list nat),
+Lemma WF_selective_diagonal : forall (n : nat) (indices_list : list nat),
+    WF_Matrix (selective_diagonal n indices_list).
+Proof. unfold WF_Matrix. intros.
+  unfold selective_diagonal.
+  destruct H0.
+  bdestruct_all; simpl; trivial.
+  destruct ((x =? y)%nat) eqn:E; trivial.
+  rewrite Nat.eqb_eq in E.
+  subst.
+  bdestruct_all.
+  trivial.
+Qed.
+
+#[export] Hint Resolve WF_selective_diagonal : wf_db.
+
+Lemma selective_diagonal_permutation_identity : forall (n : nat) (indices_list : list nat),
     Permutation (List.seq 0 n) indices_list ->
     I n = selective_diagonal n indices_list.
 Proof. intros. unfold I. unfold selective_diagonal.
@@ -6771,10 +6891,10 @@ Proof. intros. unfold I. unfold selective_diagonal.
   reflexivity.
 Qed.
 
-Lemma matrix_column_permutation_selective_diagonal : forall (n : nat) (indices_list : list nat),
+Lemma matrix_column_choose_selective_diagonal : forall (n : nat) (indices_list : list nat),
     NoDup indices_list ->
-    (matrix_column_permutation indices_list (I n)) × (matrix_column_permutation indices_list (I n)) ⊤ = selective_diagonal n indices_list.
-Proof. intros n indices_list H'.  unfold matrix_column_permutation. unfold list_vector_to_matrix.
+    (matrix_column_choose indices_list (I n)) × (matrix_column_choose indices_list (I n)) ⊤ = selective_diagonal n indices_list.
+Proof. intros n indices_list H'.  unfold matrix_column_choose. unfold list_vector_to_matrix.
   unfold selective_diagonal.
   unfold transpose, Mmult.
   do 2 (apply functional_extensionality; intros).
@@ -6877,16 +6997,6 @@ Proof. intros n indices_list H'.  unfold matrix_column_permutation. unfold list_
     rewrite big_sum_0; easy.
 Qed.
 
-(*
-list1, list2 : list nat
-  H0 : NoDup (list1 ++ list2)
-  x, x0 : nat
-  H1 : (x < n)%nat
-  H2 : x = x0
-  x1 : nat
-  H3 : In x1 list1
- *)
-
 Lemma NoDup_app_comm : forall (A : Type) (list1 list2 : list A),
     NoDup (list1 ++ list2) -> NoDup (list2 ++ list1).
 Proof. intros. apply NoDup_incl_NoDup with (l := list1 ++ list2) (l' := list2 ++ list1); trivial.
@@ -6967,49 +7077,409 @@ Proof. intros. unfold selective_diagonal.
     lca.
 Qed.
 
-Lemma matrix_column_permutation_I_n_app_split : forall (n : nat) (list1 list2 : list nat),
+Lemma matrix_column_choose_I_n_app_split : forall (n : nat) (list1 list2 : list nat),
     NoDup (list1 ++ list2) ->
-    (matrix_column_permutation (list1 ++ list2) (I n)) × (matrix_column_permutation (list1 ++ list2) (I n)) ⊤ = (matrix_column_permutation (list1) (I n)) × (matrix_column_permutation (list1) (I n)) ⊤ .+ (matrix_column_permutation (list2) (I n)) × (matrix_column_permutation (list2) (I n)) ⊤.
+    (matrix_column_choose (list1 ++ list2) (I n)) × (matrix_column_choose (list1 ++ list2) (I n)) ⊤ = (matrix_column_choose (list1) (I n)) × (matrix_column_choose (list1) (I n)) ⊤ .+ (matrix_column_choose (list2) (I n)) × (matrix_column_choose (list2) (I n)) ⊤.
 Proof. intros.
   remember H0. clear Heqn0.
   remember H0. clear Heqn1.
   apply NoDup_app_remove_l in n0.
   apply NoDup_app_remove_r in n1.
-  rewrite ! matrix_column_permutation_selective_diagonal; trivial.
+  rewrite ! matrix_column_choose_selective_diagonal; trivial.
   rewrite selective_diagonal_app_split; trivial.
 Qed.
 
-(*** is there a good way to express v_is ?? *)
-Lemma matrix_column_permutation_vector_permutation_app_split : forall {n} (list1 list2 : list nat) (M : Square n) (v : Vector n),
+Lemma matrix_column_choose_vector_row_choose_app_split : forall {n} (list1 list2 : list nat) (M : Square n) (v : Vector n),
     WF_Matrix M -> WF_Matrix v -> NoDup (list1 ++ list2) ->
     Permutation (list1 ++ list2) (List.seq 0 n) ->
-    (matrix_column_permutation (list1 ++ list2) M)
-      × (vector_permutation (list1 ++ list2) v) =
-      ((matrix_column_permutation list1 M)
-         × (vector_permutation list1 v)) .+
-        ((matrix_column_permutation list2 M)
-           × (vector_permutation list2 v)).
+    (matrix_column_choose (list1 ++ list2) M)
+      × (vector_row_choose (list1 ++ list2) v) =
+      ((matrix_column_choose list1 M)
+         × (vector_row_choose list1 v)) .+
+        ((matrix_column_choose list2 M)
+           × (vector_row_choose list2 v)).
 Proof. intros.
-  rewrite matrix_column_permutation_assoc_square_id.
-  rewrite vector_permutation_matrix_column_permutation.
-  assert (M × matrix_column_permutation (list1 ++ list2) (I n)
-            × ((matrix_column_permutation (list1 ++ list2) (I n)) ⊤ × v) =
-            M × (matrix_column_permutation (list1 ++ list2) (I n)
-                   × (matrix_column_permutation (list1 ++ list2) (I n)) ⊤) × v).
+  rewrite matrix_column_choose_pop_square_id.
+  rewrite vector_row_choose_matrix_column_choose.
+  assert (M × matrix_column_choose (list1 ++ list2) (I n)
+            × ((matrix_column_choose (list1 ++ list2) (I n)) ⊤ × v) =
+            M × (matrix_column_choose (list1 ++ list2) (I n)
+                   × (matrix_column_choose (list1 ++ list2) (I n)) ⊤) × v).
   { rewrite ! Mmult_assoc. easy. }
   rewrite H4.
-  rewrite matrix_column_permutation_I_n_app_split.
+  rewrite matrix_column_choose_I_n_app_split.
   rewrite Mmult_plus_distr_l.
   rewrite <- ! Mmult_assoc.
-  rewrite <- ! matrix_column_permutation_assoc_square_id.
+  rewrite <- ! matrix_column_choose_pop_square_id.
   rewrite Mmult_plus_distr_r.
   rewrite ! Mmult_assoc.
-  rewrite <- ! vector_permutation_matrix_column_permutation.
+  rewrite <- ! vector_row_choose_matrix_column_choose.
   easy.
   all: assumption.
 Qed.
 
-         
+
+Lemma matrix_column_choose_vector_row_choose_selective_diagonal :
+  forall {n} (indices_list : list nat) (M : Square n) (v : Vector n),
+    NoDup indices_list -> WF_Matrix M -> WF_Matrix v ->
+    matrix_column_choose indices_list M × vector_row_choose indices_list v
+    = M × selective_diagonal n indices_list × v.
+Proof. intros.
+  rewrite matrix_column_choose_pop_square_id.
+  rewrite vector_row_choose_matrix_column_choose.
+  replace (M × matrix_column_choose indices_list (I n)
+             × ((matrix_column_choose indices_list (I n)) ⊤ × v))
+    with (M × (matrix_column_choose indices_list (I n)
+                 × (matrix_column_choose indices_list (I n)) ⊤) × v)
+    by (rewrite <- ! Mmult_assoc; reflexivity).
+  rewrite matrix_column_choose_selective_diagonal.
+  all: trivial.
+Qed.
+
+(*
+    In x plus1idxA ->
+       Eigenpair (translateA b) (translate_prog n g × UA × e_i x, C1)
+                 
+         ( forall x,  In x indices_list -> Eigenpair (M1) (M2 × e_i x, c) )
+       -> M1 M2 e_i x = c M2 e_i x
+       -> M1 M2 selective_diagonal n indices_list = c M2 selective_diagonal n indices_list
+ *)
+Lemma Permutation_incl : forall (A : Type) (l l' : list A), Permutation l l' -> incl l l'.
+Proof. intros. unfold incl. intros. apply Permutation_in with (l := l); trivial. Qed.
+
+Lemma selective_diagonal_idempotent : forall (n : nat) (indices_list : list nat), selective_diagonal n indices_list × selective_diagonal n indices_list = selective_diagonal n indices_list.
+Proof. intros. unfold selective_diagonal. unfold Mmult.
+  do 2 (apply functional_extensionality; intros).
+  bdestruct_all; simpl.
+  - subst. destruct (is_in_nat_list x0 indices_list) eqn:E.
+    + apply big_sum_unique.
+      exists x0. repeat split; trivial.
+      * bdestruct_all; simpl. rewrite E. lca.
+      * intros. bdestruct_all; simpl; lca.
+    + apply @big_sum_0 with (H := C_is_monoid).
+      intros. bdestruct_all; simpl; lca.
+  - apply @big_sum_0 with (H := C_is_monoid).
+    intros. bdestruct_all; simpl; lca.
+  - apply @big_sum_0 with (H := C_is_monoid).
+    intros. bdestruct_all; simpl; lca.
+  - apply @big_sum_0 with (H := C_is_monoid).
+    intros. bdestruct_all; simpl; lca.
+Qed.
+
+Lemma selective_diagonal_orth : forall (n : nat) (list1 list2 : list nat),
+    NoDup (list1 ++ list2) ->
+    selective_diagonal n list1 × selective_diagonal n list2 = @Zero n n.
+Proof. intros.
+  unfold selective_diagonal. unfold Mmult.
+  do 2 (apply functional_extensionality; intros).
+  
+  replace (@Zero n n x x0) with C0 by lca.
+  apply @big_sum_0_bounded with (H := C_is_monoid).
+  intros.
+  bdestruct_all; simpl; try lca.
+  subst.
+  destruct (is_in_nat_list x0 list1) eqn:E1; try lca.
+  destruct (is_in_nat_list x0 list2) eqn:E2; try lca.
+  unfold is_in_nat_list in *.
+  rewrite existsb_exists in *.
+  destruct E1, E2.
+  destruct H4, H5.
+  rewrite Nat.eqb_eq in *.
+  subst.
+  pose (NoDup_app_in_neg_l nat x1 list1 list2 H0 H5).
+  contradiction.
+Qed.
+
+
+Lemma selective_diagonal_adjoint_transpose : forall (n : nat) (indices_list : list nat),
+    (selective_diagonal n indices_list) † = (selective_diagonal n indices_list) ⊤.
+Proof. intros.
+  unfold adjoint, transpose.
+  do 2 (apply functional_extensionality; intros).
+  unfold selective_diagonal.
+  bdestruct_all; simpl; try lca.
+  destruct (is_in_nat_list x0 indices_list) eqn:E; lca.
+Qed.
+  
+Lemma selective_diagonal_symmetric : forall (n : nat) (indices_list : list nat),
+    (selective_diagonal n indices_list) ⊤ = selective_diagonal n indices_list.
+Proof. intros.
+  unfold adjoint, transpose.
+  do 2 (apply functional_extensionality; intros).
+  unfold selective_diagonal.
+  bdestruct_all; simpl; try lca.
+  subst.
+  destruct (is_in_nat_list x indices_list) eqn:E; lca.
+Qed.
+
+Lemma selective_diagonal_hermitian : forall (n : nat) (indices_list : list nat),
+    (selective_diagonal n indices_list) † = selective_diagonal n indices_list.
+Proof. intros.
+  rewrite selective_diagonal_adjoint_transpose.
+  apply selective_diagonal_symmetric.
+Qed.
+
+Lemma selective_diagonal_e_i_identity : forall (n i : nat) (indices_list : list nat),
+    In i indices_list -> selective_diagonal n indices_list × e_i i = e_i i.
+Proof. intros.
+  unfold selective_diagonal.
+  unfold e_i.
+  unfold Mmult.
+  do 2 (apply functional_extensionality; intros).
+  assert ((fun y : nat =>
+             (if (x =? y)%nat && (x =? i0)%nat && (x <? n) && (x0 =? 0)%nat &&
+                   is_in_nat_list x indices_list then C1 else 0))
+         =
+           (fun y : nat =>
+              (if (x =? y)%nat && (x <? n) && is_in_nat_list x indices_list then C1 else 0) *
+                (if (y =? i0)%nat && (y <? n) && (x0 =? 0)%nat then C1 else 0))).
+  { apply functional_extensionality; intros. 
+    bdestruct_all; simpl; try lca; subst. }
+  rewrite <- H1.
+  bdestruct_all; simpl.
+  2-8: apply @big_sum_0 with (H := C_is_monoid); intros; bdestruct_all; simpl; lca.
+  subst.
+  apply @big_sum_unique with (H := C_is_monoid).
+  exists i0.
+  split; trivial.
+  split; bdestruct_all.
+  - simpl. destruct (is_in_nat_list i0 indices_list) eqn:E; try lca.
+    unfold is_in_nat_list in E.
+    assert (exists x : nat, In x indices_list /\ (fun m : nat => (i0 =? m)%nat) x = true).
+    { exists i0. split; trivial. rewrite Nat.eqb_eq. trivial. }
+    rewrite <- existsb_exists in H4.
+    rewrite H4 in E.
+    discriminate.
+  - intros. bdestruct_all. simpl. trivial.
+Qed.
+
+Lemma selective_diagonal_e_i_zero : forall (n i : nat) (indices_list : list nat),
+    ~ In i indices_list -> selective_diagonal n indices_list × e_i i = Zero.
+Proof. intros.
+  unfold selective_diagonal.
+  unfold e_i.
+  unfold Mmult.
+  do 2 (apply functional_extensionality; intros).
+  assert ((fun y : nat =>
+             (if (x =? y)%nat && (x =? i0)%nat && (x <? n) && (x0 =? 0)%nat &&
+                   is_in_nat_list x indices_list then C1 else 0))
+         =
+           (fun y : nat =>
+              (if (x =? y)%nat && (x <? n) && is_in_nat_list x indices_list then C1 else 0) *
+                (if (y =? i0)%nat && (y <? n) && (x0 =? 0)%nat then C1 else 0))).
+  { apply functional_extensionality; intros. 
+    bdestruct_all; simpl; try lca; subst. }
+  rewrite <- H1.
+  bdestruct_all; simpl.
+  2-8: apply @big_sum_0 with (H := C_is_monoid); intros; bdestruct_all; simpl; lca.
+  subst.
+  apply @big_sum_unique with (H := C_is_monoid).
+  exists i0.
+  split; trivial.
+  split; bdestruct_all.
+  - simpl. destruct (is_in_nat_list i0 indices_list) eqn:E; try lca.
+    unfold is_in_nat_list in E.
+    rewrite existsb_exists in E.
+    destruct E.
+    destruct H4.
+    rewrite Nat.eqb_eq in H5.
+    subst.
+    contradiction.
+  - intros. bdestruct_all. simpl. trivial.
+Qed.
+
+
+
+(*
+matrix_column_choose_pop_square_id
+vector_row_choose_matrix_column_choose
+  matrix_column_choose_selective_diagonal
+  
+v = M × selective_diagonal n indices_list × ((M) † × v)
+
+      (forall x : nat, In x indices_list ->
+                M1 × M2 × M3 × e_i x = c .* M2 × M3 × e_i x)
+      ->  
+        (forall v : Vector (2 ^ n), v = matrix_column_choose indices_list M3
+                                     × vector_row_choose indices_list ((M3) † × v) ->
+                               M1 × M2 × v = c .* M2 × v)
+          
+(forall v : Vector (2 ^ n), v = matrix_column_choose indices_list M3
+                             × vector_row_choose indices_list ((M3) † × v)
+                             = M3 × selective_diagonal n indices_list × (M3) † × v
+                       ->
+                               M1 × M2 × v = c .* M2 × v)
+*)
+Lemma eigenpair_to_selective_diagonal : forall {n} (indices_list : list nat) (c : C) (M1 M2 M3 : Square n),
+    WF_Matrix M2 -> WF_Matrix M3 -> 
+    (forall x : nat, In x indices_list -> Eigenpair M1 (M2 × M3 × e_i x, c)) ->  
+    (M1 × M2 × M3 × selective_diagonal n indices_list × (M3) †
+     = c .* M2 × M3 × selective_diagonal n indices_list × (M3) †).
+Proof. intros. 
+  unfold Eigenpair in H2. simpl in H2.
+  setoid_rewrite e_i_get_vec in H2; auto with wf_db.
+
+  do 2 (apply functional_extensionality; intros).
+  unfold Matrix.scale, Mmult in *. unfold get_vec in *.
+  unfold selective_diagonal in *.
+  f_equal.
+  apply functional_extensionality; intros.
+  
+  do 2 f_equal.
+  apply functional_extensionality; intros.
+
+  destruct (is_in_nat_list x2 indices_list) eqn:E.
+  - unfold is_in_nat_list in E.
+    rewrite existsb_exists in E.
+    destruct E as [x4 [H3 H4]].
+    rewrite Nat.eqb_eq in H4.
+    subst.
+    specialize (H2 x4 H3).
+    apply f_equal_inv with (x := x) in H2.
+    apply f_equal_inv with (x := 0%nat) in H2.
+    simpl in H2.
+
+    f_equal.
+
+    assert ((fun y : nat => (c * M2 x y) * M3 y x4) = (fun y : nat => c * (M2 x y * M3 y x4))).
+    { apply functional_extensionality; intros. lca. }
+    rewrite H4.
+    
+    rewrite @big_sum_mult_l with (R := C) (H := C_is_monoid) (H0 := C_is_group) (H1 := C_is_comm_group) (H2 := C_is_ring) in H2.
+    rewrite <- @big_sum_mult_l with (R := C) (H := C_is_monoid) (H0 := C_is_group) (H1 := C_is_comm_group) (H2 := C_is_ring).
+    rewrite @big_sum_mult_l with (R := C) (H := C_is_monoid) (H0 := C_is_group) (H1 := C_is_comm_group) (H2 := C_is_ring).
+    rewrite <- H2.
+    
+    pose (Mmult_assoc M1 M2 M3) as e.
+    unfold Mmult in e.
+    apply f_equal_inv with (x := x) in e.
+    apply f_equal_inv with (x := x4) in e.
+    apply e.
+  - bdestruct_all; simpl; lca.
+Qed.
+  
+  
+Lemma eigenpair_to_selective_diagonal' : forall {n} (indices_list : list nat) (c : C) (M1 M2 : Square n),
+    WF_Matrix M2 -> 
+    ((forall i : nat, In i indices_list -> Eigenpair M1 (M2 × e_i i, c)) ->
+    M1 × M2 × (selective_diagonal n indices_list) = c .* M2 × selective_diagonal n indices_list).
+Proof. intros. pose (eigenpair_to_selective_diagonal indices_list c M1 M2 (I n)).
+  rewrite ! Mmult_assoc in e.
+  rewrite ! Mmult_1_l in e.
+  rewrite ! id_adjoint_eq in e.
+  rewrite ! Mmult_1_r in e.
+  rewrite Mmult_assoc.
+  apply e.
+  all: auto with wf_db.
+Qed.
+
+Lemma eigenpair_to_selective_diagonal'' : forall {n} (indices_list : list nat) (c : C) (M1 M3 : Square n),
+    WF_Matrix M3 -> 
+    (forall x : nat, In x indices_list -> Eigenpair M1 (M3 × e_i x, c)) ->  
+    (M1 × M3 × selective_diagonal n indices_list × (M3) †
+     = c .* M3 × selective_diagonal n indices_list × (M3) †).
+Proof. intros.  pose (eigenpair_to_selective_diagonal indices_list c M1 (I n) M3).
+  rewrite ! Mscale_mult_dist_l in e.
+  rewrite ! Mmult_1_l in e.
+  rewrite ! Mmult_assoc in e.
+  rewrite ! Mmult_1_l in e.
+  rewrite <- ! Mmult_assoc in e.
+  rewrite e.
+  distribute_scale.
+  all: auto with wf_db.
+Qed.
+
+(** Extra Lemmas which may or may not be needed *)
+(*** matrix_row_choose ***)
+           (** Permutation (List.seq 0 n) list
+                -> linearly_independent M
+                -> linearly_independent (matrix_column_choose list M) **)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(*** Admitted but straightforward ***)
+
+(** eigenvalue is real : https://books.physics.oregonstate.edu/LinAlg/eigenhermitian.html **)
+Lemma Hermitian_eigenvalue_is_real : forall {n} (M : Square n) (v : Vector n) (c : C),
+    M † = M -> M × v = c .* v -> c ^* = c.
+Proof. Admitted.
+(** TBD **)
+
+  
+(** eigenvalue is unimodular : https://books.physics.oregonstate.edu/LinAlg/eigenunitary.html **)
+Lemma Unitary_eigenvalue_is_unimodular : forall {n} (M : Square n) (v : Vector n) (c : C),
+    WF_Unitary M -> M × v = c .* v -> c * c ^* = C1.
+Admitted.
+
+Lemma Unitary_Hermitian_eigenvalue_plusminus1: forall {n} (M : Square n) (v : Vector n) (c : C),
+    WF_Unitary M -> M † = M -> M × v = c .* v -> (c = C1) \/ (c = Copp C1).
+Proof. intros. remember H2 as H3. clear HeqH3.
+  destruct H0.
+  apply @Mmult_inj_l with (i := n%nat) (m := v †) in H2.
+  remember H2 as H5. clear HeqH5.
+Admitted.
+
+(** https://books.physics.oregonstate.edu/LinAlg/eigenhermitian.html **)
+Lemma Hermitian_different_eigenvalue_orthogonal_eigenvector :
+  forall {n} (v1 v2 : Vector n) (M : Square n) (c1 c2 : C),
+    M † = M -> c1 <> c2 -> M × v1 = c1 .* v1 -> M × v2 = c2 .* v2 ->
+    inner_product v1 v2 = 0.
+Proof. intros.
+Admitted.
+
+(** https://www.math.purdue.edu/~eremenko/dvi/spectral.pdf **)
+Lemma Unitary_different_eigenvalue_orthogonal_eigenvector :
+  forall {n} (v1 v2 : Vector n) (M : Square n) (c1 c2 : C),
+    WF_Unitary M -> c1 <> c2 -> M × v1 = c1 .* v1 -> M × v2 = c2 .* v2 ->
+    inner_product v1 v2 = 0.
+Admitted.
+
+
 (*
 For both P and Q, the only eigenvalues are +1 and -1, and the dimension of +1-eigenstates equals that of the -1-eigenstates.
 
@@ -7027,14 +7497,76 @@ Hence { U v1, U v2, ..., U vn } forms a basis for the +1 eigenspace of Q.
 Given a w such that Pw = -w we want to show that QUw = -Uw.
 Since eigenvectors corresponding to distinct eigenvalues are orthogonal, the -1 eigenspace of Q is orthogonal to the +1 eigenspace of Q.
 Since { U v1, U v2, ..., U vn, U w1, U w2, ..., U wn } forms an orthonormal basis, the -1 eigenspace of Q must be spanned by { U w1, U w2, ..., U wn }.
+
+(1. { U v1, U v2, ..., U vn } forms a basis for the +1 eigenspace of Q.
+ 2. eigenvectors corresponding to distinct eigenvalues are orthogonal
+ --> the -1 eigenspace of Q is orthogonal to the +1 eigenspace of Q.
+ 3. { U v1, U v2, ..., U vn, U w1, U w2, ..., U wn } forms an orthonormal basis
+       (there are only 2 eigenspaces: +1, -1)
+       (there are only 2n dimensions.)
+ 4. Therefore, the -1 eigenspace of Q must be spanned by { U w1, U w2, ..., U wn }. )
+
+
+(( Let u be a -1 eigenvector of Q. Then Q u = - u  and 
+   u = a1 U v1 + ... + an U vn + b1 U w1 + ... + bn U wn  and
+   Qu = - u = (a1 U v1 + ... + an U vn) + Q (b1 U w1 + ... + bn U wn).
+
+
+(( ??????????????????????????
+   ??????????????????????????
+   ??????????????????????????
+   ??????????????????????????
+   ??????????????????????????
+   ??????????????????????????
+   ??????????????????????????
+   ??????????????????????????
+   ??????????????????????????
+   ??????????????????????????
+   ??????????????????????????
+   ??????????????????????????
+   ??????????????????????????
+   ??????????????????????????
+   ??????????????????????????
+   ??????????????????????????
+   ??????????????????????????
+   ??????????????????????????
+   ??????????????????????????
+   ??????????????????????????
+   ??????????????????????????
+   ??????????????????????????
+   ??????????????????????????
+   ??????????????????????????
+   ??????????????????????????
+   ??????????????????????????
+   ??????????????????????????
+   ??????????????????????????
+   ??????????????????????????
+   ??????????????????????????
+   ??????????????????????????
+   ??????????????????????????
+   ??????????????????????????
+   ??????????????????????????
+   ??????????????????????????
+   ??????????????????????????
+   ??????????????????????????
+   ??????????????????????????
+   ??????????????????????????
+   ??????????????????????????
+   ?????????????????????????? ))
+
+
+(* WRONG *)
 ( Let u be a -1 eigenvector of Q. Then Q u = - u  and 
   u = a1 U v1 + ... + an U vn + b1 U w1 + ... + bn U wn  and
   Qu = - u = (a1 U v1 + ... + an U vn) + Q (b1 U w1 + ... + bn U wn).
+
   Then 0 = u - u = (b1 U w1 + ... + bn U wn) + Q (b1 U w1 + ... + bn U wn)  so
   Q (b1 U w1 + ... + bn U wn) = - (b1 U w1 + ... + bn U wn).
   Then u = - (a1 U v1 + ... + an U vn) + (b1 U w1 + ... + bn U wn)  and so
   2 u = 2 (b1 U w1 + ... + bn U wn)  which gives
   u = b1 U w1 + ... + bn U wn. )
+
+
 Since { U w1, U w2, ..., U wn } is orthonormal, they form an orthonormal basis of the -1 eigenspace of Q.
 
 Hence, given any linear combination w = a1 w1 + ... + an wn, we have QUw = - Uw.
@@ -7061,7 +7593,3484 @@ Lemma Unitary_Hermitian_trace_zero_index_split : forall {n} (A : Square n),
                     A = U × D × U† /\ trace D = 0 /\
                     (forall x, In x l1 -> Eigenpair A (U × (e_i x), C1)) /\
                     (forall x, In x l2 -> Eigenpair A (U × (e_i x), Copp C1))).
+ *)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(** subspace of the form { v | P v } **)
+Definition subspace {n : nat} (P : Vector n -> Prop) : Prop := P Zero /\ (forall (v w : Vector n) (a b : C), P v -> P w -> P ((a .* v) .+ (b .* w))).
+
+Lemma subspace_closed_under_linear_combinations : forall (n m : nat) (M : Matrix n m) (a : Vector m) (P : Vector n -> Prop), WF_Matrix a -> subspace P -> (forall (i : nat), (i < m)%nat -> P (get_vec i M)) -> P (M × a).
+Proof. intros n m M a P H0 H1 H2. 
+  induction m.
+  - unfold Mmult. simpl.
+    unfold subspace in H1.
+    destruct H1.
+    assumption.
+  - assert (M × a = (matrix_column_choose (List.seq 0 m) M) × (vector_row_choose (List.seq 0 m) a) .+ (a m 0%nat) .* (get_vec m M)).
+      { unfold Mmult.
+        unfold Matrix.scale.
+        unfold matrix_column_choose, list_vector_to_matrix.
+        unfold vector_row_choose.
+        unfold get_vec.
+        unfold Mplus.
+        simpl.
+        do 2 (apply functional_extensionality; intros).
+        unfold WF_Matrix in *.
+        bdestruct (x0 <? 1)%nat.
+        - bdestruct_all.
+          subst.
+          f_equal.
+          2 : apply Cmult_comm.
+          rewrite seq_length.
+          apply big_sum_eq_bounded.
+          intros.
+          rewrite seq_nth.
+          2 : assumption.
+          simpl.
+          f_equal.
+          rewrite nth_indep with (d' := (fun i0 x1 y : nat => if (y =? 0)%nat then M x1 i0 else 0) (s m)).
+          2 : rewrite map_length;
+          rewrite seq_length;
+          assumption.
+          rewrite map_nth with (d := s m).
+          bdestruct_all.
+          rewrite seq_nth; trivial.
+        - remember H0 as H0'. clear HeqH0'.
+          remember H0 as H0''. clear HeqH0''.
+          assert ((m >= s m)%nat \/ (x0 >= 1)%nat). { right. assumption. }
+          specialize (H0 m x0 H4).
+          rewrite H0. rewrite Cmult_0_r, Cplus_0_r.
+          bdestruct_all.
+          rewrite Cmult_0_r, Cplus_0_r.
+          f_equal.
+          2 : symmetry; apply seq_length.
+          apply functional_extensionality; intros.
+          assert ((x1 >= s m)%nat \/ (x0 >= 1)%nat). { right. assumption. }
+          specialize (H0' x1 x0 H6).
+          rewrite H0'.
+          rewrite Cmult_0_r.
+          assert ((nth x1 (List.seq 0 m) (s m) >= s m)%nat \/ (x0 >= 1)%nat). { right. assumption. }
+          specialize (H0'' (nth x1 (List.seq 0 m) (s m)) x0 H7).
+          rewrite H0''.
+          rewrite Cmult_0_r.
+          reflexivity. }
+      rewrite H3.
+      remember H1 as H1'.
+      clear HeqH1'.
+      unfold subspace in H1.
+      destruct H1.
+      specialize (H4
+                    (matrix_column_choose (List.seq 0 m) M × vector_row_choose (List.seq 0 m) a)
+                    (get_vec m M)
+                    (C1)
+                    (a m 0%nat)).
+      rewrite Mscale_1_l in H4.
+      apply H4.
+      2 : { assert (m < s m)%nat. { lia. }
+        specialize (H2 m H5); assumption. }
+      specialize (IHm
+                    (matrix_column_choose (List.seq 0 m) M)
+                    (vector_row_choose (List.seq 0 m) a)).
+      rewrite seq_length.
+      apply IHm.
+      * pose (WF_Matrix_vector_row_choose_indices_list (List.seq 0 m) a).
+        rewrite seq_length in w.
+        apply w; trivial.
+      * intros.
+        assert (i0 < s m)%nat. { lia. }
+        specialize (H2 i0 H6).
+        assert (get_vec i0 (matrix_column_choose (List.seq 0 m) M) = get_vec i0 M).
+           { unfold matrix_column_choose, list_vector_to_matrix.
+             unfold get_vec.
+             do 2 (apply functional_extensionality; intros).
+             bdestruct_all; trivial.
+             subst.
+             rewrite nth_indep with (d' := (fun i1 x0 y : nat => if (y =? 0)%nat then M x0 i1 else 0) (s m)).
+             2 : rewrite map_length;
+             rewrite seq_length;
+             assumption.
+             rewrite map_nth with (d := s m).
+             bdestruct_all.
+             rewrite seq_nth; trivial. }
+           rewrite seq_length in H7.
+           rewrite H7.
+           assumption.
+Qed.
+
+(* old version of the lemma
+
+Lemma subspace_closed_under_linear_combinations' : forall (n m : nat) (M : Matrix n m) (a : Vector m) (P : Vector n -> Prop), WF_Matrix M -> WF_Matrix a -> subspace P -> (forall (i : nat), P (get_vec i M)) -> P (M × a).
+Proof. intros n m M a P H0 H1 H2 H3.
+  induction m.
+  - unfold Mmult. simpl.
+    unfold subspace in H2.
+    destruct H2.
+    specialize (H3 0%nat).
+    unfold get_vec in H3.
+    assert (@Zero n 0 = fun x y : nat => if (y =? 0)%nat then M x 0%nat else 0).
+    { do 2 (apply functional_extensionality; intros).
+      bdestruct_all; trivial.
+      unfold WF_Matrix in H0.
+      assert ((x >= n)%nat \/ (0 >= 0)%nat). { right. lia. }
+      specialize (H0 x 0%nat H6).
+      rewrite H0.
+      trivial. }
+    rewrite <- H5 in H3.
+    apply H3.
+  - assert (M × a = (matrix_column_choose (List.seq 0 m) M) × (vector_row_choose (List.seq 0 m) a) .+ (a m 0%nat) .* (get_vec m M)).
+      { unfold Mmult.
+        unfold Matrix.scale.
+        unfold matrix_column_choose, list_vector_to_matrix.
+        unfold vector_row_choose.
+        unfold get_vec.
+        unfold Mplus.
+        simpl.
+        do 2 (apply functional_extensionality; intros).
+        unfold WF_Matrix in H1.
+        bdestruct (x0 <? 1)%nat.
+        - bdestruct_all.
+          subst.
+          f_equal.
+          2 : apply Cmult_comm.
+          rewrite seq_length.
+          apply big_sum_eq_bounded.
+          intros.
+          rewrite seq_nth.
+          2 : assumption.
+          simpl.
+          f_equal.
+          assert (@Zero n 1 = (fun i0 x1 y : nat => if (y =? 0)%nat then M x1 i0 else 0) (s m)).
+          { do 2 (apply functional_extensionality; intros).
+            bdestruct_all; trivial.
+            unfold WF_Matrix in H0.
+            assert ((x1 >= n)%nat \/ (s m >= s m)%nat). { right. lia. }
+            specialize (H0 x1 (s m) H7).
+            rewrite H0.
+            trivial. }
+          rewrite H6.
+          rewrite map_nth with (d := s m).
+          bdestruct_all.
+          rewrite seq_nth; trivial.
+        - remember H1 as H1'. clear HeqH1'.
+          remember H1 as H1''. clear HeqH1''.
+          assert ((m >= s m)%nat \/ (x0 >= 1)%nat). { right. assumption. }
+          specialize (H1 m x0 H5).
+          rewrite H1. rewrite Cmult_0_r, Cplus_0_r.
+          bdestruct_all.
+          rewrite Cmult_0_r, Cplus_0_r.
+          f_equal.
+          2 : symmetry; apply seq_length.
+          apply functional_extensionality; intros.
+          assert ((x1 >= s m)%nat \/ (x0 >= 1)%nat). { right. assumption. }
+          specialize (H1' x1 x0 H7).
+          rewrite H1'.
+          rewrite Cmult_0_r.
+          assert ((nth x1 (List.seq 0 m) (s m) >= s m)%nat \/ (x0 >= 1)%nat). { right. assumption. }
+          specialize (H1'' (nth x1 (List.seq 0 m) (s m)) x0 H8).
+          rewrite H1''.
+          rewrite Cmult_0_r.
+          reflexivity. }
+      rewrite H4.
+      remember H2 as H2'.
+      clear HeqH2'.
+      unfold subspace in H2.
+      destruct H2.
+      specialize (H5
+                    (matrix_column_choose (List.seq 0 m) M × vector_row_choose (List.seq 0 m) a)
+                    (get_vec m M)
+                    (C1)
+                    (a m 0%nat)).
+      rewrite Mscale_1_l in H5.
+      apply H5.
+      2 : specialize (H3 m); assumption.
+      specialize (IHm
+                    (matrix_column_choose (List.seq 0 m) M)
+                    (vector_row_choose (List.seq 0 m) a)).
+      rewrite seq_length.
+      apply IHm.
+      * pose (WF_Matrix_matrix_column_choose_indices_list (List.seq 0 m) M).
+        rewrite seq_length in w.
+        apply w; trivial.
+      * pose (WF_Matrix_vector_row_choose_indices_list (List.seq 0 m) a).
+        rewrite seq_length in w.
+        apply w; trivial.
+      * intros.
+        specialize (H3 i0).
+        bdestruct (i0 <? m).
+        -- assert (get_vec i0 (matrix_column_choose (List.seq 0 m) M) = get_vec i0 M).
+           { unfold matrix_column_choose, list_vector_to_matrix.
+             unfold get_vec.
+             do 2 (apply functional_extensionality; intros).
+             bdestruct_all; trivial.
+             subst.
+             assert (@Zero n 1 = (fun i1 x0 y : nat => if (y =? 0)%nat then M x0 i1 else 0) (s m)).
+             { do 2 (apply functional_extensionality; intros).
+               bdestruct_all; trivial.
+               unfold WF_Matrix in H0.
+               assert ((x0 >= n)%nat \/ (s m >= s m)%nat). { right. lia. }
+               specialize (H0 x0 (s m) H8).
+               rewrite H0.
+               trivial. }
+             rewrite H7.
+             rewrite map_nth with (d := s m).
+             bdestruct_all.
+             rewrite seq_nth; trivial. }
+           rewrite seq_length in H7.
+           rewrite H7.
+           apply H3.
+        -- assert (WF_Matrix (matrix_column_choose (List.seq 0 m) M)).
+           { pose (WF_Matrix_matrix_column_choose_indices_list (List.seq 0 m) M).
+             apply w; trivial. }
+           unfold WF_Matrix in H7.
+           rewrite seq_length in H7.
+           assert (Zero = get_vec i0 (matrix_column_choose (List.seq 0 m) M)).
+           { do 2 (apply functional_extensionality; intros).
+             unfold matrix_column_choose, list_vector_to_matrix.
+             unfold get_vec.
+             bdestruct_all; trivial.
+             subst.
+             assert (@Zero n 1 = (fun i1 x0 y : nat => if (y =? 0)%nat then M x0 i1 else 0) (s m)).
+             { do 2 (apply functional_extensionality; intros).
+               bdestruct_all; trivial.
+               unfold WF_Matrix in H0.
+               assert ((x0 >= n)%nat \/ (s m >= s m)%nat). { right. lia. }
+               specialize (H0 x0 (s m) H9).
+               rewrite H0.
+               reflexivity. }
+             rewrite H8 at 1.
+             rewrite map_nth with (d := s m).
+             bdestruct_all.
+             unfold WF_Matrix in H0.
+             assert ((x >= n)%nat \/ ((nth i0 (List.seq 0 m) (s m)) >= s m)%nat).
+             { right. rewrite nth_overflow. lia. rewrite seq_length. lia. }
+             specialize (H0 x (nth i0 (List.seq 0 m) (s m)) H10).
+             rewrite H0.
+             trivial. }
+           rewrite seq_length in H8.
+           rewrite <- H8.
+           unfold subspace in H2'.
+           destruct H2'.
+           specialize (H10 (get_vec i0 M) (get_vec i0 M) C0 C0 H3 H3).
+           rewrite ! Mscale_0_l, Mplus_0_r in H10.
+           assumption.
+Qed.
+ *)
+
+
+
+
+(** old version 
+
+(** subspace of the form { v | P v } **)
+
+Inductive subspace {n : nat} (P : Vector n -> Prop) : Prop :=
+| subspace_def :
+    (forall (v w : Vector n) (a b : C), P v -> P w -> P ((a .* v) .+ (b .* w)))
+    -> subspace P.
+
+
+Lemma subspace_closed_under_linear_combinations : forall (n m : nat) (M : Matrix n m) (a : Vector m) (P : Vector n -> Prop), WF_Matrix M -> WF_Matrix a -> subspace P -> (forall (i : nat), P (get_vec i M)) -> P (M × a).
+Proof. intros n m M a P H0 H1 H2 H3.
+  induction m.
+  - unfold Mmult. simpl.
+    inversion H2.
+    specialize (H3 0%nat).
+    unfold get_vec in H3.
+    assert (@Zero n 0 = fun x y : nat => if (y =? 0)%nat then M x 0%nat else 0).
+    { do 2 (apply functional_extensionality; intros).
+      bdestruct_all; trivial.
+      unfold WF_Matrix in H0.
+      assert ((x >= n)%nat \/ (0 >= 0)%nat). { right. lia. }
+      specialize (H0 x 0%nat H6).
+      rewrite H0.
+      trivial. }
+    rewrite <- H5 in H3.
+    apply H3.
+  - assert (M × a = (matrix_column_choose (List.seq 0 m) M) × (vector_row_choose (List.seq 0 m) a) .+ (a m 0%nat) .* (get_vec m M)).
+      { unfold Mmult.
+        unfold Matrix.scale.
+        unfold matrix_column_choose, list_vector_to_matrix.
+        unfold vector_row_choose.
+        unfold get_vec.
+        unfold Mplus.
+        simpl.
+        do 2 (apply functional_extensionality; intros).
+        unfold WF_Matrix in H1.
+        bdestruct (x0 <? 1)%nat.
+        - bdestruct_all.
+          subst.
+          f_equal.
+          2 : apply Cmult_comm.
+          rewrite seq_length.
+          apply big_sum_eq_bounded.
+          intros.
+          rewrite seq_nth.
+          2 : assumption.
+          simpl.
+          f_equal.
+          assert (@Zero n 1 = (fun i0 x1 y : nat => if (y =? 0)%nat then M x1 i0 else 0) (s m)).
+          { do 2 (apply functional_extensionality; intros).
+            bdestruct_all; trivial.
+            unfold WF_Matrix in H0.
+            assert ((x1 >= n)%nat \/ (s m >= s m)%nat). { right. lia. }
+            specialize (H0 x1 (s m) H7).
+            rewrite H0.
+            trivial. }
+          rewrite H6.
+          rewrite map_nth with (d := s m).
+          bdestruct_all.
+          rewrite seq_nth; trivial.
+        - remember H1 as H1'. clear HeqH1'.
+          remember H1 as H1''. clear HeqH1''.
+          assert ((m >= s m)%nat \/ (x0 >= 1)%nat). { right. assumption. }
+          specialize (H1 m x0 H5).
+          rewrite H1. rewrite Cmult_0_r, Cplus_0_r.
+          bdestruct_all.
+          rewrite Cmult_0_r, Cplus_0_r.
+          f_equal.
+          2 : symmetry; apply seq_length.
+          apply functional_extensionality; intros.
+          assert ((x1 >= s m)%nat \/ (x0 >= 1)%nat). { right. assumption. }
+          specialize (H1' x1 x0 H7).
+          rewrite H1'.
+          rewrite Cmult_0_r.
+          assert ((nth x1 (List.seq 0 m) (s m) >= s m)%nat \/ (x0 >= 1)%nat). { right. assumption. }
+          specialize (H1'' (nth x1 (List.seq 0 m) (s m)) x0 H8).
+          rewrite H1''.
+          rewrite Cmult_0_r.
+          reflexivity. }
+      rewrite H4.
+      inversion H2.
+      specialize (H5
+                    (matrix_column_choose (List.seq 0 m) M × vector_row_choose (List.seq 0 m) a)
+                    (get_vec m M)
+                    (C1)
+                    (a m 0%nat)).
+      rewrite Mscale_1_l in H5.
+      apply H5.
+      2 : specialize (H3 m); assumption.
+      specialize (IHm
+                    (matrix_column_choose (List.seq 0 m) M)
+                    (vector_row_choose (List.seq 0 m) a)).
+      rewrite seq_length.
+      apply IHm.
+      * pose (WF_Matrix_matrix_column_choose_indices_list (List.seq 0 m) M).
+        rewrite seq_length in w.
+        apply w; trivial.
+      * pose (WF_Matrix_vector_row_choose_indices_list (List.seq 0 m) a).
+        rewrite seq_length in w.
+        apply w; trivial.
+      * intros.
+        specialize (H3 i0).
+        bdestruct (i0 <? m).
+        -- assert (get_vec i0 (matrix_column_choose (List.seq 0 m) M) = get_vec i0 M).
+           { unfold matrix_column_choose, list_vector_to_matrix.
+             unfold get_vec.
+             do 2 (apply functional_extensionality; intros).
+             bdestruct_all; trivial.
+             subst.
+             assert (@Zero n 1 = (fun i1 x0 y : nat => if (y =? 0)%nat then M x0 i1 else 0) (s m)).
+             { do 2 (apply functional_extensionality; intros).
+               bdestruct_all; trivial.
+               unfold WF_Matrix in H0.
+               assert ((x0 >= n)%nat \/ (s m >= s m)%nat). { right. lia. }
+               specialize (H0 x0 (s m) H8).
+               rewrite H0.
+               trivial. }
+             rewrite H7.
+             rewrite map_nth with (d := s m).
+             bdestruct_all.
+             rewrite seq_nth; trivial. }
+           rewrite seq_length in H7.
+           rewrite H7.
+           apply H3.
+        -- assert (WF_Matrix (matrix_column_choose (List.seq 0 m) M)).
+           { pose (WF_Matrix_matrix_column_choose_indices_list (List.seq 0 m) M).
+             apply w; trivial. }
+           unfold WF_Matrix in H7.
+           rewrite seq_length in H7.
+           assert (Zero = get_vec i0 (matrix_column_choose (List.seq 0 m) M)).
+           { do 2 (apply functional_extensionality; intros).
+             unfold matrix_column_choose, list_vector_to_matrix.
+             unfold get_vec.
+             bdestruct_all; trivial.
+             subst.
+             assert (@Zero n 1 = (fun i1 x0 y : nat => if (y =? 0)%nat then M x0 i1 else 0) (s m)).
+             { do 2 (apply functional_extensionality; intros).
+               bdestruct_all; trivial.
+               unfold WF_Matrix in H0.
+               assert ((x0 >= n)%nat \/ (s m >= s m)%nat). { right. lia. }
+               specialize (H0 x0 (s m) H9).
+               rewrite H0.
+               reflexivity. }
+             rewrite H8 at 1.
+             rewrite map_nth with (d := s m).
+             bdestruct_all.
+             unfold WF_Matrix in H0.
+             assert ((x >= n)%nat \/ ((nth i0 (List.seq 0 m) (s m)) >= s m)%nat).
+             { right. rewrite nth_overflow. lia. rewrite seq_length. lia. }
+             specialize (H0 x (nth i0 (List.seq 0 m) (s m)) H10).
+             rewrite H0.
+             trivial. }
+           rewrite seq_length in H8.
+           rewrite <- H8.
+           inversion H2.
+           specialize (H9 (get_vec i0 M) (get_vec i0 M) C0 C0 H3 H3).
+           rewrite ! Mscale_0_l, Mplus_0_r in H9.
+           assumption.
+Qed.
+**)
+
+
+
+
+(** old version 
+
+(** subspace of the form { v | P v } **)
+
+Inductive subspace' (n : nat) (P : Vector n -> Prop) : Vector n -> Prop :=
+| subspace'_def : forall (u : Vector n),
+    (forall (v w : Vector n) (a b : C), P v -> P w -> P ((a .* v) .+ (b .* w)))
+    -> P (@Zero n 1)
+    -> P u
+    -> subspace' n P u.
+
+
+Lemma subspace'_closed_under_linear_combinations : forall (n m : nat) (M : Matrix n m) (a : Vector m) (P : Vector n -> Prop), WF_Matrix M -> WF_Matrix a -> (forall (i : nat), subspace' n P (get_vec i M)) -> subspace' n P (M × a).
+Proof. intros n m M a P H0 H1 H2. 
+  constructor.
+  - intros.
+    specialize (H2 0%nat).
+    inversion H2.
+    specialize (H5 v w a0 b H3 H4).
+    assumption.
+  - intros.
+    specialize (H2 0%nat).
+    inversion H2.
+    assumption.
+  - induction m.
+    + simpl.
+      specialize (H2 0%nat).
+      inversion H2.
+      apply H4.
+    + assert (M × a = (matrix_column_choose (List.seq 0 m) M) × (vector_row_choose (List.seq 0 m) a) .+ (a m 0%nat) .* (get_vec m M)).
+      { unfold Mmult.
+        unfold Matrix.scale.
+        unfold matrix_column_choose, list_vector_to_matrix.
+        unfold vector_row_choose.
+        unfold get_vec.
+        unfold Mplus.
+        simpl.
+        do 2 (apply functional_extensionality; intros).
+        unfold WF_Matrix in H1.
+        bdestruct (x0 <? 1)%nat.
+        - bdestruct_all.
+          rewrite H4.
+          f_equal.
+          2 : apply Cmult_comm.
+          rewrite seq_length.
+          apply big_sum_eq_bounded.
+          intros.
+          rewrite seq_nth.
+          2 : assumption.
+          simpl.
+          f_equal.
+          assert (@Zero n 1 = (fun i0 x2 y : nat => if (y =? 0)%nat then M x2 i0 else 0) (s m)).
+          { do 2 (apply functional_extensionality; intros).
+            bdestruct_all; trivial.
+            unfold WF_Matrix in H0.
+            assert ((x2 >= n)%nat \/ (s m >= s m)%nat). { right. lia. }
+            specialize (H0 x2 (s m) H7).
+            rewrite H0.
+            trivial. }
+          rewrite H6.
+          rewrite map_nth with (d := s m).
+          bdestruct_all.
+          rewrite seq_nth; trivial.
+        - remember H1 as H1'. clear HeqH1'.
+          remember H1 as H1''. clear HeqH1''.
+          assert ((m >= s m)%nat \/ (x0 >= 1)%nat). { right. assumption. }
+          specialize (H1 m x0 H4).
+          rewrite H1. rewrite Cmult_0_r, Cplus_0_r.
+          bdestruct_all.
+          rewrite Cmult_0_r, Cplus_0_r.
+          f_equal.
+          2 : symmetry; apply seq_length.
+          apply functional_extensionality; intros.
+          assert ((x1 >= s m)%nat \/ (x0 >= 1)%nat). { right. assumption. }
+          specialize (H1' x1 x0 H6).
+          rewrite H1'.
+          rewrite Cmult_0_r.
+          assert ((nth x1 (List.seq 0 m) (s m) >= s m)%nat \/ (x0 >= 1)%nat). { right. assumption. }
+          specialize (H1'' (nth x1 (List.seq 0 m) (s m)) x0 H7).
+          rewrite H1''.
+          rewrite Cmult_0_r.
+          reflexivity. }
+      rewrite H3.
+      remember H2 as H2'. clear HeqH2'.
+      specialize (H2' 0%nat).
+      inversion H2'.
+      clear H5 H6 H7.
+      specialize (H4
+                    (matrix_column_choose (List.seq 0 m) M × vector_row_choose (List.seq 0 m) a)
+                    (get_vec m M)
+                    (C1)
+                    (a m 0%nat)).
+      rewrite Mscale_1_l in H4.
+      apply H4.
+      2 : { specialize (H2 m).
+            inversion H2.
+            assumption. }
+      specialize (IHm
+                    (matrix_column_choose (List.seq 0 m) M)
+                    (vector_row_choose (List.seq 0 m) a)).
+      rewrite seq_length.
+      apply IHm.
+      * pose (WF_Matrix_matrix_column_choose_indices_list (List.seq 0 m) M).
+        rewrite seq_length in w.
+        apply w; trivial.
+      * pose (WF_Matrix_vector_row_choose_indices_list (List.seq 0 m) a).
+        rewrite seq_length in w.
+        apply w; trivial.
+      * intros.
+        specialize (H2 i0).
+        inversion H2; subst.
+        constructor; trivial.
+        bdestruct (i0 <? m).
+        -- assert (get_vec i0 (matrix_column_choose (List.seq 0 m) M) = get_vec i0 M).
+           { unfold matrix_column_choose, list_vector_to_matrix.
+             unfold get_vec.
+             do 2 (apply functional_extensionality; intros).
+             bdestruct_all; trivial.
+             subst.
+             assert (@Zero n 1 = (fun i1 x0 y : nat => if (y =? 0)%nat then M x0 i1 else 0) (s m)).
+             { do 2 (apply functional_extensionality; intros).
+               bdestruct_all; trivial.
+               unfold WF_Matrix in H0.
+               assert ((x0 >= n)%nat \/ (s m >= s m)%nat). { right. lia. }
+               specialize (H0 x0 (s m) H10).
+               rewrite H0.
+               trivial. }
+             rewrite H9.
+             rewrite map_nth with (d := s m).
+             bdestruct_all.
+             rewrite seq_nth; trivial. }
+           rewrite seq_length in H9.
+           rewrite H9.
+           apply H7.
+        -- assert (WF_Matrix (matrix_column_choose (List.seq 0 m) M)).
+           { pose (WF_Matrix_matrix_column_choose_indices_list (List.seq 0 m) M).
+             apply w; trivial. }
+           unfold WF_Matrix in H9.
+           rewrite seq_length in H9.
+           assert (Zero = get_vec i0 (matrix_column_choose (List.seq 0 m) M)).
+           { do 2 (apply functional_extensionality; intros).
+             unfold matrix_column_choose, list_vector_to_matrix.
+             unfold get_vec.
+             bdestruct_all; trivial.
+             subst.
+             assert (@Zero n 1 = (fun i1 x0 y : nat => if (y =? 0)%nat then M x0 i1 else 0) (s m)).
+             { do 2 (apply functional_extensionality; intros).
+               bdestruct_all; trivial.
+               unfold WF_Matrix in H0.
+               assert ((x0 >= n)%nat \/ (s m >= s m)%nat). { right. lia. }
+               specialize (H0 x0 (s m) H11).
+               rewrite H0.
+               reflexivity. }
+             rewrite H10 at 1.
+             rewrite map_nth with (d := s m).
+             bdestruct_all.
+             unfold WF_Matrix in H0.
+             assert ((x >= n)%nat \/ ((nth i0 (List.seq 0 m) (s m)) >= s m)%nat).
+             { right. rewrite nth_overflow. lia. rewrite seq_length. lia. }
+             specialize (H0 x (nth i0 (List.seq 0 m) (s m)) H12).
+             rewrite H0.
+             trivial. }
+           rewrite seq_length in H10.
+           rewrite <- H10.
+           assumption.
+Qed.
+**)
+
+
+
+
+Definition span {n m : nat} (M : Matrix n m) (u : Vector n) : Prop := (exists (a : Vector m), WF_Matrix a /\ u = M × a).
+
+(** old definition by inductive type
+Inductive span {n m : nat} (M : Matrix n m) : Vector n -> Prop :=
+| span_def : forall (u : Vector n), (exists (a : Vector m), u = M × a) -> span M u.
+**)
+
+Lemma span_is_subspace : forall (n m : nat) (M : Matrix n m), subspace (span M).
+Proof. intros n m M.
+  constructor.
+  - exists Zero.
+    split; auto with wf_db.
+    rewrite Mmult_0_r.
+    reflexivity.
+  - intros v w a b H0 H1.
+    unfold span.
+    inversion H0.
+    inversion H1.
+    destruct H2,H3.
+    subst.
+    exists (a .* x .+ b .* x0).
+    split; auto with wf_db.
+    rewrite Mmult_plus_distr_l.
+    rewrite ! Mscale_mult_dist_r.
+    reflexivity.
+Qed.
+
+
+(* Lemma 19 Suppose V is a vector space, u1,u2,...,un are vectors in V, and v ∈ sp{u1,u2,...,un}. Then
+sp{u1,u2,...,un,v} = sp{u1,u2,...,un}. *)
+Lemma equal_span_col_append : forall {n m : nat} (M : Matrix n m) (v u : Vector n),
+    span M u -> span (col_append M v) u.
+Proof. intros n m M v u H0.
+  unfold span in *.
+  destruct H0 as [a [H0 H1]].
+  exists (fun (r c : nat) => if r <? m then a r c else C0).
+  split.
+  - unfold WF_Matrix.
+    intros x y H2. 
+    unfold WF_Matrix in H0.
+    rewrite H0.
+    bdestruct_all; reflexivity.
+    lia.
+  - rewrite H1.
+    unfold col_append.
+    unfold Mmult.
+    prep_matrix_equality.
+    simpl.
+    bdestruct_all.
+    rewrite Cmult_0_r, Cplus_0_r.
+    apply big_sum_eq_bounded.
+    intros.
+    bdestruct_all.
+    reflexivity.
+Qed.
+
+(* Lemma 19 Suppose V is a vector space, u1,u2,...,un are vectors in V, and v ∈ sp{u1,u2,...,un}. Then
+sp{u1,u2,...,un,v} = sp{u1,u2,...,un}. *)
+Lemma equal_span_col_append_inv : forall {n m : nat} (M : Matrix n m) (v : Vector n), span M v -> (forall (u : Vector n), span (col_append M v) u -> span M u).
+Proof. intros n m M v H0 u H1.
+  unfold span in *.
+  do 2 destruct H0.
+  do 2 destruct H1.
+  rewrite H2 in H3.
+  rewrite H3.
+  unfold Mmult in H3.
+  (** Σ_{i = 0}^{i = m-1} M_i x0_i + x0_m * Σ_{i = 0}^{i = m-1} M_i x_i 
+           = Σ_{i = 0}^{i = m-1} M_i (x0_i + x0_m * x_i) **)
+  (** (fun (r c : nat) => (big_sum (fun (i : nat) => M r i  * ((x0 i c) + (x0 m c) * (x i c))) m)). **)
+  exists (fun (r c : nat) => if (r <? m) then ((x0 r c) + (x0 m c) * (x r 0%nat)) else C0).
+  split.
+  - unfold WF_Matrix.
+    intros x1 y H4.
+    destruct H4; bdestruct_all; trivial.
+    remember H1 as H1'. clear HeqH1'.
+    unfold WF_Matrix in H1, H1'.
+    assert ((x1 >= s m)%nat \/ (y >= 1)%nat). { right. lia. }
+    specialize (H1 x1 y H6).
+    rewrite H1.
+    assert ((m >= s m)%nat \/ (y >= 1)%nat). { right. lia. }
+    specialize (H1' m y H7).
+    rewrite H1'.
+    lca.
+  - unfold col_append.
+    unfold Mmult.
+    do 2 (apply functional_extensionality; intros).
+    simpl.
+    bdestruct_all.
+    assert ( Σ (fun y : nat => M x1 y * (if y <? m then x0 y x2 + x0 m x2 * x y 0%nat else 0)) m
+             =  Σ (fun y : nat => M x1 y * (x0 y x2 + x0 m x2 * x y 0%nat)) m).
+    { apply big_sum_eq_bounded.
+      intros x3 H5.
+      bdestruct_all.
+      reflexivity. }
+    rewrite H5.
+    replace (fun y : nat => M x1 y * (x0 y x2 + x0 m x2 * x y 0%nat))
+      with (fun y : nat => M x1 y * x0 y x2 + (M x1 y * x y 0%nat)* x0 m x2)
+      by (apply functional_extensionality; intros; lca).
+    assert (Σ (fun y : nat => M x1 y * x0 y x2 + M x1 y * x y 0%nat * x0 m x2) m
+            = Σ (fun y : nat => M x1 y * x0 y x2) m + Σ (fun y : nat => M x1 y * x y 0%nat) m  * x0 m x2).
+    { setoid_rewrite big_sum_plus.
+      simpl.
+      f_equal.
+      rewrite @big_sum_mult_r with (R := C) (H := C_is_monoid) (H0 := C_is_group) (H1 := C_is_comm_group) (H2 := C_is_ring).
+      simpl.
+      reflexivity. }
+    rewrite H6.
+    f_equal.
+    apply big_sum_eq_bounded.
+    intros.
+    bdestruct_all.
+    reflexivity.
+Qed.
+
+(* Lemma 19 Suppose V is a vector space, u1,u2,...,un are vectors in V, and v ∈ sp{u1,u2,...,un}. Then
+sp{u1,u2,...,un,v} = sp{u1,u2,...,un}. *)
+(*** May not be needed *)
+Lemma equal_span_reduce_col_inv : forall {n m : nat} (M : Matrix n (s m)) (i : nat),
+    (i < s m)%nat -> (forall (u : Vector n), span (reduce_col M i) u -> span M u).
+Proof. intros n m M i H u H0.
+  unfold span in *.
+  destruct H0 as [a [H0 H0']].
+  exists (fun r c => if (r <? i)%nat then (a r c) else if (r =? i)%nat then C0 else (a (r-1)%nat c)).
+  split.
+  - unfold WF_Matrix in *.
+    intros.
+    rewrite ! H0;
+      bdestruct_all; trivial;
+      lia.
+  - rewrite H0'.
+    unfold reduce_col.
+    prep_matrix_equality.
+    unfold Mmult.
+
+    replace m with (i + (m - i))%nat at 1 by lia.
+    rewrite @big_sum_sum with (H := C_is_monoid) (m := i) (n := (m - i)%nat).
+    replace (s m) with (i + ((s m) - i))%nat at 1 by lia.
+    rewrite @big_sum_sum with (H := C_is_monoid) (m := i) (n := ((s m) - i)%nat).
+    f_equal.
+    + apply big_sum_eq_bounded.
+      intros.
+      bdestruct_all.
+      reflexivity.
+    + replace ((s m) - i)%nat with (s (m - i))%nat by lia.
+      rewrite <- big_sum_extend_l.
+      bdestruct_all.
+      rewrite Cmult_0_r, Cplus_0_l.
+      apply big_sum_eq_bounded.
+      intros.
+      bdestruct_all.
+      replace (1 + (i + x0))%nat with (i + s x0)%nat by lia.
+      replace (i + s x0 - 1)%nat with (i + x0)%nat by lia.
+      reflexivity.
+Qed.
+    
+  
+(* Lemma 19 Suppose V is a vector space, u1,u2,...,un are vectors in V, and v ∈ sp{u1,u2,...,un}. Then
+sp{u1,u2,...,un,v} = sp{u1,u2,...,un}. *)
+(*** May not be needed *)
+Lemma equal_span_reduce_col : forall {n m : nat} (M : Matrix n (s m)) (i : nat),
+    (i < s m)%nat -> span (reduce_col M i) (get_vec i M) ->
+    (forall (u : Vector n), span M u -> span (reduce_col M i) u).
+Proof. intros n m M i H H0 u H1.
+  unfold span in *.
+  destruct H0 as [a [H0 H0']].
+  destruct H1 as [b [H1 H1']].
+  (* get_vec i M = reduce_col M i × a
+     =>  M_i = (Σ_{k=0}^{k=i-1} M_k a_k) + (Σ_{k=i+1}^{k=m} M_k a_{k-1})
+     
+        u = M × b = Σ_{k=0}^{k=m} M_k b_k
+        = (Σ_{k=0}^{k=i-1} M_k b_k) + M_i b_i + (Σ_{k=i+1}^{k=m} M_k b_k)
+        = (Σ_{k=0}^{k=i-1} M_k b_k) 
+        + ((Σ_{k=0}^{k=i-1} M_k a_k) + (Σ_{k=i+1}^{k=m} M_k a_{k-1})) b_i 
+        + (Σ_{k=i+1}^{k=m} M_k b_k)
+        = (Σ_{k=0}^{k=i-1} M_k (b_i a_k + b_k)) + (Σ_{k=i+1}^{k=m} M_k (b_i a_{k-1} + b_k))
+        
+        u = reduce_col M i × c = (Σ_{k=0}^{k=i-1} M_k c_k) + (Σ_{k=i+1}^{k=m} M_k c_{k-1})
+        c = ((b i 0%nat) .* a) .+ (reduce_row i b) *)
+  exists (((b i 0%nat) .* a) .+ (reduce_row b i)).
+  split.
+  - auto with wf_db.
+  - rewrite H1'.
+    rewrite Mmult_plus_distr_l.
+    distribute_scale.
+    rewrite <- H0'.
+    unfold get_vec, reduce_row, reduce_col.
+    unfold Mmult, Matrix.scale, Mplus.
+    prep_matrix_equality.
+    bdestruct_all.
+    + subst.
+      replace (s m) with (i + (s (m - i)))%nat by lia.
+      rewrite @big_sum_sum with (H := C_is_monoid) (m := i) (n := (s (m - i))%nat).
+      rewrite <- big_sum_extend_l.
+      simpl.
+      setoid_rewrite Cplus_comm at 1.
+      rewrite <- ! Cplus_assoc.
+      f_equal.
+      * replace (i + 0)%nat with i by lia.
+        lca.
+      * rewrite Cplus_comm at 1.
+        replace m with (i + (m - i))%nat at 2 by lia.
+        rewrite @big_sum_sum with (H := C_is_monoid) (m := i) (n := (m - i)%nat).
+        simpl.
+        f_equal.
+        -- apply big_sum_eq_bounded.
+           intros.
+           bdestruct_all.
+           lca.
+        -- apply big_sum_eq_bounded.
+           intros.
+           bdestruct_all.
+           replace (i + s x0)%nat with (s (i + x0)) by lia.
+           reflexivity.
+    + assert ((fun y0 : nat => M x y0 * b y0 y)
+              =
+                (fun _ : nat => C0)).
+      { apply functional_extensionality; intros.
+        unfold WF_Matrix in H1.
+        rewrite H1; try lca; lia. }
+      rewrite H3.
+      simpl.
+      rewrite Cmult_0_r, Cplus_0_l, Cplus_0_r.
+      apply big_sum_eq_bounded.
+      intros.
+      unfold WF_Matrix in H1.
+      rewrite ! H1.
+      bdestruct_all; lca.
+      all : lia.
+Qed.      
+
+  
+
+Lemma last_in_list : forall {A : Type} (d : A) (l : list A),
+    l <> [] -> In (last l d) l.
+Proof. intros A d l H0.
+  apply app_removelast_last with (d := d) in H0.
+  rewrite <- nth_middle with (a := (last l d)) (d := d) (l := removelast l) (l' := []).
+  rewrite <- H0.
+  apply nth_In.
+  rewrite H0.
+  rewrite removelast_last.
+  rewrite app_length.
+  simpl.
+  lia.
+Qed.
+
+(*** Admitted: Not used ***)
+Lemma big_sum_permutation_function : forall (m : nat) (f g : nat -> C) (l : list nat),
+    Permutation l (List.seq 0 m) -> map f l = map g (List.seq 0 m) -> Σ f m = Σ g m.
+Proof. intros m f g l H0 H1.
+  gen H1.
+  dependent induction H0.
+  - intros.
+    simpl in *.
+    destruct m.
+    + reflexivity.
+    + discriminate.
+  - intros.
+    
+  (*
+  gen l.
+  induction m.
+  - reflexivity.
+  - intros l H0 H1.
+    inversion H1.
+    destruct (list_eq_dec Nat.eq_dec l []) as [H2 | H2].
+    + subst.
+      apply Permutation_length in H0.
+      simpl in *.
+      discriminate.
+    + remember H2 as H2'. clear HeqH2'.
+      apply app_removelast_last with (d := 0%nat) in H2'.
+      rewrite <- Nat.add_1_r in H1.
+      rewrite (seq_app m 1%nat 0%nat) in H1.
+      simpl in H1.
+      rewrite map_last in H1.
+      rewrite H2' in H1.
+      rewrite map_last in H1.
+      rewrite app_inj_tail_iff in H1.
+      destruct H1.
+      apply last_in_list with (d := 0%nat) in H2.
+      apply Permutation_in with (l' := (List.seq 0 (s m))) in H2; try assumption.
+      rewrite in_seq in H2.
+      assert (Add (last l 0%nat) (removelast l) l).
+      { setoid_rewrite app_nil_end at 2.
+        rewrite H2' at 3.
+        apply Add_app. }
+      assert ((List.seq 0 (s m)) = (firstn (last l 0%nat) (List.seq 0 (s m)) ++ [nth (last l 0%nat) (List.seq 0 (s m)) 0%nat] ++ skipn (s (last l 0%nat)) (List.seq 0 (s m)))).
+      { apply nth_inc.
+        rewrite seq_length.
+        lia. }
+      assert (Add (last l 0%nat) (firstn (last l 0%nat) (List.seq 0 (s m)) ++ skipn (s (last l 0%nat)) (List.seq 0 (s m))) (List.seq 0 (s m))).
+      { rewrite seq_nth in H6; try lia.
+        replace (0 + last l 0)%nat with (last l 0)%nat in H6 by lia.
+        rewrite H6 at 3.
+        apply Add_app. }
+      apply Permutation_Add_inv with (a := (last l 0%nat)) (l1 := l) (l1' := removelast l) in H7; try assumption.
 *)
+
+(* Permutation_nth
+FinFun.bInjective_bSurjective
+
+      specialize (IHm (removelast l) H7 H1).
+
+
+      
+      assert (Add m (List.seq 0 m) (List.seq 0 (s m))).
+      { rewrite <- Nat.add_1_r.
+        rewrite (seq_app m 1%nat 0%nat).
+        simpl.
+        setoid_rewrite app_nil_end at 1.
+        apply Add_app. }
+seq_nth
+  nth_inc
+
+    (last l 0%nat) < (s m)
+
+    seq_nth :
+forall [len : nat] (start : nat) [n : nat] (d : nat),
+  (n < len)%nat -> nth n (List.seq start len) d = (start + n)%nat
+                            nth (last l 0%nat) (List.seq 0%nat (s m)) d = (0 + (last l 0%nat))%nat
+n := (last l 0%nat)
+ls := (List.seq 0%nat (s m))
+
+    nth_inc :
+forall {X : Type} (n : nat) (ls : list X) (x : X),
+  (n < length ls)%nat -> ls = firstn n ls ++ [nth n ls x] ++ skipn (s n) ls
+
+                                  
+      
+Search firstn.
+      in_seq
+        
+        nth_in_or_default
+          
+          list_seq_decompose
+      Permutation
+      apply Permutation_Add_inv with  *)
+  Admitted.
+
+(*** Admitted: Not used ***)
+Lemma big_sum_permutation_function' : forall (m : nat) (f g : nat -> C),
+    (exists l, Permutation l (List.seq 0 m) /\ map f l = map g (List.seq 0 m))
+    -> Σ f m = Σ g m.
+Proof. intros m f g H0.
+  destruct H0 as [l [H0 H1]].
+  gen l.
+  apply big_sum_permutation_function.
+Qed.
+
+
+(*** Admitted: Not used ***)
+Lemma map_ext_nth : forall {A : Type} (d : A) (l1 l2 : list A) (f g : A -> C),
+    map f l1 = map g l2 <->
+      (length l1 = length l2 /\ (forall n : nat, (n < length l1)%nat -> f (nth n l1 d) = g (nth n l2 d))).
+Proof. intros A d l1 l2 f g.
+  split.
+  - intros H0.
+    assert (length l1 = length l2).
+    { rewrite <- map_length with (f := f) (l := l1).
+      rewrite <- map_length with (f := g) (l := l2).
+      rewrite H0.
+      reflexivity. }
+    split; try assumption.
+    intros n H2.
+    rewrite <- map_nth with (f := f) (n := n) (d := d) (l := l1).
+    rewrite <- map_nth with (f := g) (n := n) (d := d) (l := l2).
+    rewrite H0.
+    rewrite nth_indep with (d := f d) (d' := g d);
+      try reflexivity.
+    rewrite map_length.
+    rewrite <- H1.
+    assumption.
+  - intros H0.
+    destruct H0 as [H0 H1].
+    gen l1.
+    induction l2.
+    + intros l1 H0 H1.
+      simpl in H0.
+      rewrite length_zero_iff_nil in H0.
+      subst.
+      reflexivity.
+    + intros l1 H0 H1.
+      simpl in H0.
+      Admitted.
+
+
+Definition col_insert_front {n m : nat} (M : Matrix n m) (v : Vector n) : Matrix n (s m) :=
+  fun r c => if (c =? 0)%nat then v r 0%nat else M r (c - 1)%nat.
+
+Lemma WF_Matrix_col_insert_front : forall {n m : nat} (M : Matrix n m) (v : Vector n),
+    WF_Matrix M -> WF_Matrix v -> WF_Matrix (col_insert_front M v).
+Proof. intros n m M v H0 H1.
+  unfold col_insert_front.
+  unfold WF_Matrix in *.
+  intros.
+  bdestruct_all.
+  - rewrite H1; trivial.
+    lia.
+  - rewrite H0; trivial.
+    lia.
+Qed.
+
+ #[export] Hint Resolve WF_Matrix_col_insert_front : wf_db.
+ 
+
+(* # ~12 *)
+    (** Theorem 24 Let V be a vector space over a field F, and let u1,u2,...,un be vectors in V , where n ≥ 2. Then {u1, u2, . . . , un} is linearly dependent if and only if at least one of u1, u2, . . . , un can be written as a linear combination of the remaining n − 1 vectors. **)
+
+(* proves the "only if" part of theorem 24
+
+Lemma lin_dep_gen_elem : forall {m n} (T : Matrix n (S m)),
+  WF_Matrix T -> linearly_dependent T -> 
+  (exists i, i < (S m) /\ 
+             (exists v : Vector m, WF_Matrix v /\ 
+                 @Mmult n m 1 (reduce_col T i) v = (-C1) .* (get_vec i T))). 
+ *)
+
+Lemma span_linearly_dependent_col_insert_front : forall {m n} (M : Matrix n m) (v : Vector n),
+    WF_Matrix M -> span M v -> linearly_dependent (col_insert_front M v).
+Proof. intros m n M v H0 H1.
+  unfold linearly_dependent.
+  unfold span in H1.
+  destruct H1 as [a [H1 H2]].
+  exists (fun r c => if (r =? 0)%nat
+             then if (c =? 0)%nat
+                  then (- C1)%C
+                  else C0
+             else a (r - 1)%nat c).
+  split.
+  - unfold WF_Matrix.
+    intros.
+    bdestruct_all; trivial.
+    unfold WF_Matrix in H1.
+    rewrite H1; trivial; lia.
+  - split.
+    + intro.
+      apply f_equal_inv with (x := 0%nat) in H3.
+      apply f_equal_inv with (x := 0%nat) in H3.
+      simpl in H3.
+      inversion H3.
+      lra.
+    + unfold col_insert_front.
+      unfold Mmult.
+      prep_matrix_equality.
+      rewrite <- big_sum_extend_l.
+      bdestruct_all.
+      * subst.
+        simpl.
+        unfold Mmult.
+        assert (@Zero n 1 x 0%nat
+                = Σ (fun y : nat => M x y * a y 0%nat) m * - C1 + Σ (fun y : nat => M x y * a y 0%nat) m).
+        { lca. }
+        rewrite H2.
+        apply Cplus_inj_l.
+        apply big_sum_eq_bounded.
+        intros.
+        replace (x0 - 0)%nat with x0 by lia.
+        reflexivity.
+      * rewrite Cmult_0_r, Cplus_0_l.
+        replace (@Zero n 1 x y) with C0 by lca.
+        simpl.
+        rewrite big_sum_0_bounded; trivial.
+        intros.
+        unfold WF_Matrix in H1.
+        rewrite H1; try lca; lia.
+Qed.
+
+Lemma span_linearly_dependent_col_append : forall {m n} (M : Matrix n m) (v : Vector n),
+    WF_Matrix M -> span M v -> linearly_dependent (col_append M v).
+Proof. intros m n M v H0 H1.
+  unfold linearly_dependent.
+  unfold span in H1.
+  destruct H1 as [a [H1 H2]].
+  exists (fun r c => if (r =? m)%nat
+             then if (c =? 0)%nat
+                  then (- C1)%C
+                  else C0
+             else a r c).
+  split.
+  - unfold WF_Matrix.
+    intros.
+    bdestruct_all; trivial.
+    unfold WF_Matrix in H1.
+    rewrite H1; trivial; lia.
+  - split.
+    + intro.
+      apply f_equal_inv with (x := m) in H3.
+      apply f_equal_inv with (x := 0%nat) in H3.
+      simpl in H3.
+      replace (m =? m)%nat with true in H3 by (rewrite Nat.eqb_refl; reflexivity).
+      inversion H3.
+      lra.
+    + unfold col_append.
+      unfold Mmult.
+      prep_matrix_equality.
+      rewrite <- big_sum_extend_r.
+      bdestruct_all.
+      * subst.
+        simpl.
+        unfold Mmult.
+        assert (@Zero n 1 x 0%nat
+                = Σ (fun y : nat => M x y * a y 0%nat) m + Σ (fun y : nat => M x y * a y 0%nat) m * - C1 ).
+        { lca. }
+        rewrite H2.
+        apply Cplus_inj_r.
+        apply big_sum_eq_bounded.
+        intros.
+        bdestruct_all.
+        reflexivity.
+      * rewrite Cmult_0_r, Cplus_0_r.
+        replace (@Zero n 1 x y) with C0 by lca.
+        rewrite big_sum_0_bounded; trivial.
+        intros.
+        bdestruct_all.
+        unfold WF_Matrix in H1.
+        rewrite H1; try lca; lia.
+Qed.
+
+        
+
+Lemma linearly_dependent_linear_combination : forall {n m : nat} (M : Matrix n m), (m > 1)%nat -> WF_Matrix M -> linearly_dependent M -> (exists (i : nat) (a : Vector (m-1)), (i < m)%nat /\ WF_Matrix a /\ get_vec i M = (matrix_column_choose ((List.seq 0 i) ++ (List.seq (i+1) (m-i-1))) M) × a).
+Proof. intros n m M H0 H1 H2.
+  unfold linearly_dependent in H2.
+  destruct H2 as [u [H2 [H3 H4]]].
+  apply nonzero_vec_nonzero_elem in H3; trivial.
+  destruct H3 as [i H3].
+  exists i.
+  bdestruct (i <? m).
+  - exists (fun r c : nat => if r <? i then (- (/ (u i 0%nat)) * (u r c))%C else (- (/ (u i 0%nat)) * (u (r+1)%nat c))%C).
+    split.
+    + assumption.
+    + split.
+      * unfold WF_Matrix in *.
+        intros.
+        destruct H6; bdestruct_all.
+        -- assert ((x+1 >= m)%nat \/ (y >= 1)%nat). { left. lia. }
+           specialize (H2 (x+1)%nat y H8).
+           rewrite H2.
+           lca.
+        -- assert ((x >= m)%nat \/ (y >= 1)%nat). { right. lia. }
+           specialize (H2 x y H8).
+           rewrite H2.
+           lca.
+        -- assert ((x+1 >= m)%nat \/ (y >= 1)%nat). { right. lia. }
+           specialize (H2 (x+1)%nat y H8).
+           rewrite H2.
+           lca.
+      * unfold Mmult in *.
+        unfold matrix_column_choose, list_vector_to_matrix.
+        unfold get_vec.
+        do 2 (apply functional_extensionality; intros).
+        apply f_equal_inv with (x := x) in H4.
+        apply f_equal_inv with (x := x0) in H4.
+        replace (Zero x x0) with C0 in H4 by reflexivity.
+        bdestruct_all.
+        -- assert (@Zero n 1%nat = (fun i0 x1 y0 : nat => if (y0 =? 0)%nat then M x1 i0 else 0) m).
+           { do 2 (apply functional_extensionality; intros).
+             replace (Zero x1 x2) with C0 by reflexivity.
+             bdestruct_all; trivial.
+             unfold WF_Matrix in H1.
+             assert ((x1 >= n)%nat \/ (m >= m)%nat). { right. lia. }
+             specialize (H1 x1 m H8).
+             rewrite H1.
+             reflexivity. }
+           rewrite H7.
+           assert ((fun y : nat =>
+                      nth y
+                        (map (fun i0 x1 y0 : nat => if (y0 =? 0)%nat then M x1 i0 else 0)
+                           (List.seq 0 i ++ List.seq (i + 1) (m - i - 1)))
+                        (fun x1 y0 : nat => if (y0 =? 0)%nat then M x1 m else 0) x 0%nat *
+                        (if y <? i then - / u i 0%nat * u y x0 else - / u i 0%nat * u (y + 1)%nat x0))
+                   =
+                     (fun y : nat =>
+                        (- / u i 0%nat)%C * ((M x (nth y (List.seq 0 i ++ List.seq (i + 1) (m - i - 1)) m)) *
+                                             (if y <? i then u y x0 else u (y + 1)%nat x0)))).
+           { apply functional_extensionality; intros.
+             rewrite map_nth with (d := m).
+             bdestruct_all; lca. }
+           setoid_rewrite H8.
+           rewrite <- @big_sum_scale_l with (H7 := C_is_module_space).
+           simpl.
+           apply Cmult_cancel_l with (a := (- u i 0%nat)%C).
+           ++ intro.
+              rewrite Copp_opp in H9.
+              replace (- C0)%C with C0%C in H9 by lca.
+              contradiction.
+           ++ rewrite Cmult_assoc.
+              replace (- u i 0%nat * - / u i 0%nat)%C with C1.
+              ** rewrite Cmult_1_l.
+                 rewrite Cmult_comm.
+                 rewrite <- Copp_mult_distr_r.
+                 apply Cplus_inv_r with (c := (M x i * u i 0%nat)%C).
+                 replace (- (M x i * u i 0%nat) + M x i * u i 0%nat)%C with C0 by lca.
+                 rewrite <- H4 at 1.
+                 Search big_sum.
+                 
+                 assert (Σ
+                           (fun x1 : nat =>
+                              M x (nth x1 (List.seq 0 i ++ List.seq (i + 1) (m - i - 1)) m) *
+                                (if x1 <? i then u x1 x0 else u (x1 + 1)%nat x0))
+                           (length (List.seq 0 i ++ List.seq (i + 1) (m - i - 1))) +
+                           M x i * u i 0%nat
+                         =
+                           Σ
+                             (fun x1 : nat =>
+                                M x (nth x1 (List.seq 0 i ++ List.seq (i + 1) (m - i - 1) ++ [i]) m) *
+                                  (if (x1 =? m-1)%nat then u i 0%nat else
+                                     (if x1 <? i then u x1 x0 else u (x1 + 1)%nat x0)))
+                             (length (List.seq 0 i ++ List.seq (i + 1) (m - i - 1) ++ [i]))).
+                 { rewrite app_assoc.
+                   setoid_rewrite app_length at 2.
+                   simpl.
+                   Search ((?x + 1)%nat = Datatypes.S ?x).
+                   setoid_rewrite Nat.add_1_r at 6.
+                   rewrite <- @big_sum_extend_r with (H := C_is_monoid).
+                   simpl.
+                   assert ((length (List.seq 0 i ++ List.seq (i + 1) (m - i - 1))) = (m-1)%nat).
+                   { rewrite app_length.
+                     rewrite ! seq_length.
+                     lia. }
+                   rewrite ! H9.
+                   bdestruct_all.
+                   rewrite <- H9 at 3.
+                   rewrite nth_middle with (a := i) (l' := []).
+                   f_equal.
+                   apply big_sum_eq_bounded.
+                   intros x1 H12.
+                   bdestruct_all.
+                   - setoid_rewrite app_nth1 at 2.
+                     + reflexivity.
+                     + rewrite app_length.
+                       rewrite ! seq_length.
+                       lia.
+                   - setoid_rewrite app_nth1 at 2.
+                     + reflexivity.
+                     + rewrite app_length.
+                       rewrite ! seq_length.
+                       lia. }
+                 rewrite H9.
+                 rewrite ! app_length.
+                 rewrite ! seq_length.
+                 simpl.
+                 replace (i + (m - i - 1 + 1))%nat with m by lia.
+                 assert (Σ (fun y : nat => M x y * u y x0) m
+                         =
+                           Σ (fun y : nat => M x (nth y (List.seq 0 m) m) *
+                                          u (nth y (List.seq 0 m) m) x0) m).
+                 { apply big_sum_eq_bounded.
+                   intros x1 H10. 
+                   rewrite seq_nth.
+                   lca.
+                   assumption. }
+                 rewrite H10.
+                 assert ((fun x1 : nat =>
+                            M x (nth x1 (List.seq 0 i ++ List.seq (i + 1) (m - i - 1) ++ [i]) m) *
+                              (if (x1 =? m - 1)%nat
+                               then u i 0%nat
+                               else if x1 <? i then u x1 x0 else u (x1 + 1)%nat x0))
+                         =
+                           (fun x1 : nat =>
+                              M x (nth x1 (List.seq 0 i ++ List.seq (i + 1) (m - i - 1) ++ [i]) m) *
+                                u (nth x1 (List.seq 0 i ++ List.seq (i + 1) (m - i - 1) ++ [i]) m) x0)).
+                 { apply functional_extensionality; intros.
+                   subst.
+                   f_equal.
+                   bdestruct_all.
+                   - rewrite <- nth_firstn with (n := i); try lia.
+                     rewrite firstn_app.
+                     rewrite seq_length.
+                     replace (i - i)%nat with 0%nat by lia.
+                     simpl.
+                     rewrite app_nil_r.
+                     replace i with (length (List.seq 0 i)) at 1
+                       by (rewrite seq_length; reflexivity).
+                     rewrite firstn_all.
+                     rewrite seq_nth; try lia.
+                     lca.
+                   - subst.
+                     rewrite app_assoc.
+                     replace (m - 1)%nat with (length (List.seq 0 i ++ List.seq (i + 1) (m - i - 1)))
+                       by (rewrite app_length; rewrite ! seq_length; lia).
+                     rewrite nth_middle.
+                     reflexivity.
+                   - bdestruct (x1 <? (m-1)%nat).
+                     + rewrite <- nth_firstn with (n := (m-1)%nat); try assumption.
+                       rewrite <- firstn_removelast.
+                       * rewrite app_assoc.
+                         rewrite removelast_last.
+                         rewrite nth_firstn; try assumption.
+                         rewrite app_nth2.
+                         -- rewrite seq_length.
+                            rewrite seq_nth; try lia.
+                            replace (i + 1 + (x1 - i))%nat with (x1 + 1)%nat by lia.
+                            reflexivity.
+                         -- rewrite seq_length; assumption.
+                       * rewrite ! app_length; rewrite ! seq_length; simpl; lia.
+                     + remember H2 as H2'. clear HeqH2'.
+                       unfold WF_Matrix in H2, H2'.
+                       rewrite nth_overflow.
+                       * assert ((x1 + 1 >= m)%nat \/ (0 >= 1)%nat). { left; lia. }
+                         assert ((m >= m)%nat \/ (0 >= 1)%nat). { left; lia. }
+                         specialize (H2 (x1+1)%nat 0%nat H13).
+                         specialize (H2' m 0%nat H14).
+                         rewrite H2, H2'.
+                         reflexivity.
+                       * rewrite ! app_length; rewrite ! seq_length; simpl; lia. }
+                 rewrite H11.
+                 apply big_sum_permutation with (f := fun z => M x z * u z x0).
+                 2: rewrite seq_length; lia.
+                 replace (List.seq 0 m) with (List.seq 0 i ++ List.seq i (m - i))
+                   by (rewrite <- seq_app; f_equal; lia).
+                 apply Permutation_app.
+                 1: apply Permutation_refl.
+                 replace (m - i)%nat with ((m - i - 1) + 1)%nat at 1 by lia.
+                 rewrite Nat.add_1_r at 1.
+                 simpl.
+                 rewrite cons_conc.
+                 rewrite <- Nat.add_1_r.
+                 apply Permutation_app_comm.
+              ** rewrite <- Copp_mult_distr_l, <- Copp_mult_distr_r.
+                 rewrite Copp_involutive.
+                 rewrite Cinv_r; trivial.
+        -- unfold WF_Matrix in H2.
+           assert ((fun y : nat =>
+                      nth y
+                        (map (fun i0 x1 y0 : nat => if (y0 =? 0)%nat then M x1 i0 else 0)
+                           (List.seq 0 i ++ List.seq (i + 1) (m - i - 1))) (@Zero n 1%nat) x 0%nat *
+                        (if y <? i then - / u i 0%nat * u y x0 else - / u i 0%nat * u (y + 1)%nat x0)) =
+                     (fun _ : nat => C0)).
+           { apply functional_extensionality; intros.
+             assert (@Zero n 1%nat = (fun i0 x2 y0 : nat => if (y0 =? 0)%nat then M x2 i0 else 0) m).
+             { do 2 (apply functional_extensionality; intros).
+               replace (Zero x2 x3) with C0 by reflexivity.
+               bdestruct_all; trivial.
+               unfold WF_Matrix in H1.
+               assert ((x2 >= n)%nat \/ (m >= m)%nat). { right. lia. }
+               specialize (H1 x2 m H8).
+               rewrite H1.
+               reflexivity. }
+             rewrite H7.
+             rewrite map_nth with (d := m).
+             bdestruct_all.
+             - assert ((x1 >= m)%nat \/ (x0 >= 1)%nat). { right. lia. }
+               specialize (H2 x1 x0 H10).
+               rewrite H2.
+               lca.
+             - assert ((x1+1 >= m)%nat \/ (x0 >= 1)%nat). { right. lia. }
+               specialize (H2 (x1+1)%nat x0 H10).
+               rewrite H2.
+               lca. }
+           setoid_rewrite H7.
+           rewrite big_sum_0; trivial. 
+  - assert ((i >= m)%nat \/ (0 >= 1)%nat). { left. lia. }
+    unfold WF_Matrix in H2.
+    specialize (H2 i 0%nat H6).
+    contradiction.
+Qed.
+
+(*** Admitted. May not be needed:
+     try to use lin_dep_gen_elem *)
+(** lin_dep_gen_elem :
+forall {m n : nat} (T : Matrix n (s m)),
+WF_Matrix T ->
+linearly_dependent T ->
+exists i : nat,
+  (i < s m)%nat /\
+  (exists v : Vector m, WF_Matrix v /\ reduce_col T i × v = - C1 .* get_vec i T) *)
+
+Lemma linearly_dependent_linear_combination' : forall {n m : nat} (M : Matrix n m), (m > 1)%nat -> WF_Matrix M -> (linearly_dependent M <-> (exists (i : nat) (a : Vector (m-1)), (i < m)%nat /\ WF_Matrix a /\ get_vec i M = (matrix_column_choose ((List.seq 0 i) ++ (List.seq (i+1) (m-i-1))) M) × a)).
+Proof. intros n m M H0 H1.
+  split.
+  - intros H2.
+    unfold linearly_dependent in H2.
+    destruct H2 as [u [H2 [H3 H4]]].
+    apply nonzero_vec_nonzero_elem in H3; trivial.
+    destruct H3 as [i H3].
+    exists i.
+    bdestruct (i <? m).
+    + exists (fun r c : nat => if r <? i then (- (/ (u i 0%nat)) * (u r c))%C else (- (/ (u i 0%nat)) * (u (r+1)%nat c))%C).
+      split.
+      * assumption.
+      * split.
+        -- unfold WF_Matrix in *.
+           intros.
+           destruct H6; bdestruct_all.
+           ++ assert ((x+1 >= m)%nat \/ (y >= 1)%nat). { left. lia. }
+              specialize (H2 (x+1)%nat y H8).
+              rewrite H2.
+              lca.
+           ++ assert ((x >= m)%nat \/ (y >= 1)%nat). { right. lia. }
+              specialize (H2 x y H8).
+              rewrite H2.
+              lca.
+           ++ assert ((x+1 >= m)%nat \/ (y >= 1)%nat). { right. lia. }
+              specialize (H2 (x+1)%nat y H8).
+              rewrite H2.
+              lca.
+        -- unfold Mmult in *.
+           unfold matrix_column_choose, list_vector_to_matrix.
+           unfold get_vec.
+           do 2 (apply functional_extensionality; intros).
+           apply f_equal_inv with (x := x) in H4.
+           apply f_equal_inv with (x := x0) in H4.
+           replace (Zero x x0) with C0 in H4 by reflexivity.
+           bdestruct_all.
+           ++ assert (@Zero n 1%nat = (fun i0 x1 y0 : nat => if (y0 =? 0)%nat then M x1 i0 else 0) m).
+              { do 2 (apply functional_extensionality; intros).
+                replace (Zero x1 x2) with C0 by reflexivity.
+                bdestruct_all; trivial.
+                unfold WF_Matrix in H1.
+                assert ((x1 >= n)%nat \/ (m >= m)%nat). { right. lia. }
+                specialize (H1 x1 m H8).
+                rewrite H1.
+                reflexivity. }
+              rewrite H7.
+              assert ((fun y : nat =>
+                         nth y
+                           (map (fun i0 x1 y0 : nat => if (y0 =? 0)%nat then M x1 i0 else 0)
+                              (List.seq 0 i ++ List.seq (i + 1) (m - i - 1)))
+                           (fun x1 y0 : nat => if (y0 =? 0)%nat then M x1 m else 0) x 0%nat *
+                           (if y <? i then - / u i 0%nat * u y x0 else - / u i 0%nat * u (y + 1)%nat x0))
+                      =
+                        (fun y : nat =>
+                           (- / u i 0%nat)%C * ((M x (nth y (List.seq 0 i ++ List.seq (i + 1) (m - i - 1)) m)) *
+                             (if y <? i then u y x0 else u (y + 1)%nat x0)))).
+              { apply functional_extensionality; intros.
+                rewrite map_nth with (d := m).
+                bdestruct_all; lca. }
+              setoid_rewrite H8.
+              rewrite <- @big_sum_scale_l with (H7 := C_is_module_space).
+              simpl.
+              apply Cmult_cancel_l with (a := (- u i 0%nat)%C).
+              ** intro.
+                 rewrite Copp_opp in H9.
+                 replace (- C0)%C with C0%C in H9 by lca.
+                 contradiction.
+              ** rewrite Cmult_assoc.
+                 replace (- u i 0%nat * - / u i 0%nat)%C with C1.
+                 --- rewrite Cmult_1_l.
+                     rewrite Cmult_comm.
+                     rewrite <- Copp_mult_distr_r.
+                     apply Cplus_inv_r with (c := (M x i * u i 0%nat)%C).
+                     replace (- (M x i * u i 0%nat) + M x i * u i 0%nat)%C with C0 by lca.
+                     rewrite <- H4 at 1.
+                     Search big_sum.
+
+                     assert (Σ
+                               (fun x1 : nat =>
+                                  M x (nth x1 (List.seq 0 i ++ List.seq (i + 1) (m - i - 1)) m) *
+                                    (if x1 <? i then u x1 x0 else u (x1 + 1)%nat x0))
+                               (length (List.seq 0 i ++ List.seq (i + 1) (m - i - 1))) +
+                              M x i * u i 0%nat
+                             =
+                               Σ
+                                 (fun x1 : nat =>
+                                    M x (nth x1 (List.seq 0 i ++ List.seq (i + 1) (m - i - 1) ++ [i]) m) *
+                                      (if (x1 =? m-1)%nat then u i 0%nat else
+                                         (if x1 <? i then u x1 x0 else u (x1 + 1)%nat x0)))
+                                 (length (List.seq 0 i ++ List.seq (i + 1) (m - i - 1) ++ [i]))).
+                     { rewrite app_assoc.
+                       setoid_rewrite app_length at 2.
+                       simpl.
+                       Search ((?x + 1)%nat = Datatypes.S ?x).
+                       setoid_rewrite Nat.add_1_r at 6.
+                       rewrite <- @big_sum_extend_r with (H := C_is_monoid).
+                       simpl.
+                       assert ((length (List.seq 0 i ++ List.seq (i + 1) (m - i - 1))) = (m-1)%nat).
+                       { rewrite app_length.
+                         rewrite ! seq_length.
+                         lia. }
+                       rewrite ! H9.
+                       bdestruct_all.
+                       rewrite <- H9 at 3.
+                       rewrite nth_middle with (a := i) (l' := []).
+                       f_equal.
+                       apply big_sum_eq_bounded.
+                       intros x1 H12.
+                       bdestruct_all.
+                       - setoid_rewrite app_nth1 at 2.
+                         + reflexivity.
+                         + rewrite app_length.
+                           rewrite ! seq_length.
+                           lia.
+                       - setoid_rewrite app_nth1 at 2.
+                         + reflexivity.
+                         + rewrite app_length.
+                           rewrite ! seq_length.
+                           lia. }
+                     rewrite H9.
+                     rewrite ! app_length.
+                     rewrite ! seq_length.
+                     simpl.
+                     replace (i + (m - i - 1 + 1))%nat with m by lia.
+                     assert (Σ (fun y : nat => M x y * u y x0) m
+                             =
+                               Σ (fun y : nat => M x (nth y (List.seq 0 m) m) *
+                                              u (nth y (List.seq 0 m) m) x0) m).
+                     { apply big_sum_eq_bounded.
+                       intros x1 H10. 
+                       rewrite seq_nth.
+                       lca.
+                       assumption. }
+                     rewrite H10.
+                     assert ((fun x1 : nat =>
+                                 M x (nth x1 (List.seq 0 i ++ List.seq (i + 1) (m - i - 1) ++ [i]) m) *
+                                   (if (x1 =? m - 1)%nat
+                                    then u i 0%nat
+                                    else if x1 <? i then u x1 x0 else u (x1 + 1)%nat x0))
+                              =
+                                (fun x1 : nat =>
+                                   M x (nth x1 (List.seq 0 i ++ List.seq (i + 1) (m - i - 1) ++ [i]) m) *
+                                     u (nth x1 (List.seq 0 i ++ List.seq (i + 1) (m - i - 1) ++ [i]) m) x0)).
+                     { apply functional_extensionality; intros.
+                       subst.
+                       f_equal.
+                       bdestruct_all.
+                       - rewrite <- nth_firstn with (n := i); try lia.
+                         rewrite firstn_app.
+                         rewrite seq_length.
+                         replace (i - i)%nat with 0%nat by lia.
+                         simpl.
+                         rewrite app_nil_r.
+                         replace i with (length (List.seq 0 i)) at 1
+                           by (rewrite seq_length; reflexivity).
+                         rewrite firstn_all.
+                         rewrite seq_nth; try lia.
+                         lca.
+                       - subst.
+                         rewrite app_assoc.
+                         replace (m - 1)%nat with (length (List.seq 0 i ++ List.seq (i + 1) (m - i - 1)))
+                           by (rewrite app_length; rewrite ! seq_length; lia).
+                         rewrite nth_middle.
+                         reflexivity.
+                       - bdestruct (x1 <? (m-1)%nat).
+                         + rewrite <- nth_firstn with (n := (m-1)%nat); try assumption.
+                           rewrite <- firstn_removelast.
+                           * rewrite app_assoc.
+                             rewrite removelast_last.
+                             rewrite nth_firstn; try assumption.
+                             rewrite app_nth2.
+                             -- rewrite seq_length.
+                                rewrite seq_nth; try lia.
+                                replace (i + 1 + (x1 - i))%nat with (x1 + 1)%nat by lia.
+                                reflexivity.
+                             -- rewrite seq_length; assumption.
+                           * rewrite ! app_length; rewrite ! seq_length; simpl; lia.
+                         + remember H2 as H2'. clear HeqH2'.
+                           unfold WF_Matrix in H2, H2'.
+                           rewrite nth_overflow.
+                           * assert ((x1 + 1 >= m)%nat \/ (0 >= 1)%nat). { left; lia. }
+                             assert ((m >= m)%nat \/ (0 >= 1)%nat). { left; lia. }
+                             specialize (H2 (x1+1)%nat 0%nat H13).
+                             specialize (H2' m 0%nat H14).
+                             rewrite H2, H2'.
+                             reflexivity.
+                           * rewrite ! app_length; rewrite ! seq_length; simpl; lia. }
+                     rewrite H11.
+                     apply big_sum_permutation with (f := fun z => M x z * u z x0).
+                     2: rewrite seq_length; lia.
+                     replace (List.seq 0 m) with (List.seq 0 i ++ List.seq i (m - i))
+                       by (rewrite <- seq_app; f_equal; lia).
+                     apply Permutation_app.
+                     1: apply Permutation_refl.
+                     replace (m - i)%nat with ((m - i - 1) + 1)%nat at 1 by lia.
+                     rewrite Nat.add_1_r at 1.
+                     simpl.
+                     rewrite cons_conc.
+                     rewrite <- Nat.add_1_r.
+                     apply Permutation_app_comm.
+                     (** unused old code
+
+
+                       apply big_sum_permutation_function'. (*** Admitted *)
+                     assert (List.seq 0 m = List.seq 0 i ++ [i] ++ List.seq (i + 1) (m - i - 1)).
+                     { replace m with (i + (m-i))%nat at 1 by lia.
+                       rewrite seq_app.
+                       simpl.
+                       replace (m - i)%nat with (1 + (m - i - 1))%nat at 1 by lia.
+                       rewrite seq_app.
+                       simpl.
+                       reflexivity. }
+                     assert (List.seq 0 m = List.seq 0 i ++ List.seq i (m - i - 1) ++ [m - 1])%nat.
+                     { replace m with (i + (m-i))%nat at 1 by lia.
+                       rewrite seq_app.
+                       simpl.
+                       replace (m - i)%nat with ((m - i - 1) + 1)%nat at 1 by lia.
+                       rewrite seq_app.
+                       simpl.
+                       replace (i + (m - i - 1))%nat with (m - 1)%nat by lia.
+                       reflexivity. }
+                     exists (List.seq 0 i ++ List.seq (i + 1) (m - i - 1) ++ [i]).
+                     split.
+                     +++ rewrite H11.
+                         apply Permutation_app.
+                         *** apply Permutation_refl.
+                         *** apply Permutation_app_comm.
+                     +++ setoid_rewrite H12 at 3.
+                         rewrite ! map_app.
+                         f_equal.
+                         *** rewrite map_ext_in_iff.
+                             intros a H13.
+                             f_equal.
+                             ---- f_equal.
+                                  rewrite in_seq in H13.
+                                  rewrite seq_nth; try lia.
+                                  rewrite <- nth_firstn with (n := i); try lia.
+                                  rewrite firstn_app.
+                                  rewrite seq_length.
+                                  replace (i - i)%nat with 0%nat by lia.
+                                  simpl.
+                                  rewrite app_nil_r.
+                                  replace i with (length (List.seq 0 i)) at 1
+                                    by (rewrite seq_length; reflexivity).
+                                  rewrite firstn_all.
+                                  rewrite seq_nth; lia.
+                             ---- rewrite in_seq in H13.
+                                  bdestruct_all; try lia.
+                                  f_equal.
+                                  rewrite seq_nth; try lia.
+                         *** f_equal.
+                             ---- rewrite map_ext_nth.
+                                  assert (length (List.seq (i + 1) (m - i - 1)) = length (List.seq i (m - i - 1))).
+                                  { rewrite ! seq_length.
+                                    reflexivity. }
+                                  split; try assumption.
+                                  intros n0 H14.
+                                  rewrite seq_length in H14.
+                                  f_equal.
+                                  ++++ f_equal.
+                                       rewrite ! seq_nth; try lia.
+                                       **** rewrite <- nth_firstn with (n := (i + n0 + 1)%nat).
+                                         ----- rewrite <- Nat.add_assoc with (n := i) (m := n0) (p := 1%nat).
+                                         replace i with (length (List.seq 0 i)) at 3
+                                           by (rewrite seq_length; reflexivity).
+                                         rewrite firstn_app_2.
+                                         rewrite app_nth2 with (n := (i + n0)%nat);
+                                           try (rewrite seq_length; lia).
+                                         rewrite seq_length.
+                                         replace (i + n0 - i)%nat with n0 by lia.
+                                         rewrite nth_firstn; try lia.
+                                         rewrite <- nth_firstn with (n := (m - i - 1)%nat); try lia.
+                                         rewrite firstn_app.
+                                         rewrite seq_length.
+                                         replace (m - i - 1 - (m - i - 1))%nat with 0%nat by lia.
+                                         simpl.
+                                         rewrite app_nil_r.
+                                         rewrite nth_firstn; try assumption.
+                                         rewrite seq_nth; try assumption.
+                                         reflexivity.
+                                         ----- lia.
+                                       **** rewrite seq_nth; lia.
+                                  ++++ bdestruct_all;
+                                         rewrite seq_nth in H15;
+                                         rewrite seq_nth in H16;
+                                         try lia.
+                                       f_equal.
+                                       rewrite ! seq_nth; try lia.
+                                       rewrite seq_nth; lia.
+                             ---- simpl.
+                                  f_equal.
+                                  bdestruct_all.
+                                  f_equal.
+                                  +++++ f_equal.
+                                  rewrite seq_nth; try lia.
+                                  assert (length (List.seq 0 i ++ List.seq (i + 1) (m - i - 1)) + 0 = m - 1)%nat.
+                                  { rewrite app_length.
+                                    rewrite ! seq_length.
+                                    lia. }
+                                  rewrite <- H15.
+                                  rewrite app_assoc.
+                                  rewrite app_nth2_plus.
+                                  reflexivity.
+                                  +++++ f_equal; try assumption.
+                                  rewrite seq_nth; lia. *)
+                 --- rewrite <- Copp_mult_distr_l, <- Copp_mult_distr_r.
+                     rewrite Copp_involutive.
+                     rewrite Cinv_r; trivial.
+           ++ unfold WF_Matrix in H2.
+              assert ((fun y : nat =>
+                         nth y
+                           (map (fun i0 x1 y0 : nat => if (y0 =? 0)%nat then M x1 i0 else 0)
+                              (List.seq 0 i ++ List.seq (i + 1) (m - i - 1))) (@Zero n 1%nat) x 0%nat *
+                           (if y <? i then - / u i 0%nat * u y x0 else - / u i 0%nat * u (y + 1)%nat x0)) =
+                        (fun _ : nat => C0)).
+              { apply functional_extensionality; intros.
+                assert (@Zero n 1%nat = (fun i0 x2 y0 : nat => if (y0 =? 0)%nat then M x2 i0 else 0) m).
+                { do 2 (apply functional_extensionality; intros).
+                  replace (Zero x2 x3) with C0 by reflexivity.
+                  bdestruct_all; trivial.
+                  unfold WF_Matrix in H1.
+                  assert ((x2 >= n)%nat \/ (m >= m)%nat). { right. lia. }
+                  specialize (H1 x2 m H8).
+                  rewrite H1.
+                  reflexivity. }
+                rewrite H7.
+                rewrite map_nth with (d := m).
+                bdestruct_all.
+                - assert ((x1 >= m)%nat \/ (x0 >= 1)%nat). { right. lia. }
+                  specialize (H2 x1 x0 H10).
+                  rewrite H2.
+                  lca.
+                - assert ((x1+1 >= m)%nat \/ (x0 >= 1)%nat). { right. lia. }
+                  specialize (H2 (x1+1)%nat x0 H10).
+                  rewrite H2.
+                  lca. }
+              setoid_rewrite H7.
+              rewrite big_sum_0; trivial. 
+    + assert ((i >= m)%nat \/ (0 >= 1)%nat). { left. lia. }
+      unfold WF_Matrix in H2.
+      specialize (H2 i 0%nat H6).
+      contradiction.
+  - intros H2.
+    destruct H2 as [i [u [H2 [H3 H4]]]].
+    unfold linearly_dependent.
+    exists (fun r c : nat => if r <? i then u r c else (if (r =? i)%nat then (if (c =? 0)%nat then (- C1)%C else C0) else u (r-1)%nat c)).
+    split.
+    + unfold WF_Matrix.
+      intros x y H5.
+      unfold WF_Matrix in H3.
+      destruct H5; bdestruct_all; trivial.
+      * assert ((x-1 >= m - 1)%nat \/ (y >= 1)%nat). { left. lia. }
+        specialize (H3 (x-1)%nat y H8).
+        assumption.
+      * assert ((x >= m - 1)%nat \/ (y >= 1)%nat). { right. lia. }
+        specialize (H3 x y H7).
+        assumption.
+      * assert ((x-1 >= m - 1)%nat \/ (y >= 1)%nat). {right. lia. }
+        specialize (H3 (x-1)%nat y H8).
+        assumption.
+    + split.
+      * intro.
+        apply f_equal_inv with (x := i) in H5.
+        apply f_equal_inv with (x := 0%nat) in H5.
+        contradict H5.
+        bdestruct_all.
+        replace (Zero i 0%nat) with C0 by reflexivity.
+        nonzero.
+      * unfold Mmult in *.
+        do 2 (apply functional_extensionality; intros).
+        unfold matrix_column_choose, list_vector_to_matrix in H4.
+        unfold get_vec in H4.
+        apply f_equal_inv with (x := x) in H4.
+        apply f_equal_inv with (x := x0) in H4.
+        replace (@Zero n 1%nat x x0) with C0 by lca.
+        assert (@Zero n 1%nat = (fun i x y0 : nat => if (y0 =? 0)%nat then M x i else 0) m).
+        { do 2 (apply functional_extensionality; intros).
+          replace (@Zero n 1%nat x1 x2) with C0 by lca.
+          bdestruct_all; trivial.
+          unfold WF_Matrix in H1.
+          assert ((x1 >= n)%nat \/ (m >= m)%nat). { right. lia. }
+          specialize (H1 x1 m H6).
+          rewrite H1.
+          reflexivity. }
+        rewrite H5 in H4.
+        assert ((fun y : nat =>
+                   nth y
+                     (map (fun i x y0 : nat => if (y0 =? 0)%nat then M x i else 0)
+                        (List.seq 0 i ++ List.seq (i + 1) (m - i - 1)))
+                     (fun x y0 : nat => if (y0 =? 0)%nat then M x m else 0) x 0%nat * 
+                     u y x0)
+                =
+                  (fun y : nat =>
+                    M x (nth y (List.seq 0 i ++ List.seq (i + 1) (m - i - 1)) m) * u y x0)).
+        { apply functional_extensionality; intros.
+          rewrite map_nth with (d := m).
+          bdestruct_all.
+          reflexivity. }
+        setoid_rewrite H6 in H4.
+        clear H5 H6.
+        bdestruct_all; try lca.
+        -- subst.
+           
+           
+
+           
+           admit.
+
+
+        (**   
+
+           
+           Lemma vsum_reorder : forall {d} n (v : nat -> Vector d) f,
+  permutation n f ->
+  big_sum v n = big_sum (fun i => v (f i)) n.
+
+
+
+           (*** Admitted *)
+          Lemma big_sum_split :
+           big_sum f m = big_sum f i + f i + (big_sum f m - big_sum f (i + 1))
+                                               f = fun y => ...
+            i+1 <= y < m
+                        
+           **)
+           
+        -- assert ((fun y : nat =>
+                      M x y *
+                        (if y <? i then u y x0 else if (y =? i)%nat then 0 else u (y - 1)%nat x0))
+                   = (fun _ : nat => C0)).
+           { apply functional_extensionality; intros.
+             bdestruct_all; try lca.
+             - unfold WF_Matrix in H3.
+               assert ((x1 >= m - 1)%nat \/ (x0 >= 1)%nat). { right. lia. }
+               specialize (H3 x1 x0 H7).
+               rewrite H3.
+               lca.
+             - unfold WF_Matrix in H3.
+               assert ((x1-1 >= m - 1)%nat \/ (x0 >= 1)%nat). { right. lia. }
+               specialize (H3 (x1-1)%nat x0 H8).
+               rewrite H3.
+               lca. }
+           rewrite H6.
+           apply @big_sum_0 with (H := C_is_monoid).
+           trivial.
+Admitted.
+
+(* # ~11 *)
+(** Theorem 26 Let V be a vector space over a field F, and let u1,u2,...,un be vectors in V . Then {u1, u2, . . . , un} is linearly independent if and only if each vector in sp{u1,u2,...,un} can be written uniquely as a linear combination of u1,u2,...,un. **)
+
+Lemma linearly_independent_iff_unique_linear_combination_of_span : forall {n m : nat} (M : Matrix n m), linearly_independent M <-> (forall v : Vector n, span M v -> (exists a : Vector m, WF_Matrix a /\ v = M × a /\ (forall b : Vector m, WF_Matrix b -> v = M × b -> b = a))).
+Proof. intros n m M.
+  split.
+  - intros H0 v H1.
+    unfold span in *.
+    do 2 destruct H1.
+    exists x.
+    split; trivial.
+    split; trivial.
+    intros b H3 H4.
+    apply Mscale_inj with (c := (- C1)%C) in H2.
+    apply (Mplus_double_side H4) in H2.
+    replace (v .+ - C1 .* v) with (@Zero n 1) in H2 by lma.
+    unfold linearly_independent in *.
+    symmetry in H2.
+    rewrite <- Mscale_mult_dist_r in H2.
+    rewrite <- Mmult_plus_distr_l in H2.
+    specialize (H0 (b .+ - C1 .* x)).
+    apply H0 in H2; auto with wf_db.
+    apply Mplus_inj_r with (m := x) in H2.
+    rewrite Mplus_assoc in H2.
+    replace (- C1 .* x .+ x) with (@Zero m 1) in H2 by lma.
+    rewrite Mplus_0_l, Mplus_0_r in H2.
+    assumption.
+  - intros.
+    unfold linearly_independent.
+    intros a H1 H2.
+    assert (span M Zero).
+    { unfold span.
+      exists Zero.
+      split; auto with wf_db.
+      rewrite Mmult_0_r.
+      reflexivity. }
+    specialize (H0 Zero H3).
+    do 2 destruct H0.
+    destruct H4.
+    symmetry in H2.
+    remember H5 as H5'. clear HeqH5'.
+    specialize (H5' Zero).
+    assert (WF_Matrix (@Zero m 1%nat)). { auto with wf_db. }
+    assert (@Zero n 1%nat = M × (@Zero m 1%nat)). { rewrite Mmult_0_r. reflexivity. }
+    specialize (H5' H6 H7).
+    specialize (H5 a H1 H2).
+    subst.
+    reflexivity.
+Qed.
+
+(** Definition 27 Let V be a vector space over a field F, and let u1,u2,...,un be vectors in V. We say that {u1,u2,...,un} is a basis for V if and only if {u1,u2,...,un} spans V and is linearly independent. **)
+
+Definition basis {n m : nat} (P : Vector n -> Prop) (M : Matrix n m) : Prop := subspace P /\ (forall i : nat, (i < m)%nat -> P (get_vec i M)) /\ (forall v : Vector n, P v -> span M v) /\ linearly_independent M.
+
+(** Theorem 28 Let V be a vector space over a field F, and suppose u1,u2,...,un are vectors in V. Then {u1,u2,...,un} is a basis for V if and only if each v ∈ V can be written uniquely as a linear combination of u1, u2, . . . , un. **)
+
+Lemma basis_iff_unique_linear_combination : forall {n m : nat} (P : Vector n -> Prop) (M : Matrix n m), basis P M <-> subspace P /\ (forall i : nat, (i < m)%nat -> P (get_vec i M)) /\ (forall v : Vector n, P v -> (exists a : Vector m, WF_Matrix a /\ v = M × a /\ (forall b : Vector m, WF_Matrix b -> v = M × b -> b = a))).
+Proof. intros n m P M.
+  split.
+  - intros H0. 
+    unfold basis in H0.
+    destruct H0.
+    destruct H1.
+    destruct H2.
+    do 2 (split; trivial).
+    intros v H4.
+    specialize (H2 v H4).
+    rewrite linearly_independent_iff_unique_linear_combination_of_span in H3.
+    specialize (H3 v H2).
+    assumption.
+  - intros H0.
+    destruct H0.
+    destruct H1.
+    unfold basis.
+    do 2 (split; trivial).
+    split.
+    + intros v H3.
+      unfold span.
+      specialize (H2 v H3).
+      destruct H2.
+      exists x.
+      destruct H2.
+      destruct H4.
+      split; trivial.
+    + rewrite linearly_independent_iff_unique_linear_combination_of_span.
+      intros v H3.
+      unfold span in H3.
+      destruct H3.
+      destruct H3.
+      assert (P (M × x)).
+      { apply subspace_closed_under_linear_combinations; trivial. }
+      rewrite <- H4 in H5.
+      specialize (H2 v H5).
+      assumption.
+Qed.
+
+
+
+
+    
+  
+
+(*** Not used ***)
+Lemma sumbool_decidable : forall (A : Prop), {A} + {~ A} -> A \/ ~ A.
+Proof. intros.
+  destruct H0.
+  - left. assumption.
+  - right. assumption.
+Qed.
+
+(*** Admitted: Not used ***)
+Lemma linearly_dependent_least_column : forall {n m : nat} (M : Matrix n m), WF_Matrix M -> (forall i : nat, (i < m)%nat -> get_vec i M <> Zero) -> linearly_dependent M -> (exists k : nat, (k < m)%nat /\ (linearly_dependent (matrix_column_choose (List.seq 0 k) M)) /\ (forall k' : nat, ((k' < m)%nat /\ (linearly_dependent (matrix_column_choose (List.seq 0 k') M))) -> (k <= k')%nat)).
+Proof. intros.
+  pose (dec_inh_nat_subset_has_unique_least_element (fun k : nat => (k < m)%nat /\ (linearly_dependent (matrix_column_choose (List.seq 0 k) M)))).
+  assert ((forall n0 : nat,
+      (fun k : nat =>
+       (k < m)%nat /\ linearly_dependent (matrix_column_choose (List.seq 0 k) M))
+        n0 \/
+      ~
+      (fun k : nat =>
+       (k < m)%nat /\ linearly_dependent (matrix_column_choose (List.seq 0 k) M))
+      n0)).
+  { intros.
+    assert (((n0 < m)%nat /\ linearly_dependent (matrix_column_choose (List.seq 0 n0) M) \/
+              ~ ((n0 < m)%nat /\ linearly_dependent (matrix_column_choose (List.seq 0 n0) M)))
+             <-> ((n0 < m)%nat /\ linearly_dependent (matrix_column_choose (List.seq 0 n0) M) \/
+                  ((n0 >= m)%nat \/ linearly_independent (matrix_column_choose (List.seq 0 n0) M)))).
+    { split.
+      - intros. destruct H3.
+        + destruct H3.
+          left. split; assumption.
+        + (*** Classical Logic Used ***)
+          apply Classical_Prop.not_and_or in H3.
+          destruct H3.
+          * right. left. lia.
+          * apply not_lindep_implies_linindep in H3.
+            right. right; assumption.
+      - intros. destruct H3.
+        + destruct H3.
+          left. split; assumption.
+        + destruct H3.
+          * right.
+            (*** Classical Logic Used ***)
+            apply Classical_Prop.or_not_and.
+            left. intro. lia.
+          * right.
+            (*** Classical Logic Used ***)
+            apply Classical_Prop.or_not_and.
+            right.
+            pose (lindep_implies_not_linindep (matrix_column_choose (List.seq 0 n0) M)).
+            pose (not_lindep_implies_linindep (matrix_column_choose (List.seq 0 n0) M)).
+            intro.
+            specialize (n1 H4).
+            contradiction. }
+    rewrite H3.
+    assert (WF_Matrix (matrix_column_choose (List.seq 0 n0) M)).
+    { apply WF_Matrix_matrix_column_choose_indices_list.
+      assumption. }
+    (*
+    destruct (lin_dep_indep_dec (matrix_column_choose (List.seq 0 n0) M)).
+     *)
+
+    Admitted.
+
+    
+  
+
+(** another way to say the first n columns **)
+Definition submatrix_column {n m} (k : nat) (M : Matrix n m) : Matrix n k :=
+  (fun r c : nat => if (c <? k)%nat then M r c else C0).
+
+Lemma subsubmatrix_column_outer : forall {n m} (i j : nat) (M : Matrix n m),
+    (i >= j)%nat -> submatrix_column i (submatrix_column j M) = (submatrix_column j M).
+Proof. intros.
+  unfold submatrix_column.
+  apply functional_extensionality; intros r.
+  apply functional_extensionality; intros c.
+  bdestruct_all; trivial.
+Qed.
+
+Lemma subsubmatrix_column_inner : forall {n m} (i j : nat) (M : Matrix n m),
+    (i < j)%nat -> submatrix_column i (submatrix_column j M) = (submatrix_column i M).
+Proof. intros.
+  unfold submatrix_column.
+  apply functional_extensionality; intros r.
+  apply functional_extensionality; intros c.
+  bdestruct_all; trivial.
+Qed.
+
+Lemma submatrix_column_matrix_column_choose : forall {n m} (k : nat) (M : Matrix n m), WF_Matrix M -> submatrix_column k M = matrix_column_choose (List.seq 0 k) M.
+Proof. intros.
+  unfold submatrix_column.
+  unfold matrix_column_choose, list_vector_to_matrix.
+  apply functional_extensionality; intros r.
+  apply functional_extensionality; intros c.
+  assert (Zero = (fun i0 : nat => get_vec i0 M) m).
+  { unfold get_vec.
+    apply functional_extensionality; intros x.
+    apply functional_extensionality; intros y.
+    bdestruct_all; trivial.
+    unfold WF_Matrix in H0.
+    assert ((x >= n)%nat \/ (m >= m)%nat). { right. lia. }
+    specialize (H0 x m H2).
+    rewrite H0.
+    trivial. }
+  rewrite H1.
+  rewrite map_nth with (d := m).
+  unfold get_vec.
+  bdestruct_all.
+  - rewrite seq_nth; auto.
+  - rewrite nth_overflow.
+    + unfold WF_Matrix in H0.
+      rewrite H0; auto.
+    + rewrite seq_length; trivial.
+Qed.
+
+Lemma WF_Matrix_submatrix_column : forall {n m} (k : nat) (M : Matrix n m),
+    WF_Matrix M -> WF_Matrix (submatrix_column k M).
+Proof. intros.
+  unfold WF_Matrix in *.
+  unfold submatrix_column.
+  intros.
+  bdestruct_all; trivial.
+  rewrite H0; trivial.
+  destruct H1; lia.
+Qed.
+
+#[export] Hint Resolve WF_Matrix_submatrix_column : wf_db.
+
+
+
+
+ (** Lemma 33 Let V be a vector space over a field F, and let v1,v2,...,vn be nonzero vectors in V . If {v1, v2, . . . , vn} is linearly dependent, then there exists an integer k, with 2 ≤ k ≤ n, such that vk is a linear combination of v1,v2,...,vk−1. **)
+
+(* Proof Let k be the smallest positive integer such that {v1, v2, . . . , vk} is linearly dependent. By assumption k ≤ n, and k ≥ 2 because the singleton set {v1} is linearly dependent only if v1 is the zero vector, which is not the case. By Theorem 24, one of the vectors v1,v2,...,vk is a linear combination of the others. If it is vk, then the proof is complete, so suppose vt, 1 ≤ t < k, is a linear combination of v1, ..., vt−1, vt+1, ..., vk:
+
+vt = α1 v1 + ... + αt−1 vt−1 + αt+1 vt+1 + ... + αk vk. (2.12)
+
+We must have αk ̸= 0, since otherwise {v1, v2, . . . , vk−1} would be linearly dependent by Theorem 26, contradicting that {v1, v2, . . . , vl} is linearly inde- pendent for l < k. But, with αk ̸= 0, we can solve (2.12) for vk:
+
+vk = −α−1α1v1−...−α−1αt−1vt−1+α−1vt−α−1αt+1vt+1−...−α−1αk−1vk−1.
+Therefore vk is a linear combination of v1,v2,...,vk−1. *)
+
+
+Lemma linearly_dependent_bounded_linear_combination : forall {n m : nat} (M : Matrix n m), WF_Matrix M -> (forall i : nat, (i < m)%nat -> get_vec i M <> Zero) -> linearly_dependent M -> (exists k : nat, (0 < k < m)%nat /\ (exists a : Vector k, WF_Matrix a /\ get_vec k M = (submatrix_column k M) × a)).
+Proof. intros n m M H H0 H1.
+  induction m.
+  - exists 0%nat.
+    intros.
+    Search Zero.
+    unfold linearly_dependent in H1.
+    destruct H1 as [a [H1 [H2 H3]]].
+    contradict H2.
+    unfold WF_Matrix in H1.
+    prep_matrix_equality.
+    apply H1.
+    lia.
+  - remember (submatrix_column m M) as M'.
+    (*** Classical Logic Used ***)
+    destruct (Classical_Prop.classic (linearly_dependent M')).
+    + destruct (IHm M') as [k H'].
+      * subst.
+        apply WF_Matrix_submatrix_column.
+        assumption.
+      * intros.
+        rewrite HeqM'.
+        intro.
+        apply (H0 i0).
+        -- lia.
+        -- unfold get_vec.
+           unfold get_vec in H4.
+           rewrite <- H4.
+           unfold submatrix_column.
+           bdestruct_all.
+           reflexivity.
+      * assumption.
+      * exists k.
+        intros.
+        destruct H'.
+        split; try lia.
+        assert (submatrix_column k M' = submatrix_column k M).
+        { rewrite HeqM'.
+          rewrite subsubmatrix_column_inner; trivial.
+          lia. }
+        assert (get_vec k M' = get_vec k M).
+        { rewrite HeqM'.
+          unfold get_vec.
+          unfold submatrix_column.
+          bdestruct_all.
+          reflexivity. }
+        rewrite <- H6.
+        rewrite <- H5.
+        assumption.
+    + assert (linearly_independent M').
+      { unfold linearly_independent.
+        unfold linearly_dependent in H2.
+        intros.
+        (*** Classical Logic Used ***)
+        apply Classical_Pred_Type.not_ex_all_not with (U := Vector m) (n := a) in H2.
+        apply Classical_Prop.not_and_or in H2.
+        destruct H2; try contradiction.
+        apply Classical_Prop.not_and_or in H2.
+        destruct H2; try contradiction.
+        unfold "<>" in H2.
+        rewrite Decidable.not_not_iff in H2; trivial.
+        unfold Decidable.decidable.
+        apply (Classical_Prop.classic (a = Zero)). }
+      subst.
+      exists m.
+      bdestruct (m =? 0)%nat.
+      * subst.
+        remember H1 as H1'. clear HeqH1'.
+        apply lindep_implies_not_linindep in H1'.
+        assert (M <> Zero).
+        { intro.
+          assert (0 < 1)%nat. { lia. }
+          specialize (H0 0%nat H5).
+          contradict H0.
+          rewrite H4.
+          unfold get_vec.
+          prep_matrix_equality.
+          bdestruct_all; trivial. }
+        pose (lin_indep_vec M H H4).
+        contradiction.
+      * split; try lia.
+        unfold linearly_dependent in H1.
+        destruct H1 as [a [H5 [H6 H7]]].
+        assert (a m 0%nat <> C0).
+        { intro.
+          assert (WF_Matrix (reduce_row a m)).
+          { unfold WF_Matrix.
+            unfold WF_Matrix in H5.
+            intros.
+            unfold reduce_row.
+            bdestruct_all.
+            - apply H5. right. lia.
+            - apply H5. left. lia. }
+          assert (reduce_row a m <> Zero).
+          { unfold reduce_row.
+            intro.
+            destruct (nonzero_vec_nonzero_elem a H5 H6) as [x H10].
+            apply f_equal_inv with (x := x) in H9.
+            apply f_equal_inv with (x := 0%nat) in H9.
+            replace (Zero x 0%nat) with C0 in H9 by trivial.
+            bdestruct (x <? m)%nat.
+            - contradiction.
+            - bdestruct (x =? m)%nat.
+              + subst. contradiction.
+              + contradict H10.
+                unfold WF_Matrix in H5.
+                apply H5.
+                left.
+                lia. }
+          assert ((submatrix_column m M) × (reduce_row a m) = Zero).
+          { unfold reduce_row, submatrix_column.
+            unfold Mmult.
+            prep_matrix_equality.
+            replace (@Zero n 1%nat x y) with C0 by trivial.
+            assert ((fun y0 : nat =>
+                       (if y0 <? m then M x y0 else 0) *
+                         (if y0 <? m then a y0 y else a (1 + y0)%nat y))
+                    =
+                      (fun y0 : nat =>
+                         (if y0 <? m then M x y0 * a y0 y else 0))).
+            { apply functional_extensionality; intros.
+              bdestruct_all; lca. }
+            rewrite H10.
+            assert (Σ (fun y0 : nat => if y0 <? m then M x y0 * a y0 y else 0) m
+                    =
+                      Σ (fun y0 : nat => M x y0 * a y0 y) m).
+            { apply big_sum_eq_bounded.
+              intros.
+              bdestruct_all.
+              reflexivity. }
+            rewrite H11.
+            unfold Mmult in H7.
+            apply f_equal_inv with (x := x) in H7.
+            apply f_equal_inv with (x := y) in H7.
+            replace (@Zero n 1%nat x y) with C0 in H7 by lca.
+            rewrite <- H7.
+            simpl.
+            bdestruct (y =? 0)%nat.
+            - subst.
+              rewrite H1.
+              rewrite Cmult_0_r.
+              rewrite Cplus_0_r.
+              reflexivity.
+            - unfold WF_Matrix in H5.
+              rewrite H5.
+              + rewrite Cmult_0_r.
+                rewrite Cplus_0_r.
+                reflexivity.
+              + right. lia. }
+          unfold linearly_independent in H3.
+          specialize (H3 (reduce_row a m) H8 H10).
+          contradiction. }
+        exists ((- (/ (a m 0%nat)))%C .* (reduce_row a m)).
+        split; auto with wf_db. 
+        distribute_scale.
+        apply Mscale_div with (c := (- (a m 0%nat))%C).
+        -- intro.
+           rewrite Copp_opp in H8.
+           replace (- 0)%C with C0 in H8 by lca.
+           contradiction.
+        -- distribute_scale.
+           replace (- a m 0%nat * - / a m 0%nat)%C with (a m 0%nat * / a m 0%nat)%C by lca.
+           rewrite Cinv_r; trivial.
+           rewrite Mscale_1_l.
+           apply Mplus_inv_r with (m := a m 0%nat .* get_vec m M); auto with wf_db.
+           replace (- a m 0%nat .* get_vec m M .+ a m 0%nat .* get_vec m M) with (@Zero n 1)
+             by lma.
+           rewrite <- H7.
+           unfold submatrix_column, reduce_row, get_vec.
+           unfold Mmult, Matrix.scale, Mplus.
+           prep_matrix_equality.
+           simpl.
+           assert ((fun y0 : nat =>
+                      (if y0 <? m then M x y0 else 0) * (if y0 <? m then a y0 y else a (s y0) y))
+                   =
+                     (fun y0 : nat =>
+                        (if y0 <? m then M x y0 *a y0 y else C0))).
+           { apply functional_extensionality; intros.
+             bdestruct_all; lca. }
+           rewrite H8.
+           bdestruct_all.
+           ++ subst.
+              f_equal; try lca.
+              apply big_sum_eq_bounded.
+              intros.
+              bdestruct_all.
+              reflexivity.
+           ++ unfold WF_Matrix in H5.
+              rewrite H5 at 1.
+              ** f_equal; try lca.
+                 apply big_sum_eq_bounded.
+                 intros.
+                 bdestruct_all.
+                 reflexivity.
+              ** right. lia.
+Qed.
+
+Lemma linearly_dependent_submatrix_column : forall {n m : nat} (k : nat) (M : Matrix n m),
+    (k < m)%nat -> linearly_dependent (submatrix_column k M) -> linearly_dependent M.
+Proof. intros n m k M H0 H1.
+  unfold submatrix_column in H1.
+  unfold linearly_dependent in *.
+  destruct H1 as [a [H1 [H2 H3]]].
+  exists (fun r c => if (r <? k) then a r c else C0).
+  split.
+  - unfold WF_Matrix.
+    intros.
+    bdestruct_all; trivial.
+    unfold WF_Matrix in H1.
+    rewrite H1; trivial.
+    lia.
+  - split.
+    + pose (nonzero_vec_nonzero_elem a H1 H2) as H4.
+      destruct H4 as [x H4].
+      intro.
+      apply f_equal_inv with (x := x) in H5.
+      apply f_equal_inv with (x := 0%nat) in H5.
+      bdestruct (x <? k)%nat.
+      * contradiction.
+      * unfold WF_Matrix in H1.
+        rewrite H1 in H4.
+        -- contradiction.
+        -- lia.
+    + rewrite <- H3.
+      unfold Mmult.
+      prep_matrix_equality.
+      replace m with (k + (m - k))%nat by lia.
+      rewrite @big_sum_sum with (H := C_is_monoid) (m := k) (n := (m - k)%nat).
+      simpl.
+      rewrite <- Cplus_0_r with (x := Σ (fun y0 : nat => (if y0 <? k then M x y0 else 0) * a y0 y) k).
+      f_equal.
+      * apply big_sum_eq_bounded.
+        intros.
+        bdestruct_all.
+        reflexivity.
+      * rewrite big_sum_0_bounded; trivial.
+        intros.
+        bdestruct_all.
+        lca.
+Qed.
+
+ (*** Classical Logic used ***)
+Lemma some_zero_vector_linearly_dependent : forall {n m : nat} (M : Matrix n m),
+    ~ (forall i : nat, (i < m)%nat -> get_vec i M <> Zero) -> linearly_dependent M.
+Proof. intros n m M H0.
+  apply Classical_Pred_Type.not_all_ex_not in H0.
+  destruct H0 as [k H0 ].
+  apply Classical_Prop.imply_to_and in H0.
+  destruct H0.
+  unfold "~", "<>" in H1.
+  rewrite Decidable.not_not_iff in H1.
+  2 : { unfold Decidable.decidable.
+        apply (Classical_Prop.classic (get_vec k M = Zero)). }
+  unfold linearly_dependent.
+  exists (e_i k).
+  split; auto with wf_db.
+  split.
+  - intro.
+    unfold e_i in H2.
+    apply f_equal_inv with (x := k) in H2.
+    apply f_equal_inv with (x := 0%nat) in H2.
+    assert ((k =? k)%nat && (k <? m) && (0 =? 0)%nat = true).
+    { bdestruct_all. trivial. }
+    rewrite H3 in H2.
+    replace (Zero k 0%nat) with C0 in H2; trivial.
+    inversion H2.
+    lra.
+  - rewrite <- H1.
+    rewrite matrix_by_basis; trivial.
+Qed.
+
+Lemma submatrix_column_overflow : forall {n m : nat} (k : nat) (M : Matrix n m),
+    WF_Matrix M -> (k >= m)%nat -> submatrix_column k M = M.
+Proof. intros n m k M H0 H1.
+  unfold submatrix_column.
+  prep_matrix_equality.
+  bdestruct_all; trivial.
+  unfold WF_Matrix in H0.
+  rewrite H0; trivial; lia.
+Qed.
+
+Lemma get_vec_submatrix_column : forall {n m : nat} (i k : nat) (M : Matrix n m),
+    (i < k)%nat -> get_vec i (submatrix_column k M) = get_vec i M.
+Proof. intros n m i0 k M H0.
+  unfold submatrix_column.
+  unfold get_vec.
+  prep_matrix_equality.
+  bdestruct_all; trivial.
+Qed.
+
+Lemma get_vec_col_insert_front_front : forall {n m : nat} (i : nat) (M : Matrix n m) (v : Vector n),
+    WF_Matrix v -> (i = 0%nat) -> get_vec i (col_insert_front M v) = v.
+Proof. intros n m i0 M v H0 H1.
+  unfold get_vec, col_insert_front.
+  prep_matrix_equality.
+  bdestruct_all.
+  - subst.
+    reflexivity.
+  - unfold WF_Matrix in H0.
+    rewrite H0; trivial.
+    lia.
+Qed.
+
+Lemma get_vec_col_insert_front_back : forall {n m : nat} (i : nat) (M : Matrix n m) (v : Vector n),
+    (i <> 0%nat) -> get_vec i (col_insert_front M v) = get_vec (i - 1)%nat M.
+Proof. intros n m i0 M v H0.
+  unfold get_vec, col_insert_front.
+  prep_matrix_equality.
+  bdestruct_all; trivial.
+Qed.
+
+
+Lemma get_vec_col_append_front : forall {n m : nat} (i : nat) (M : Matrix n m) (v : Vector n),
+    (i <> m) -> get_vec i (col_append M v) = get_vec i M.
+Proof. intros n m i0 M v H0.
+  unfold get_vec, col_append.
+  prep_matrix_equality.
+  bdestruct_all; trivial.
+Qed.
+
+Lemma get_vec_col_append_back : forall {n m : nat} (i : nat) (M : Matrix n m) (v : Vector n),
+    WF_Matrix v -> (i = m) -> get_vec i (col_append M v) = v.
+Proof. intros n m i0 M v H0 H1.
+  unfold get_vec, col_append.
+  prep_matrix_equality.
+  bdestruct_all.
+  - subst.
+    reflexivity.
+  - unfold WF_Matrix in H0.
+    rewrite H0; trivial.
+    lia.
+Qed.
+
+Lemma submatrix_column_col_append : forall {n m : nat} (k : nat) (M : Matrix n m) (v : Vector n),
+    (k <= m)%nat -> submatrix_column k (col_append M v) = submatrix_column k M.
+Proof. intros n m k M v H0.
+  unfold submatrix_column.
+  unfold col_append.
+  prep_matrix_equality.
+  bdestruct_all; trivial.
+Qed.
+
+Lemma submatrix_column_1_get_vec : forall {n m : nat} (M : Matrix n m),
+    submatrix_column 1%nat M = get_vec 0%nat M.
+Proof. intros n m M.
+  unfold submatrix_column, get_vec.
+  prep_matrix_equality.
+  bdestruct_all; auto.
+Qed.
+
+Lemma span_submatrix_column_span_reduce_col :
+  forall {n m : nat} (k i : nat) (M : Matrix n (s m)) (v : Vector n),
+    (k <= m)%nat -> (i >= k)%nat -> span (submatrix_column k M) v -> span (reduce_col M i) v.
+Proof. intros n m k i0 M v H0 H1 H2.
+  unfold span in *.
+  destruct H2 as [a [H2 H3]].
+  exists (fun r c => if (r <? k)%nat then a r c else C0).
+  split.
+  - unfold WF_Matrix.
+    intros.
+    bdestruct_all; trivial.
+    unfold WF_Matrix in H2.
+    rewrite H2; trivial.
+    lia.
+  - rewrite H3.
+    unfold submatrix_column, reduce_col.
+    unfold Mmult.
+    prep_matrix_equality.
+    replace m with (k + (m - k))%nat by lia.
+    rewrite @big_sum_sum with (H := C_is_monoid).
+    rewrite <- Cplus_0_r with (x := Σ (fun y0 : nat => (if y0 <? k then M x y0 else 0) * a y0 y) k).
+    simpl.
+    f_equal.
+    + apply big_sum_eq_bounded.
+      intros.
+      bdestruct_all.
+      reflexivity.
+    + rewrite big_sum_0_bounded; trivial.
+      intros.
+      bdestruct_all; lca.
+Qed. 
+    
+
+Lemma span_col_insert_front :
+  forall {n m : nat} (P : Vector n -> Prop) (M : Matrix n m) (v : Vector n),
+    basis P M -> span M v ->
+    (forall u : Vector n, span M u <-> span (col_insert_front M v) u).
+Proof. intros n m P M v H0 H1 u.
+  split.
+  - intros H2.
+    unfold span in *.
+    unfold basis in *.
+    destruct H0 as [H0 [H0' [H0'' H0''']]].
+    destruct H1 as [a [H1 H1']].
+    destruct H2 as [b [H2 H2']].
+    exists (fun r c => if (r =? 0)%nat then C0 else b (r - 1)%nat c).
+    split.
+    + unfold WF_Matrix.
+      intros x y H3.
+      bdestruct_all; trivial.
+      unfold WF_Matrix in H2.
+      rewrite H2; trivial.
+      lia.
+    + rewrite H2'.
+      unfold col_insert_front, Mmult.
+      prep_matrix_equality.
+      rewrite <- big_sum_extend_l.
+      bdestruct_all.
+      rewrite Cmult_0_r, Cplus_0_l.
+      apply big_sum_eq_bounded.
+      intros x0 H4.
+      bdestruct_all.
+      replace (s x0 - 1)%nat with x0 by lia.
+      reflexivity.
+  - intros H2. 
+    unfold span in *.
+    unfold basis in *.
+    destruct H0 as [H0 [H0' [H0'' H0''']]].
+    destruct H1 as [a [H1 H1']].
+    destruct H2 as [b [H2 H2']].
+    exists (fun r c => (b 0%nat c) * (a r 0%nat) + (b (r + 1)%nat c)).
+    split.
+    + unfold WF_Matrix in *.
+      intros x y H3.
+      destruct H3.
+      * rewrite H1; try lia.
+        setoid_rewrite H2 at 2; try lia.
+        lca.
+      * setoid_rewrite H2; try lia.
+        lca.
+    + rewrite H2'.
+      unfold col_insert_front, Mmult.
+      prep_matrix_equality.
+      rewrite <- big_sum_extend_l.
+      bdestruct_all.
+      rewrite H1'.
+      unfold Mmult.
+      simpl.
+      rewrite @big_sum_mult_r with (H2 := C_is_ring).
+      rewrite <- @big_sum_plus with (H0 := C_is_group).
+      2 : apply C_is_comm_group.
+      apply big_sum_eq_bounded.
+      intros x0 H4.
+      simpl.
+      replace (x0 - 0)%nat with x0 by lia.
+      replace (x0 + 1)%nat with (s x0) by lia.
+      lca.
+Qed.
+
+
+ Lemma span_col_append :
+  forall {n m : nat} (P : Vector n -> Prop) (M : Matrix n m) (v : Vector n),
+    basis P M -> span M v ->
+    (forall u : Vector n, span M u <-> span (col_append M v) u).
+ Proof. intros n m P M v H0 H1 u.
+   split.
+   - intros H2.
+     unfold span in *.
+     unfold basis in *.
+     destruct H0 as [H0 [H0' [H0'' H0''']]].
+     destruct H1 as [a [H1 H1']].
+     destruct H2 as [b [H2 H2']].
+     exists (fun r c => if (r <? m)%nat then b r c else C0).
+     split.
+     + unfold WF_Matrix.
+       intros x y H3.
+       bdestruct_all; trivial.
+       unfold WF_Matrix in H2.
+       rewrite H2; trivial.
+       lia.
+     + rewrite H2'.
+       unfold col_append, Mmult.
+       prep_matrix_equality.
+       simpl.
+       bdestruct_all.
+       rewrite Cmult_0_r, Cplus_0_r.
+       apply big_sum_eq_bounded.
+       intros x0 H5.
+       bdestruct_all.
+       reflexivity.
+   - intros H2.
+     unfold span in *.
+     unfold basis in *.
+     destruct H0 as [H0 [H0' [H0'' H0''']]].
+     destruct H1 as [a [H1 H1']].
+     destruct H2 as [b [H2 H2']].
+     exists (fun r c => if (r <? m) then (b m c) * (a r 0%nat) + (b r c) else C0).
+     split.
+     + unfold WF_Matrix.
+       intros x y H3.
+       bdestruct_all; trivial.
+       unfold WF_Matrix in *.
+       rewrite ! H2; try lia.
+       lca.
+     + rewrite H2'.
+       unfold col_append, Mmult.
+       prep_matrix_equality.
+       simpl.
+       bdestruct_all.
+       rewrite H1'.
+       unfold Mmult.
+       rewrite @big_sum_mult_r with (H2 := C_is_ring).
+       rewrite <- @big_sum_plus with (H0 := C_is_group).
+       2 : apply C_is_comm_group.
+       apply big_sum_eq_bounded.
+       intros x0 H4.
+       bdestruct_all.
+       lca.
+ Qed.
+
+ Lemma get_vec_reduce_col_back : forall {n m : nat} (i col : nat) (A : Matrix n (s m)),
+     (i >= col)%nat -> get_vec i (reduce_col A col) = get_vec (1 + i)%nat A.
+ Proof. intros n m i0 col A H0.
+   unfold get_vec, reduce_col.
+   prep_matrix_equality.
+   bdestruct_all; reflexivity.
+ Qed.
+
+ Lemma get_vec_overflow : forall {n m : nat} (k : nat) (A : Matrix n m),
+    (k >= m)%nat -> WF_Matrix A -> get_vec k A = Zero.
+Proof. intros n m k A H0 H1.
+  prep_matrix_equality.
+  unfold get_vec.
+  bdestruct_all; trivial.
+  unfold WF_Matrix in H1.
+  rewrite H1; trivial; lia.
+Qed.
+
+
+
+Lemma submatrix_column_zero : forall {n m : nat} (A : Matrix n m),
+    submatrix_column 0 A = @Zero n 0.
+Proof. intros n m A.
+  unfold submatrix_column.
+  prep_matrix_equality.
+  bdestruct_all.
+  reflexivity.
+Qed.
+
+Lemma matrix_column_choose_original : forall {n m : nat} (A : Matrix n m),
+    WF_Matrix A -> matrix_column_choose (List.seq 0 m) A = A.
+Proof. intros n m A H0. 
+  unfold matrix_column_choose, list_vector_to_matrix.
+  unfold WF_Matrix in H0.
+  prep_matrix_equality.
+  assert (@Zero n 1 = (get_vec m A)).
+  { unfold get_vec.
+    prep_matrix_equality.
+    bdestruct_all; trivial.
+    rewrite H0; trivial.
+    lia. }
+  bdestruct (x <? n)%nat.
+  - bdestruct (y <? m)%nat.
+    + rewrite H1.
+      rewrite map_nth with (d := m).
+      rewrite seq_nth; trivial.
+    + rewrite nth_overflow.
+      * rewrite H0; trivial.
+        lia.
+      * rewrite map_length.
+        rewrite seq_length.
+        assumption.
+  - bdestruct (y <? m)%nat.
+    + rewrite H1.
+      rewrite map_nth with (d := m).
+      rewrite seq_nth; trivial.
+    + rewrite nth_overflow.
+      * rewrite H0; trivial.
+        lia.
+      * rewrite map_length.
+        rewrite seq_length.
+        assumption.
+Qed.
+
+Lemma get_vec_smash_left : forall {n m o : nat} (i : nat) (A : Matrix n m) (B : Matrix n o),
+    (i < m)%nat -> get_vec i (smash A B) = get_vec i A.
+Proof. intros n m o i0 A B H0.
+  unfold smash, get_vec.
+  prep_matrix_equality.
+  bdestruct_all; trivial.
+Qed.
+
+Lemma get_vec_smash_right : forall {n m o : nat} (i : nat) (A : Matrix n m) (B : Matrix n o),
+    (i >= m)%nat -> get_vec i (smash A B) = get_vec (i - m) B.
+Proof. intros n m o i0 A B H0.
+  unfold smash, get_vec.
+  prep_matrix_equality.
+  bdestruct_all; trivial.
+Qed.
+
+Lemma get_vec_matrix_column_choose : forall {n m : nat} (i d : nat) (indices_list : list nat) (A : Matrix n m),
+    (i < length indices_list)%nat -> WF_Matrix A ->
+    get_vec i (matrix_column_choose indices_list A) = get_vec (nth i indices_list d) A.
+Proof. intros n m i0 d indices_list A H0 H1. 
+  unfold get_vec, matrix_column_choose, list_vector_to_matrix.
+  prep_matrix_equality.
+  bdestruct_all; trivial.
+  assert (@Zero n 1 = get_vec m A).
+  { unfold get_vec.
+    prep_matrix_equality.
+    bdestruct_all; trivial.
+    unfold WF_Matrix in H1.
+    rewrite H1; trivial.
+    lia. }
+  rewrite H3.
+  rewrite map_nth with (d := m).
+  unfold get_vec.
+  bdestruct_all.
+  rewrite nth_indep with (d := d) (d' := m); trivial.
+Qed.
+
+Lemma submatrix_column_smash_left : forall {n m o : nat} (k : nat) (A : Matrix n m) (B : Matrix n o),
+    (k <= m)%nat -> submatrix_column k (smash A B) = submatrix_column k A.
+Proof. intros n m o k A B H0.
+  unfold smash, submatrix_column.
+  prep_matrix_equality.
+  bdestruct_all; trivial.
+Qed.
+
+Lemma submatrix_column_smash_right : forall {n m o : nat} (k : nat) (A : Matrix n m) (B : Matrix n o),
+    (k > m)%nat -> submatrix_column k (smash A B) = smash A (submatrix_column (k - m) B).
+Proof. intros n m o k A B H0.
+  unfold smash, submatrix_column.
+  prep_matrix_equality.
+  bdestruct_all; trivial.
+Qed.
+
+Lemma submatrix_column_original : forall {n m : nat} (k : nat) (A : Matrix n m),
+    WF_Matrix A -> (k >= m)%nat -> submatrix_column k A = A.
+Proof. intros n m k A H0 H1.
+  unfold submatrix_column.
+  prep_matrix_equality.
+  bdestruct_all; trivial.
+  unfold WF_Matrix in H0.
+  rewrite H0; trivial; lia.
+Qed.
+  
+Lemma get_vec_submatrix_column_linearly_dependent : forall {n m : nat} (k : nat) (a : Vector k) (A : Matrix n m),
+    (k < m)%nat -> get_vec k A = (submatrix_column k A) × a -> linearly_dependent A.
+Proof. intros n m k a A H0 H1.
+  unfold linearly_dependent.
+  exists (fun r c => if (r <? k)%nat then (if (c =? 0)%nat then a r c else C0)
+             else if (r =? k)%nat then (if (c =? 0)%nat then (Copp C1) else C0)
+                  else C0).
+  repeat split.
+  - unfold WF_Matrix.
+    intros x y H2.
+    bdestruct_all; trivial.
+  - intro.
+    apply f_equal_inv with (x := k) in H2.
+    apply f_equal_inv with (x := 0%nat) in H2.
+    simpl in H2.
+    rewrite Nat.ltb_irrefl in H2.
+    rewrite Nat.eqb_refl in H2.
+    inversion H2.
+    lra.
+  - unfold Mmult.
+    prep_matrix_equality.
+    replace (@Zero n 1 x y) with C0 by easy.
+    replace m with (k + (1 + (m - k - 1)))%nat by lia.
+    rewrite big_sum_sum with (m := k).
+    rewrite big_sum_sum with (m := 1%nat).
+    simpl.
+    rewrite Cplus_0_l.
+    bdestruct_all.
+    + assert (forall x y z : C, x + z = y -> x + (y * (Copp C1) + z) = 0).
+      { intros x0 y0 z H5.
+        rewrite <- H5.
+        lca. }
+      apply H5.
+      replace (k + 0)%nat with k by lia.
+      unfold get_vec in H1.
+      apply f_equal_inv with (x := x) in H1.
+      apply f_equal_inv with (x := 0%nat) in H1.
+      simpl in H1.
+      rewrite H1.
+      unfold submatrix_column, Mmult.
+      rewrite <- Cplus_0_r.
+      f_equal.
+      * apply big_sum_eq_bounded.
+        intros x0 H6.
+        bdestruct_all.
+        subst.
+        reflexivity.
+      * rewrite big_sum_0_bounded; trivial.
+        intros x0 H6.
+        bdestruct_all.
+        lca.
+    + rewrite Cmult_0_r, Cplus_0_l.
+      rewrite <- Cplus_0_r.
+      f_equal.
+      * rewrite big_sum_0_bounded; trivial.
+        intros x0 H5.
+        bdestruct_all.
+        lca.
+      * rewrite big_sum_0_bounded; trivial.
+        intros x0 H5.
+        bdestruct_all.
+        lca.
+Qed.
+    
+Lemma reduce_col_smash_left : forall {n m o : nat} (k : nat) (A : Matrix n (s m)) (B : Matrix n o),
+    (k <= m)%nat -> reduce_col (smash A B) k = smash (reduce_col A k) B.
+Proof. intros n m o k A B H0.
+  unfold smash, reduce_col.
+  prep_matrix_equality.
+  bdestruct_all; trivial.
+Qed.
+
+Lemma reduce_col_smash_right : forall {n m o : nat} (k : nat) (A : Matrix n m) (B : Matrix n (s o)),
+    (k >= m)%nat -> reduce_col (smash A B) k = smash A (reduce_col B (k - m)).
+Proof. intros n m o k A B H0.
+  unfold smash, reduce_col.
+  prep_matrix_equality.
+  bdestruct_all; trivial.
+  replace (1 + (y - m))%nat with (1 + y - m)%nat by lia.
+  reflexivity.
+Qed.
+
+Lemma reduce_col_submatrix_column_last : forall {n m : nat} (j : nat) (A : Matrix n m),
+    reduce_col (submatrix_column (s j) A) j = submatrix_column j A.
+Proof. intros n m j A.
+  unfold submatrix_column, reduce_col.
+  prep_matrix_equality.
+  bdestruct_all; trivial.
+Qed.
+
+Definition delete_nth {A : Type} (l : list A) (n : nat) := firstn n l ++ skipn (n + 1) l.
+Compute (delete_nth [0; 1; 2; 3]%nat 0). (* = [1; 2; 3]%nat *)
+Compute (delete_nth [0; 1; 2; 3]%nat 1). (* = [0; 2; 3]%nat *)
+
+Lemma reduce_col_matrix_column_choose_delete : forall {n m : nat} (k : nat) (indices_list : list nat) (A : Matrix n m),
+    WF_Matrix A -> (length indices_list > k)%nat->
+    reduce_col (matrix_column_choose indices_list A) k = matrix_column_choose (delete_nth indices_list k) A.
+Proof. intros n m k indices_list A H0 H1. 
+  unfold reduce_col, delete_nth, matrix_column_choose, list_vector_to_matrix.
+  prep_matrix_equality.
+  assert (@Zero n 1 = get_vec m A).
+  { unfold get_vec.
+    prep_matrix_equality.
+    bdestruct_all; trivial.
+    unfold WF_Matrix in H0.
+    rewrite H0; trivial; lia. }
+  bdestruct_all.
+  - rewrite <- firstn_skipn with (n := k) (l := indices_list) at 1.
+    rewrite ! H2.
+    rewrite ! map_nth with (d := m).
+    unfold get_vec.
+    bdestruct_all.
+    f_equal.
+    rewrite ! app_nth1; trivial; rewrite firstn_length; lia.
+  - rewrite H2.
+    rewrite ! map_nth with (d := m).
+    unfold get_vec.
+    bdestruct_all.
+    f_equal.
+    rewrite app_nth2.
+    + rewrite firstn_length.
+      replace (Init.Nat.min k (length indices_list)) with k by lia.
+      rewrite <- firstn_skipn with (n := (k + 1)%nat) at 1.
+      rewrite app_nth2.
+      * rewrite firstn_length.
+        replace (Init.Nat.min (k + 1) (length indices_list)) with (k + 1)%nat by lia.
+        f_equal.
+        lia.
+      * rewrite firstn_length.
+        lia.
+    + rewrite firstn_length.
+      lia.
+Qed.
+
+Lemma length_delete_nth : forall {A : Type} (l : list A) (k : nat),
+    (k < length l)%nat -> length (delete_nth l k) = ((length l) - 1)%nat.
+Proof. intros A l k H0. 
+  unfold delete_nth.
+  rewrite app_length.
+  rewrite firstn_length.
+  rewrite skipn_length.
+  lia.
+Qed.
+
+Lemma incl_firstn_next : forall {A : Type} (l : list A) (k : nat),
+    incl (firstn k l) (firstn (s k) l).
+Proof. unfold incl.
+  intros A l k a H0.
+  gen l.
+  induction k.
+  - intros.
+    simpl in H0.
+    contradiction.
+  - intros.
+    destruct l.
+    + inversion H0.
+    + simpl in H0.
+      destruct H0.
+      * simpl.
+        auto.
+      * right.
+        auto.
+Qed.
+
+Lemma incl_skipn_previous : forall {A : Type} (l : list A) (k : nat),
+    incl (skipn (s k) l) (skipn k l).
+Proof. unfold incl.
+  intros A l k a H0.
+    gen l.
+  induction k.
+  - intros.
+    simpl.
+    destruct l.
+    + inversion H0.
+    + simpl in H0.
+      simpl.
+      auto.
+  - intros. 
+    destruct l.
+    + inversion H0.
+    + simpl.
+      apply IHk.
+      simpl in H0.
+      apply H0.
+Qed.
+
+Lemma incl_delete_nth_original : forall {A : Type} (l : list A) (k : nat),
+    incl (delete_nth l k) l.
+Proof. intros A l k.
+  unfold incl, delete_nth.
+  intros a H0.
+  rewrite in_app_iff in H0.
+  destruct H0.
+  - induction l.
+    + rewrite firstn_nil in H0.
+      assumption.
+    + destruct k.
+      * simpl in *.
+        contradiction.
+      * rewrite firstn_cons in H0.
+        simpl in H0.
+        simpl.
+        destruct H0.
+        -- left; assumption.
+        -- right.
+           apply IHl.
+           apply incl_firstn_next; trivial.
+  - induction k.
+    + replace l with (skipn 0%nat l) by easy.
+      apply incl_skipn_previous.
+      assumption.
+    + apply IHk.
+      apply incl_skipn_previous.
+      assumption.
+Qed.
+
+Lemma incl_delete_nth : forall {A : Type} (l l' : list A) (k : nat),
+    incl l l' -> incl (delete_nth l k) l'.
+Proof. intros A l l' k H0.
+  apply (incl_tran (incl_delete_nth_original l k)) in H0.
+  assumption.
+Qed.
+
+Lemma matrix_column_choose_empty : forall {n m : nat} (A : Matrix n m),
+    matrix_column_choose [] A = Zero.
+Proof. intros n m A.
+  unfold matrix_column_choose, list_vector_to_matrix.
+  prep_matrix_equality.
+  simpl.
+  destruct y; auto.
+Qed.
+
+
+ (** separate lemma of invariant for Theorem 34 *)
+Lemma invariant_span : forall {n m o : nat} (P : Vector n -> Prop) (M : Matrix n m) (A : Matrix n o),
+    WF_Matrix M -> WF_Matrix A -> basis P M ->
+    (forall i : nat, (i < o)%nat -> P (get_vec i A)) -> (o > m)%nat ->
+    (forall i : nat, (i < m)%nat -> get_vec i M <> Zero) ->
+    (forall i : nat, (i < o)%nat -> get_vec i A <> Zero) ->
+    forall j , (j <= m)%nat ->
+          (linearly_dependent (submatrix_column j A) \/
+             (exists indices_list : list nat,
+                 length indices_list = (m - j)%nat /\
+                   incl indices_list (List.seq 0 m) /\
+                   (forall v : Vector n,
+                       span M v <->
+                         (span
+                            (smash
+                               (submatrix_column j A)
+                               (matrix_column_choose indices_list M))
+                            v)))).
+Proof. intros n m o P M A H0 H1 H2 H3 H4 nonzero_col_M nonzero_col_A  j H5.
+  induction j.
+  - right.
+    exists (List.seq 0 m).
+    split.
+    + rewrite seq_length. lia.
+    + split.
+      * unfold incl.
+        intros a H6.
+        assumption.
+      * intros v.
+        -- assert (H7 : submatrix_column 0 A = @Zero n 0).
+           { apply submatrix_column_zero. }
+           rewrite H7.
+           assert (H8 : matrix_column_choose (List.seq 0 m) M = M).
+           { apply matrix_column_choose_original.
+             assumption. }
+           rewrite H8.
+           assert (H9 : smash (@Zero n 0) M = M).
+           { prep_matrix_equality.
+             unfold smash.
+             bdestruct_all.
+             replace (y - 0)%nat with y by lia.
+             reflexivity. }
+           rewrite seq_length.
+           rewrite H9.
+           split; auto.
+  - assert (H6 : (j <= m)%nat). { lia. }
+    specialize (IHj H6).
+    destruct IHj as [H7 | H7].
+    + left.
+      assert (H8 : submatrix_column j A = submatrix_column j (submatrix_column (s j) A)).
+      { rewrite subsubmatrix_column_inner; auto. }
+      rewrite H8 in H7.
+      apply linearly_dependent_submatrix_column in H7; auto.
+    + destruct H7 as [indices_list [length_indices_list [incl_indices_list eq_span]]].
+      assert (H7 : WF_Matrix (smash (submatrix_column (s j) A) (matrix_column_choose indices_list M))).
+      { auto with wf_db. }
+      assert (H8 : forall i : nat, (i < s m)%nat ->
+                       get_vec i (smash (submatrix_column (s j) A) (matrix_column_choose indices_list M)) <> @Zero n (s m)).
+      { intros i0 H8.
+        bdestruct (i0 <? s j).
+        - rewrite get_vec_smash_left; try lia.
+          rewrite get_vec_submatrix_column; try lia.
+          apply nonzero_col_A; lia.
+        - rewrite get_vec_smash_right; try lia.
+          rewrite get_vec_matrix_column_choose with (d := 0%nat); trivial; try lia.
+          apply nonzero_col_M.
+          assert (H10 : In (nth (i0 - s j) indices_list 0%nat) indices_list). { apply nth_In; lia. }
+          apply incl_indices_list in H10.
+          rewrite in_seq in H10.
+          lia. }
+      assert (H9 : linearly_dependent
+                (smash (submatrix_column (s j) A) (matrix_column_choose indices_list M))).
+      { unfold linearly_dependent.
+        assert (H9 : span (smash (submatrix_column j A) (matrix_column_choose indices_list M)) (get_vec j A)).
+        { rewrite <- eq_span.
+          unfold basis in H2.
+          destruct H2 as [subspaceP [MinP [MspansP lin_indep_m]]].
+          apply MspansP.
+          apply H3.
+          lia. }
+        unfold span in H9.
+        destruct H9 as [a [WFa H9]].
+        exists (fun r c => if (r <? j)%nat then a r c else
+                     if (r =? j)%nat then
+                       if (c =? 0)%nat then (Copp C1) else C0
+                     else a (r - 1)%nat c).
+        repeat split.
+        - unfold WF_Matrix.
+          intros x y H10.
+          unfold WF_Matrix in WFa.
+          bdestruct_all; trivial.
+          + rewrite WFa; trivial; lia.
+          + rewrite WFa; trivial; lia.
+        - intro H10.
+          apply f_equal_inv with (x := j) in H10.
+          apply f_equal_inv with (x := 0%nat) in H10.
+          simpl in H10.
+          rewrite Nat.ltb_irrefl in H10.
+          rewrite Nat.eqb_refl in H10.
+          inversion H10; lra.
+        - unfold smash, submatrix_column, matrix_column_choose, list_vector_to_matrix, Mmult.
+          prep_matrix_equality.
+          replace (@ Zero n 1 x y) with C0 by easy.
+          rewrite length_indices_list.
+          replace (s j + (m - j))%nat with ((j) + ((1) + (m - j)))%nat by lia.
+
+          rewrite big_sum_sum with (m := j) (n := (1 + (m - j))%nat).
+          rewrite big_sum_sum with (m := 1%nat) (n := (m - j)%nat).
+          assert (H10 : forall x y z : C, x + (y + z) = (x + z) + y). { intros. lca. }
+          rewrite H10.
+          simpl.
+          rewrite Cplus_0_l.
+          bdestruct_all; trivial.
+          
+          + subst.
+            clear H10. clear H11. clear H12.  clear H14.
+            assert (H10 : forall x y z : C, x + y = z -> (x + y) + z * (Copp C1) = 0).
+            { intros.
+              rewrite H10.
+              lca. }
+            apply H10.
+            replace (j + 0)%nat with j by lia.
+            apply f_equal_inv with (x := x) in H9.
+            apply f_equal_inv with (x := 0%nat) in H9.
+            unfold get_vec in H9.
+            simpl in H9.
+            rewrite H9.
+            unfold smash, submatrix_column, matrix_column_choose, list_vector_to_matrix, Mmult.
+            rewrite length_indices_list.
+            rewrite big_sum_sum with (m := j) (n := (m - j)%nat).
+            simpl.
+            f_equal.
+            * apply big_sum_eq_bounded.
+              intros x0 H11.
+              bdestruct_all.
+              reflexivity.
+            * apply big_sum_eq_bounded.
+              intros x0 H11.
+              bdestruct_all.
+              replace (j + s x0 - s j)%nat with x0 by lia.
+              replace (j + x0 - j)%nat with x0 by lia.
+              replace (j + s x0 - 1)%nat with (j + x0)%nat by lia.
+              reflexivity.
+          + unfold WF_Matrix in WFa.
+            rewrite Cmult_0_r, Cplus_0_r.
+            rewrite <- Cplus_0_r.
+            f_equal.
+            * rewrite big_sum_0_bounded; trivial.
+              intros x0 H15.
+              bdestruct_all.
+              rewrite WFa; trivial.
+              -- lca.
+              -- lia.
+            * rewrite big_sum_0_bounded; trivial.
+              intros x0 H15.
+              bdestruct_all.
+              rewrite WFa; trivial.
+              -- lca.
+              -- lia. }
+      
+      assert (H10 : (s m = s j + length indices_list)%nat).
+      { rewrite length_indices_list. rewrite <- Nat.add_1_r. lia. }
+      rewrite H10 in H8.
+      pose (linearly_dependent_bounded_linear_combination
+              (smash (submatrix_column (s j) A) (matrix_column_choose indices_list M))
+              H7 H8 H9) as H11.
+      destruct H11 as [k [H11 [a [WFa H12]]]].
+(* split k into two cases: 
+1. when k corresponds to (submatrix_column (s j) A)
+2. when k corresponds to (matrix_column_choose indices_list M)
+bdestruct (k <? s j). *)
+      bdestruct (k <? s j).
+      * (* For case 1: k < s j *)
+        (* We can get "get_vec k (submatrix_column (s j) A)
+           = (submatrix_column k (submatrix_column (s j) A)) × a" *)
+        rewrite get_vec_smash_left in H12; try lia.
+        rewrite submatrix_column_smash_left in H12; try lia.
+        (* Prove that  (submatrix_column (s j) A) is linearly_dependent by proving a separate lemma "get_vec k A = (submatrix_column k A) × a -> linearly_dependent A" then substitute A with (submatrix_column (s j) A) to get "linearly_dependent (submatrix_column (s j) A)" *)
+        apply get_vec_submatrix_column_linearly_dependent with (k := k) (a := a) (A := (submatrix_column (s j) A)) in H12; auto.
+      * (* For case 2: k >= s j *)
+        (* We prove the assertion "span (submatrix_column k (smash (submatrix_column (s j) A) (matrix_column_choose indices_list M))) (get_vec k (smash (submatrix_column (s j) A) (matrix_column_choose indices_list M)))" *)
+        assert (H14 : span (submatrix_column k (smash (submatrix_column (s j) A) (matrix_column_choose indices_list M))) (get_vec k (smash (submatrix_column (s j) A) (matrix_column_choose indices_list M)))).
+        { unfold span.
+          exists a.
+          auto. }
+        (* Then, by using "span_submatrix_column_span_reduce_col" we prove the assertion "span (reduce_col (smash (submatrix_column (s j) A) (matrix_column_choose indices_list M)) k) (get_vec k (smash (submatrix_column (s j) A) (matrix_column_choose indices_list M)))" *)
+        apply span_submatrix_column_span_reduce_col with (i := k) in H14; auto.
+        2: { rewrite length_indices_list.
+             assert (k <= j + (m - j))%nat; trivial; lia. }
+        (* Then, by using "equal_span_reduce_col" and "equal_span_reduce_col_inv" we can prove the assertion "∀ u, span (smash (submatrix_column (s j) A) (matrix_column_choose indices_list M)) u <-> span (reduce_col (smash (submatrix_column (s j) A) (matrix_column_choose indices_list M)) k) u" *)
+        assert (H15 : forall u, span (smash (submatrix_column (s j) A) (matrix_column_choose indices_list M)) u <-> span (reduce_col (smash (submatrix_column (s j) A) (matrix_column_choose indices_list M)) k) u).
+        { intros u.
+          split.
+          - intros H15.
+            apply equal_span_reduce_col; trivial.
+            rewrite length_indices_list.
+            assert (k < s (j + (m - j)))%nat; trivial; lia.
+          - intros H15.
+            apply equal_span_reduce_col_inv with (i := k); trivial.
+            rewrite length_indices_list.
+            assert (k < s (j + (m - j)))%nat; trivial; lia. }
+        (* We can directly prove the assertion "∀ u, span (smash (submatrix_column j A) (matrix_column_choose indices_list M)) u -> span (smash (submatrix_column (s j) A) (matrix_column_choose indices_list M)) u" *)
+        assert (H16 : forall u, span (smash (submatrix_column j A) (matrix_column_choose indices_list M)) u -> span (smash (submatrix_column (s j) A) (matrix_column_choose indices_list M)) u).
+        { intros u H16.
+          unfold span.
+          unfold span in H16.
+          rewrite length_indices_list in *.
+          replace (j + (m - j))%nat with m in H16 by lia.
+          replace (s j + (m - j))%nat with (s m) by lia.
+          destruct H16 as [b [WFb H16]].
+          exists (fun r c => if (r <? j)%nat then b r c else if (r =? j)%nat then C0 else b (r - 1)%nat c).
+          split.
+          - unfold WF_Matrix.
+            intros x y H17.
+            bdestruct_all; trivial.
+            assert (y >= 1)%nat; auto; try lia.
+            destruct H17; auto.
+            assert (x - 1 >= m)%nat; auto; lia.
+          - rewrite H16.
+            unfold smash, Mmult, submatrix_column.
+            prep_matrix_equality.
+            replace m with (j + (m - j))%nat at 1 by lia.
+            rewrite big_sum_sum with (m := j) (n := (m - j)%nat) at 1.
+            replace (s m) with (j + ((s m) - j))%nat at 1 by lia.
+            rewrite big_sum_sum with (m := j) (n := ((s m) - j)%nat) at 1.
+            f_equal.
+            + apply big_sum_eq_bounded.
+              intros x0 H17.
+              bdestruct_all; trivial.
+            + replace (s m - j)%nat with (1 + (m - j))%nat at 1 by lia.
+              rewrite big_sum_sum with (m := 1%nat) (n := (m - j)%nat) at 1.
+              simpl.
+              rewrite ! Cplus_0_l.
+              rewrite <- Cplus_0_l at 1.
+              f_equal.
+              * bdestruct_all.
+                lca.
+              * apply big_sum_eq_bounded.
+                intros x0 H17.
+                bdestruct_all.
+                replace (j + x0 - j)%nat with x0 by lia.
+                replace (j + s x0 - s j)%nat with x0 by lia.
+                replace (j + s x0 - 1)%nat with (j + x0)%nat by lia.
+                reflexivity. }
+        (* Using "forall i : nat, (i < o)%nat -> P (get_vec i A)" and "basis P M" and "∀ v, span M v <-> span (smash (submatrix_column j A) (matrix_column_choose indices_list M)) v" and by proving the assertion "get_vec j (smash (submatrix_column (s j) A) (matrix_column_choose indices_list M)) = get_vec j A" we can prove the assertion "span (smash (submatrix_column j A) (matrix_column_choose indices_list M)) (get_vec j (smash (submatrix_column (s j) A) (matrix_column_choose indices_list M)))" *)
+        assert (H17 : span (smash (submatrix_column j A) (matrix_column_choose indices_list M)) (get_vec j (smash (submatrix_column (s j) A) (matrix_column_choose indices_list M)))).
+        { rewrite get_vec_smash_left; try lia.
+          rewrite get_vec_submatrix_column; try lia.
+          rewrite <- eq_span.
+          unfold basis in H2.
+          destruct H2 as [subspaceP [MinP [MspansP lin_indep_M]]].
+          apply MspansP.
+          apply H3.
+          lia. }
+        (* By proving a separate general lemma "k <= size of A -> reduce_col (smash A B) k = smash (reduce_col A k) B" and by proving a separate lemma "reduce_col (submatrix_column (s j) A) j = submatrix_column j A", we can prove the assertion "smash (submatrix_column j A) (matrix_column_choose indices_list M) = reduce_col (smash (submatrix_column (s j) A) (matrix_column_choose indices_list M)) j" *)
+        assert (H18 : smash (submatrix_column j A) (matrix_column_choose indices_list M) = reduce_col (smash (submatrix_column (s j) A) (matrix_column_choose indices_list M)) j).
+        { rewrite reduce_col_smash_left, reduce_col_submatrix_column_last; trivial. }
+        (* By combining the above assertions, we can get the assertion "span (reduce_col (smash (submatrix_column (s j) A) (matrix_column_choose indices_list M)) j) (get_vec j (smash (submatrix_column (s j) A) (matrix_column_choose indices_list M)))" *)
+        rewrite H18 in H17.
+        (* By using the lemma "equal_span_reduce_col", we can get the assertion "∀ u, span (smash (submatrix_column (s j) A) (matrix_column_choose indices_list M)) u -> span (reduce_col (smash (submatrix_column (s j) A) (matrix_column_choose indices_list M)) j) u" *)
+        assert (H19 : forall u, span (smash (submatrix_column (s j) A) (matrix_column_choose indices_list M)) u -> span (reduce_col (smash (submatrix_column (s j) A) (matrix_column_choose indices_list M)) j) u).
+        { intros u H19.
+          apply equal_span_reduce_col; trivial.
+          rewrite length_indices_list.
+          assert (j < 1 + (j + (m - j)))%nat; trivial; lia. }
+        (* By combining the above assertions, we can get the assertion "∀ u, span (smash (submatrix_column (s j) A) (matrix_column_choose indices_list M)) u -> span (smash (submatrix_column j A) (matrix_column_choose indices_list M)) u" *)
+        rewrite <- H18 in H19.
+        (* Thus, we get the assertion "∀ u, span (smash (submatrix_column j A) (matrix_column_choose indices_list M)) u <-> span (smash (submatrix_column (s j) A) (matrix_column_choose indices_list M)) u" *)
+        assert (H20 : forall u, span (smash (submatrix_column j A) (matrix_column_choose indices_list M)) u <-> span (smash (submatrix_column (s j) A) (matrix_column_choose indices_list M)) u).
+        { intros u.
+          split; auto. }
+        (* We can now obtain the assertion "∀ u, span M u <-> span (smash (submatrix_column (s j) A) (matrix_column_choose indices_list M)) u" *)
+        assert (H21 : forall u, span M u <-> span (smash (submatrix_column (s j) A) (matrix_column_choose indices_list M)) u).
+        { intros u.
+          split.
+          - intros H21.
+            rewrite <- H20, <- eq_span; trivial.
+          - intros H21.
+            rewrite eq_span, H20; trivial. }
+        (* By using the above assertions, we can obtain the assertion "∀ u, span M u <-> span (reduce_col (smash (submatrix_column (s j) A) (matrix_column_choose indices_list M)) k) u" *)
+        assert (H22 : forall u, span M u <-> span (reduce_col (smash (submatrix_column (s j) A) (matrix_column_choose indices_list M)) k) u).
+        { intros u.
+          split.
+          - intros H22.
+            rewrite <- H15, <- H21; trivial.
+          - intros H22.
+            rewrite H21, H15; trivial. }
+        (* We need to show that "reduce_col (smash (submatrix_column (s j) A) (matrix_column_choose indices_list M)) k = smash (submatrix_column (s j) A) (reduce_col (matrix_column_choose indices_list M) (k - # around (s j)))". We can do this by proving a separate general lemma "k > size of A -> reduce_col (smash A B) k = smash A (reduce_col B (k - size of A))" *)
+        assert (H23 : reduce_col (smash (submatrix_column (s j) A) (matrix_column_choose indices_list M)) k = @smash n (s j) (m - j - 1)%nat (submatrix_column (s j) A) (reduce_col (matrix_column_choose indices_list M) (k - (s j)))).
+        { rewrite ! length_indices_list.
+          replace (Init.Nat.sub m j) with (Datatypes.S (Init.Nat.sub (Init.Nat.sub m j) (Datatypes.S O))) by lia.
+          replace ((fix add (n0 m0 : nat) {struct n0} : nat :=
+           match n0 return nat with
+           | O => m0
+           | Datatypes.S p => Datatypes.S (add p m0)
+           end) j (Datatypes.S (Init.Nat.sub (Init.Nat.sub m j) (Datatypes.S O))))
+            with
+            (Init.Nat.add (Datatypes.S j) (Init.Nat.sub (Init.Nat.sub m j) (Datatypes.S O)))
+            by (rewrite Plus.plus_Snm_nSm_stt; trivial).
+          rewrite reduce_col_smash_right; easy. }
+        (* We show that "reduce_col (matrix_column_choose indices_list M) (k - # around (s j)) = matrix_column_choose indices_list0 M". We can do this by proving a separate general lemma "reduce_col (matrix_column_choose indices_list M) k = matrix_column_choose (delete the kth element of indices_list) M". We delete the kth element in "indices_list" to create indices_list0. Define : firstn n l ++ skipn (n + 1) l  <- ??? try to compute on a concrete sequence *)
+        setoid_rewrite reduce_col_matrix_column_choose_delete with (k := (k - s j)%nat) in H23; trivial; try lia.
+        (* Using the above, we obtain the assertion "∀ u, span M u <-> span (smash (submatrix_column (s j) A) (matrix_column_choose indices_list0 M)) u" *)
+        rewrite H23 in H22.
+        (* Additionally, we need to show "length indices_list0 = (m - s j)%nat" and "incl indices_list0 (List.seq 0 m)". You might need to prove separate additional lemmas about lists to prove these. *)
+        right.
+        exists (delete_nth indices_list (k - s j)%nat).
+        split.
+        -- rewrite length_delete_nth, length_indices_list; lia.
+        -- split.
+           ++ apply incl_delete_nth; trivial.
+           ++ intros v.
+              split.
+              ** intros H24.
+                 rewrite length_delete_nth; try lia.
+                 assert (H25 : (Init.Nat.add (Datatypes.S j)
+                            (Init.Nat.sub (@length nat indices_list) (Datatypes.S O)))
+                         =
+                           ((fix add (n m : nat) {struct n} : nat :=
+                               match n return nat with
+                               | O => m
+                               | Datatypes.S p => Datatypes.S (add p m)
+                               end) j (@length nat indices_list))).
+                 { rewrite length_indices_list, Plus.plus_Snm_nSm_stt.
+                   replace (Init.Nat.add j (Datatypes.S (Init.Nat.sub (Init.Nat.sub m j) (Datatypes.S O)))) with m by lia.
+                   replace ((fix add (n0 m0 : nat) {struct n0} : nat :=
+                               match n0 return nat with
+                               | O => m0
+                               | Datatypes.S p => Datatypes.S (add p m0)
+                               end) j (Init.Nat.sub m j))
+                     with
+                     (Init.Nat.add j (Init.Nat.sub m j))
+                     by trivial.
+                   lia. }
+                 rewrite H25.
+                 rewrite <- H22.
+                 assumption.
+              ** intros H24.
+                 rewrite H22.
+                 rewrite length_delete_nth, length_indices_list in H24; try lia.
+                 rewrite length_indices_list.
+                 assert (H25 : (Init.Nat.add (Datatypes.S j)
+                                  (Init.Nat.sub (Init.Nat.sub m j) (Datatypes.S O)))
+                               =
+                                 ((fix add (n m : nat) {struct n} : nat :=
+                                     match n return nat with
+                                     | O => m
+                                     | Datatypes.S p => Datatypes.S (add p m)
+                                     end) j (Init.Nat.sub m j))).
+                 { rewrite Plus.plus_Snm_nSm_stt.
+                   replace (Init.Nat.add j (Datatypes.S (Init.Nat.sub (Init.Nat.sub m j) (Datatypes.S O)))) with m by lia.
+                   replace ((fix add (n0 m0 : nat) {struct n0} : nat :=
+                               match n0 return nat with
+                               | O => m0
+                               | Datatypes.S p => Datatypes.S (add p m0)
+                               end) j (Init.Nat.sub m j))
+                     with
+                     (Init.Nat.add j (Init.Nat.sub m j))
+                     by trivial.
+                   lia. }
+                 rewrite H25 in H24.
+                 assumption.
+Qed.
+
+Lemma invariant_span_final_step : forall {n m o : nat} (P : Vector n -> Prop) (M : Matrix n m) (A : Matrix n o),
+    WF_Matrix M -> WF_Matrix A -> basis P M ->
+    (forall i : nat, (i < o)%nat -> P (get_vec i A)) -> (o > m)%nat ->
+    (forall v : Vector n, span M v <-> span (submatrix_column m A) v) -> linearly_dependent A.
+Proof. intros n m o P M A H0 H1 H2 H3 H4 H5.
+  (** Show that the m+1 th column (get_vec m A) of A is a linear combination of (submatrix_column m A): (span (submatrix_column m A) (get_vec m A)) **)
+  unfold basis in H2.
+  destruct H2 as [subspaceP [MinP [MspansP lin_indep_M]]].
+  specialize (H3 m H4).
+  specialize (MspansP (get_vec m A) H3).
+  rewrite H5 in MspansP.
+  unfold span in MspansP.
+  destruct MspansP as [a [WFa H6]].
+  (** Use the lemma "get_vec_submatrix_column_linearly_dependent" to show (linearly_dependent A) **)
+  apply (get_vec_submatrix_column_linearly_dependent m a A H4 H6).
+Qed.
+
+
+(** Theorem 34 Let V be a finite-dimensional vector space over a field F, and let {u1,u2,...,um} be a basis for V. If v1,v2,...,vn are any n vectors in V, with n > m, then {v1, v2, . . . , vn} is linearly dependent. **)
+Lemma dimension_overflow : forall {n m o : nat} (P : Vector n -> Prop) (M : Matrix n m) (A : Matrix n o),
+    WF_Matrix M -> WF_Matrix A ->
+    basis P M -> (forall i : nat, (i < o)%nat -> P (get_vec i A)) -> (o > m)%nat -> linearly_dependent A.
+Proof. intros n m o P M A WFM WFA basisM AinP overflow.
+
+  (*** Classical Logic used ***)
+  destruct (Classical_Prop.classic (forall i : nat, (i < m)%nat -> get_vec i M <> Zero)) as [M_nonzero_cols | M_some_zero_cols].
+  2 : { apply some_zero_vector_linearly_dependent in M_some_zero_cols.
+        unfold basis in basisM.
+        destruct basisM as [subspaceP [MinP [MspansP lin_indep_M]]].
+        apply lindep_implies_not_linindep in M_some_zero_cols.
+        contradiction. }  
+  (*** Classical Logic used ***)
+  destruct (Classical_Prop.classic (forall i : nat, (i < o)%nat -> get_vec i A <> Zero)) as [A_nonzero_cols | A_some_zero_cols].
+  2 : { apply some_zero_vector_linearly_dependent in A_some_zero_cols.
+        assumption. }
+  remember basisM as basisM'. clear HeqbasisM'.
+  unfold basis in basisM'.
+  destruct basisM' as [subspaceP [MinP [MspansP lin_indep_M]]].
+  assert (m_leq_m : (m <= m)%nat); auto.
+  destruct (invariant_span P M A WFM WFA basisM AinP overflow M_nonzero_cols A_nonzero_cols m m_leq_m) as [lin_dep_A_m | [indices_list [length_indices_list [incl_indices_list_seq eq_span]]]].
+  - apply linearly_dependent_submatrix_column in lin_dep_A_m; assumption.
+  - replace (m - m)%nat with 0%nat in length_indices_list by lia.
+    rewrite length_zero_iff_nil in length_indices_list.
+    rewrite length_indices_list in eq_span.
+    rewrite matrix_column_choose_empty in eq_span.
+    rewrite smash_zero in eq_span; auto with wf_db.
+    simpl in eq_span.
+    rewrite Nat.add_0_r in eq_span.
+    apply (invariant_span_final_step P M A WFM WFA basisM AinP overflow eq_span).
+Qed.
+
+
+(* Corollary 35 Let V be a vector space over a field F, and let {u1,u2,...,un}
+and {v1,v2,...,vm} be two bases for V. Then m=n.
+Proof Since {u1,u2,...,un} is a basis for V and {v1,v2,...,vm} is linearly independent, Theorem 34 implies that m ≤ n. But the same reasoning implies that n ≤ m, and so m = n must hold. *)
+Lemma basis_equal_number : forall {n m o : nat} (P : Vector n -> Prop) (A : Matrix n m) (B : Matrix n o),
+    WF_Matrix A -> WF_Matrix B -> basis P A -> basis P B -> m = o.
+Proof. intros n m o P A B WFA WFB basisA basisB.
+  remember basisA as basisA'. clear HeqbasisA'.
+  remember basisB as basisB'. clear HeqbasisB'.
+  unfold basis in basisA', basisB'.
+  destruct basisA' as [subspaceP [AinP [AspansP lin_indep_A]]].
+  destruct basisB' as [subspaceP' [BinP [BspansP lin_indep_B]]].
+  bdestruct (o <=? m)%nat.
+  - bdestruct (m <=? o)%nat.
+    + lia.
+    + pose (dimension_overflow P B A WFB WFA basisB AinP H1) as lin_dep_B.
+      apply lindep_implies_not_linindep in lin_dep_B.
+      contradiction.
+  - pose (dimension_overflow P A B WFA WFB basisA BinP H0) as lin_dep_B.
+    apply lindep_implies_not_linindep in lin_dep_B.
+    contradiction.
+Qed.
+
+(* Definition 36 Let V be a finite-dimensional vector space. If V is the trivial vector space, then we say that the dimension of V is zero; otherwise, the dimension of V is the number of vectors in a basis for V . *)
+
+Definition dimension {n : nat} (P : Vector n -> Prop) (d : nat) := exists (A : Matrix n d), basis P A.
+Check dimension.
+
+(* Inductive dimension {n : nat} (P : Vector n -> Prop) (d : nat) :=
+| dim : forall (A : Matrix n d), basis P A -> dimension P d.
+
+Definition dimension {n : nat} (P : Vector n -> Prop) := { d : nat & {A : Matrix n d | basis P A } }. *)
+
+
+(*** direct induction on the number of elements m ***)
+
+(* Theorem 41 Let V be a nontrivial vector space over a field F, and suppose {u1,u2,...,um} spans V. Then a subset of {u1,u2,...,um} is a basis for V. *)
+Lemma temp : forall {n m : nat} (P : Vector n -> Prop) (M : Matrix n m),
+    subspace P -> (forall i, (i < m)%nat -> P (get_vec i M)) -> (forall v, P v -> span M v) ->
+    (exists v, v <> Zero /\ P v) ->
+    (exists indices_list, incl indices_list (List.seq 0 m)
+                     /\ basis P (matrix_column_choose indices_list M)).
+Proof. Admitted.
+
+
+
+
+
+Lemma invariant : forall {n m : nat} (M : Matrix n m),
+  forall j, (j < m)%nat ->
+       (exists indices_list, length indices_list = (m - j)%nat /\ incl indices_list (List.seq 0 m) /\
+                         
+         (linearly_independent (matrix_column_choose indices_list M) \/
+           (forall v, span M v <-> (span (matrix_column_choose indices_list M) v))))
+         
+           
+
+    ???
+          
+
+
+
+ (** separate lemma of invariant for Theorem 34 *)
+Lemma invariant_span : forall {n m o : nat} (P : Vector n -> Prop) (M : Matrix n m) (A : Matrix n o),
+    WF_Matrix M -> WF_Matrix A -> basis P M ->
+    (forall i : nat, (i < o)%nat -> P (get_vec i A)) -> (o > m)%nat ->
+    (forall i : nat, (i < m)%nat -> get_vec i M <> Zero) ->
+    (forall i : nat, (i < o)%nat -> get_vec i A <> Zero) ->
+    forall j , (j <= m)%nat ->
+          (linearly_dependent (submatrix_column j A) \/
+             (exists indices_list : list nat,
+                 length indices_list = (m - j)%nat /\
+                   incl indices_list (List.seq 0 m) /\
+                   (forall v : Vector n,
+                       span M v <->
+                         (span
+                            (smash
+                               (submatrix_column j A)
+                               (matrix_column_choose indices_list M))
+                            v)))).
+
+
+
+
+
+
 (*** Admitted ***)
 (** *** Heisenberg semantics should work for ATypes. *)
 Lemma Eigenvector_Heisenberg_semantics' {n} (a b : AType n) (g : prog) :
@@ -7084,10 +11093,10 @@ Proof. intros Pa Pb Ua Ha Ta Ub Hb Tb Triple.
   
   specialize (Unitary_Hermitian_trace_zero_index_split (translateA a) Ua Ha Ta);
     intros [plus1idxA [minus1idxA [UA [DA [PermA [equal_len_A [WFDDA [WFUUA [SpecA [traceDA0 [Eigen_plus1_A Eigen_minus1_A]]]]]]]]]]].
-  (*
+ 
   specialize (Unitary_Hermitian_trace_zero_index_split (translateA b) Ub Hb Tb);
     intros [plus1idxB [minus1idxB [UB [DB [PermB [equal_len_B [WFDDB [WFUUB [SpecB [traceDB0 [Eigen_plus1_B Eigen_minus1_B]]]]]]]]]]].
-   *)
+
 
   assert (plusA_Eigen : forall x : nat, In x plus1idxA -> Eigenpair (translateA b) (translate_prog n g × UA × e_i x, C1)).
   { intros.
@@ -7107,6 +11116,8 @@ Proof. intros Pa Pb Ua Ha Ta Ub Hb Tb Triple.
             and since { U v1, U v2, ..., U vn, U w1, U w2, ..., U wn } forms an orthonormal basis,
             { U w1, U w2, ..., U wn } "spans" the 'whole' -1 eigenspace of Q.
 
+
+            (* WRONG *)
             ( Let u be a -1 eigenvector of Q. Then Q u = - u  and 
               u = a1 U v1 + ... + an U vn + b1 U w1 + ... + bn U wn  and
               Qu = - u = (a1 U v1 + ... + an U vn) + Q (b1 U w1 + ... + bn U wn).
@@ -7122,30 +11133,44 @@ Proof. intros Pa Pb Ua Ha Ta Ub Hb Tb Triple.
                   
                3. U wi is an -1 eigenvector of Q 
 *)
-  assert (total_length : length (plus1idxA ++ minus1idxA) = (2 ^ n)%nat).
+  assert (total_length_idxA : length (plus1idxA ++ minus1idxA) = (2 ^ n)%nat).
   { apply Permutation_length in PermA.
     rewrite seq_length in PermA.
     assumption. }
 
+  assert (total_length_idxB : length (plus1idxB ++ minus1idxB) = (2 ^ n)%nat).
+  { apply Permutation_length in PermB.
+    rewrite seq_length in PermB.
+    assumption. }
 
-  
-
-(*  assert (spans_whole_space : forall (v : Vector n),
-           exists coef_vec : Vector (length (plus1idxA ++ minus1idxA)),
-             v = matrix_column_permutation
-                   (plus1idxA ++ minus1idxA)
-                   (translate_prog n g × UA)
-                   × coef_vec). *)
-  assert (spans_whole_space : forall (v : Vector n),
+  assert (spans_whole_space_A : forall (v : Vector n),
              @WF_Matrix (2 ^ n) 1 v ->
-             v = matrix_column_permutation
+             v = matrix_column_choose
+                   (plus1idxA ++ minus1idxA)
+                   UA
+                   × (vector_row_choose
+                        (plus1idxA ++ minus1idxA)
+                        ((UA)† × v))).
+  { intros.
+    destruct WFUUA as [WFUA UUA].
+    rewrite matrix_column_choose_vector_row_choose_original.
+    - apply Minv_flip in UUA; auto with wf_db.
+      rewrite <- Mmult_assoc.
+      rewrite UUA.
+      rewrite Mmult_1_l; auto with wf_db.
+    - auto with wf_db.
+    - apply Permutation_sym; auto. }
+  
+  assert (spans_whole_space_B : forall (v : Vector n),
+             @WF_Matrix (2 ^ n) 1 v ->
+             v = matrix_column_choose
                    (plus1idxA ++ minus1idxA)
                    (translate_prog n g × UA)
-                   × (vector_permutation
+                   × (vector_row_choose
                         (plus1idxA ++ minus1idxA)
                         ((translate_prog n g × UA)† × v))).
   { intros.
-    rewrite matrix_column_permutation_vector_permutation_original.
+    rewrite matrix_column_choose_vector_row_choose_original.
     - rewrite Mmult_adjoint.
       assert ((@Mmult (Nat.pow (Datatypes.S (Datatypes.S O)) n)
        (Nat.pow (Datatypes.S (Datatypes.S O)) n) (Datatypes.S O)
@@ -7177,132 +11202,34 @@ Proof. intros Pa Pb Ua Ha Ta Ub Hb Tb Triple.
       destruct WFU_g as [WF_g U_g].
       auto with wf_db.
     - apply Permutation_sym in PermA. easy. }
-      
-(*exists (vector_permutation (plus1idxA ++ minus1idxA) ((translate_prog n g × UA)† × v)).*)
-    (** redundant if matrix_column_permutation_vector_permutation_original is proved.
-
-    unfold matrix_column_permutation.
-    unfold list_vector_to_matrix.
-    unfold vector_permutation.
-
-    unfold Mmult at 1.
-
-    rewrite ! total_length.
-    do 2 (apply functional_extensionality; intros).
-    
-     assert (Zero_equals : Zero = (fun i0 : nat => get_vec i0 (translate_prog n g × UA)) (2 ^ n)%nat).
-      { simpl.
-        remember WFU_g as WFg.  clear HeqWFg.
-        remember WFUUA as WFUA. clear HeqWFUA.
-        destruct WFg as [WFg Ug].
-        destruct WFUA as [WFUA UUA].
-        unfold WF_Matrix in WFg, WFUA.
-        unfold Mmult. unfold get_vec.
-        do 2 (apply functional_extensionality; intros).
-        bdestruct_all. 2: easy.
-        rewrite big_sum_0. 1: easy.
-        intros x'. specialize (WFUA x' (2 ^ n)%nat).
-        assert (precond : (x' >= 2 ^ n)%nat \/ (2 ^ n >= 2 ^ n)%nat). 1: right; lia.
-        specialize (WFUA precond).
-        rewrite WFUA.
-        lca. }
-      rewrite Zero_equals.
-
-      assert (H' : (fun y : nat =>
-                 nth y
-                   (map
-                      (fun i0 : nat => get_vec i0 (translate_prog n g × UA))
-                      (plus1idxA ++ minus1idxA))
-                   (get_vec (2 ^ n) (translate_prog n g × UA))
-                   x 0%nat *
-                   (@Mmult (2^n)%nat (2^n)%nat 1 (translate_prog n g × UA) † v)
-                     (nth y (plus1idxA ++ minus1idxA) 0%nat) 0%nat) =
-                (fun y : nat =>
-                   get_vec
-                     (nth y (plus1idxA ++ minus1idxA) (2 ^ n)%nat)
-                     (translate_prog n g × UA)
-                     x 0%nat *
-                     (@Mmult (2^n)%nat (2^n)%nat 1 (translate_prog n g × UA) † v)
-                       (nth y (plus1idxA ++ minus1idxA) 0%nat) 0%nat)).
-      { apply functional_extensionality; intros.
-        rewrite map_nth with (d := (2 ^ n)%nat) (f := (fun i0 : nat => get_vec i0 (translate_prog n g × UA))) (l := (plus1idxA ++ minus1idxA)).
-        easy. }
-      rewrite H'. admit. } *)
-    
-      (* 
-      Search big_sum.
-      
-      remember PermA as P. clear HeqP.
-      rewrite Permutation_nth in P.
-      destruct P as [LenPerm [bijection [Bounded [Injective Mapping]]]].
-      rewrite seq_length in LenPerm.
-      Search Permutation. 
-      unfold Mmult at 1.
-      rewrite <- LenPerm. *)
-
-
-      (** bijection: 0 1 2 3 |---> p p n n *)
-
-
-
-      
-
-        
-   (** how about doing this as a matrix ***)
-  (* u = a1 U v1 + ... + an U vn + b1 U w1 + ... + bn U wn *)
-(*  assert (spans_whole_space : forall (v : Vector n),
-           exists list_coef : list C,
-             v =
-               fold_left Mplus
-                 (map (uncurry Matrix.scale)
-                    (combine list_coef
-                       (map (fun i : nat => @Mmult (2^n) (2^n) 1 (translate_prog n g × UA) (e_i i))
-                          (plus1idxA ++ minus1idxA))))
-                 Zero).
+  
+  assert (spans_whole_space_idxB : forall (v : Vector n),
+             @WF_Matrix (2 ^ n) 1 v ->
+             v = matrix_column_choose
+                   (plus1idxB ++ minus1idxB)
+                   UB
+                   × (vector_row_choose
+                        (plus1idxB ++ minus1idxB)
+                        ((UB)† × v))).
   { intros.
-    pose (coef := map (fun (i:nat) => (@Mmult (2^n) (2^n) 1
-                                   (@Mmult (2^n) (2^n) (2^n) (translate_prog n g) UA)†
-                                   v) i 0%nat) 
-                   (plus1idxA ++ minus1idxA)).
-    exists coef. unfold coef.
-    rewrite combine_map_list_app.
-    rewrite map_app.
-    rewrite fold_left_Mplus_app_Zero.
-    
-    admit. } *)
-
-  
-
-(** Definition col_append {n m} (T : Matrix n m) (v : Vector n) : Matrix n (S m)  
-
-list_vector_to_matrix_indirect := fold_left col_append l (@Zero n 0)
-
-l : list (Vector n)
-
-list of vectors into matrix
-
-list_vector_to_matrix_direct := (fun r c : nat => (nth c l (@Zero n 1)) r)
- *)
-
-
-(** permutation of matrices:
- separate definition : list of indices -> list of column vectors -> permuted matrix *)
-
-
-
-
-  
-    (** u = b1 U w1 + ... + bn U wn
+    destruct WFUUB as [WFUB UUB].
+    rewrite matrix_column_choose_vector_row_choose_original.
+    - apply Minv_flip in UUB; auto with wf_db.
+      rewrite <- Mmult_assoc.
+      rewrite UUB.
+      rewrite Mmult_1_l; auto with wf_db.
+    - auto with wf_db.
+    - apply Permutation_sym; auto. }
+(** u = b1 U w1 + ... + bn U wn
        = U A α
 
 (U A)† u = α 
-b1 = α [n]
-
+bi = α [i]
      *)
 
-  assert (half_length : length (minus1idxA) = (2 ^ (n-1))%nat).
-  { rewrite app_length in total_length.
-    rewrite equal_len_A in total_length.
+  assert (half_length_idxA : length (minus1idxA) = (2 ^ (n-1))%nat).
+  { rewrite app_length in total_length_idxA.
+    rewrite equal_len_A in total_length_idxA.
     assert (H' : (2 ^ n = 2 * (2 ^ (n - 1)))%nat).
     { setoid_rewrite <- Nat.pow_1_r at 7.
       rewrite <- Nat.pow_add_r.
@@ -7317,69 +11244,152 @@ b1 = α [n]
           replace (1 + (n - 1))%nat with ((n - 1) + 1)%nat by lia.
           assumption. }
       rewrite H'. reflexivity. }
-    rewrite H' in total_length.
+    rewrite H' in total_length_idxA.
     lia. }
+
+  assert (half_length_idxB : length (minus1idxB) = (2 ^ (n-1))%nat).
+  { rewrite app_length in total_length_idxB.
+    rewrite equal_len_B in total_length_idxB.
+    assert (H' : (2 ^ n = 2 * (2 ^ (n - 1)))%nat).
+    { setoid_rewrite <- Nat.pow_1_r at 7.
+      rewrite <- Nat.pow_add_r.
+      assert (H' : (1 + (n - 1) = n)%nat).
+      { simpl.
+        rewrite Nat.sub_1_r.
+        rewrite Nat.succ_pred; try easy.
+        destruct Pb as [ | t b Pt Pb].
+        - unfold translateA in Ub. simpl in Ub.
+          apply zero_not_unitary in Ub. contradiction.
+        - destruct Pt as [n_nonzero length_snd_t_is_n].
+          replace (1 + (n - 1))%nat with ((n - 1) + 1)%nat by lia.
+          assumption. }
+      rewrite H'. reflexivity. }
+    rewrite H' in total_length_idxB.
+    lia. }
+
+  assert (NoDup_plus1_minus1_idxA : NoDup (plus1idxA ++ minus1idxA)).
+  { apply Permutation_NoDup with (l := List.seq 0 (2 ^ n)).
+    - apply Permutation_sym; trivial.
+    - apply seq_NoDup. }
+
+  assert (NoDup_plus1_idxA : NoDup plus1idxA).
+  { apply NoDup_app_remove_r in NoDup_plus1_minus1_idxA; trivial. }
+
+  assert (NoDup_minus1_idxA : NoDup minus1idxA).
+  { apply NoDup_app_remove_l in NoDup_plus1_minus1_idxA; trivial. }
+
+  assert (NoDup_plus1_minus1_idxB : NoDup (plus1idxB ++ minus1idxB)).
+  { apply Permutation_NoDup with (l := List.seq 0 (2 ^ n)).
+    - apply Permutation_sym; trivial.
+    - apply seq_NoDup. }
+
+  assert (NoDup_plus1_idxB : NoDup plus1idxB).
+  { apply NoDup_app_remove_r in NoDup_plus1_minus1_idxB; trivial. }
+
+  assert (NoDup_minus1_idxB : NoDup minus1idxB).
+  { apply NoDup_app_remove_l in NoDup_plus1_minus1_idxB; trivial. }
 
 
   (** here for reference **)
   (* <Q (U A α) = (U A α') :: use if then else to split the multiplication in the Matrix > *)
     (** spans_minus_one_space *)
-    (* ( Let u be a -1 eigenvector of Q. Then Q u = - u  and 
-              u = a1 U v1 + ... + an U vn + b1 U w1 + ... + bn U wn  and
+    (* 
+      (* WRONG *)
+    ( Let u be a -1 eigenvector of Q. Then Q u = - u  and 
+              u* = a1 U v1 + ... + an U vn + b1 U w1 + ... + bn U wn  and
 <done>
-              Qu = - u = (a1 U v1 + ... + an U vn) + Q (b1 U w1 + ... + bn U wn).
+              Qu = - u** = (a1 U v1 + ... + an U vn) + Q (b1 U w1 + ... + bn U wn).
               Then 0 = u - u = (b1 U w1 + ... + bn U wn) + Q (b1 U w1 + ... + bn U wn)  so
               Q (b1 U w1 + ... + bn U wn) = - (b1 U w1 + ... + bn U wn).
               Then u = - (a1 U v1 + ... + an U vn) + (b1 U w1 + ... + bn U wn)  and so
               2 u = 2 (b1 U w1 + ... + bn U wn)  which gives
               u = b1 U w1 + ... + bn U wn. ) *)
 
-
-(*  assert (spans_minus_one_space : forall (v : Vector n),
-             Eigenpair (translateA b) (v, Copp C1) -> 
-             exists coef_vec : Vector (length minus1idxA),
-               v = matrix_column_permutation
-                     minus1idxA
-                     (translate_prog n g × UA)
-                     × coef_vec). *)
-  assert (spans_minus_one_space : forall (v : Vector n),
+   (*** Not needed? ***)
+(*  assert (spans_minus_one_space_B : forall (v : Vector (2 ^ n)),
              Eigenpair (translateA b) (v, Copp C1) -> @WF_Matrix (2^n)%nat 1 v ->  
-               v = matrix_column_permutation
+               v = matrix_column_choose
                      minus1idxA
                      (translate_prog n g × UA)
-                     × (vector_permutation minus1idxA ((translate_prog n g × UA)† × v))).
+                     × (vector_row_choose minus1idxA ((translate_prog n g × UA)† × v))).
   { unfold Eigenpair. simpl. 
-    intros.
-   (* exists (vector_permutation minus1idxA ((translate_prog n g × UA)† × v)). *)
+    intros v H0 H1. 
 
-    specialize (spans_whole_space v H1).
+    specialize (spans_whole_space_B v H1).
     
-    (* destruct spans_whole_space as [coef_vec_total v_is]. *)
-    remember spans_whole_space as v_is. clear Heqv_is.
+    remember spans_whole_space_B as v_is. clear Heqv_is.
+
+    rewrite matrix_column_choose_vector_row_choose_app_split in v_is.
+    all : try (destruct WFU_g as [WF_g U_g];
+               destruct WFUUA as [WFUA UUA];
+               auto with wf_db).
+
     
+    setoid_rewrite matrix_column_choose_pop_square_id in v_is.
+    setoid_rewrite vector_row_choose_matrix_column_choose in v_is.
+    
+
+    assert (H2: @Mplus (2 ^ n) 1 (translate_prog n g × UA × matrix_column_choose plus1idxA (I (2 ^ n))
+              × ((matrix_column_choose plus1idxA (I (2 ^ n))) ⊤
+                   × ((translate_prog n g × UA) † × v)))
+               (translate_prog n g × UA × matrix_column_choose minus1idxA (I (2 ^ n))
+              × ((matrix_column_choose minus1idxA (I (2 ^ n))) ⊤
+                   × ((translate_prog n g × UA) † × v))) =
+              translate_prog n g × UA × (matrix_column_choose plus1idxA (I (2 ^ n))
+                × (matrix_column_choose plus1idxA (I (2 ^ n))) ⊤)
+                     × ((translate_prog n g × UA) † × v)
+                .+ translate_prog n g × UA × (matrix_column_choose minus1idxA (I (2 ^ n))
+                × (matrix_column_choose minus1idxA (I (2 ^ n))) ⊤)
+                × ((translate_prog n g × UA) † × v)).
+    { rewrite ! Mmult_assoc. easy. }
+    rewrite H2 in v_is.
+    clear H2.
+    
+    rewrite ! matrix_column_choose_selective_diagonal in v_is.
+    
+    remember v_is as v_is'. clear Heqv_is'.
+
+    apply eigenpair_to_selective_diagonal' in plusA_Eigen.
+                  
     apply @Mmult_inj_l with (i := (2^n)%nat) (j := (2^n)%nat) (m := translateA b) in v_is.
     rewrite H0 in v_is.
-    rewrite <- Mmult_assoc in v_is.
-    rewrite <- matrix_column_permutation_assoc_square in v_is.
-    rewrite matrix_column_permutation_vector_permutation_app_split in v_is.
-    2: destruct WFU_g as [WF_g U_g];
-    destruct WFUUA as [WFUA UUA];
-    auto with wf_db.
+    rewrite Mmult_plus_distr_l in v_is.
+    rewrite <- ! Mmult_assoc in v_is.
+    all : auto with wf_db.
 
-    rewrite matrix_column_permutation_vector_permutation_app_split in spans_whole_space.
-    
+    rewrite <- ! Mmult_assoc in plusA_Eigen.
+    rewrite plusA_Eigen in v_is.
+    rewrite Mscale_1_l in v_is.
 
+    apply Mscale_inj with (c := Copp C1) in v_is.
+    replace (- C1 .* (- C1 .* v)) with v in v_is by lma'; auto with wf_db.
     
+    pose (Mplus_double_side _ _ _ _ v_is v_is') as e.
+    replace (v .+ v) with (2 .* v) in e by lma'.
+
+    rewrite matrix_column_choose_vector_row_choose_app_split in spans_whole_space_B.
+
+    admit. all: auto with wf_db. } *)
+
+  
+(** 
+    In x plus1idxA ->
+       Eigenpair (translateA b) (translate_prog n g × UA × e_i x, C1)
+                 
+         ( forall x,  In x indices_list -> Eigenpair (M1) (M2 × e_i x, c) )
+       -> M1 M2 e_i x = c M2 e_i x
+       -> M1 M2 selective_diagonal n indices_list = c M2 selective_diagonal n indices_list
+     *)
     (*** is there a good way to express v_is ?? *)
 
     
 
     
     (** the following may be redundant if we can figure it out in the above *)
-    
-    unfold matrix_column_permutation.
+    (*
+    unfold matrix_column_choose.
     unfold list_vector_to_matrix.
-    unfold vector_permutation.
+    unfold vector_row_choose.
 
     unfold Mmult at 1.
 
@@ -7426,11 +11436,16 @@ b1 = α [n]
       rewrite H'.
 
       
-      admit. }
+      admit. } *)
+
+    
 
 (** here for reference **)
   (* <Q (U A α) = (U A α') :: use if then else to split the multiplication in the Matrix > *)
-    (** spans_minus_one_space *)
+             (** spans_minus_one_space *)
+
+
+    (* WRONG *)
     (* ( Let u be a -1 eigenvector of Q. Then Q u = - u  and 
               u = a1 U v1 + ... + an U vn + b1 U w1 + ... + bn U wn  and
               Qu = - u = (a1 U v1 + ... + an U vn) + Q (b1 U w1 + ... + bn U wn).
@@ -7466,14 +11481,852 @@ b1 = α [n]
 (** non-working old version
 Lemma spans_whole_space {n} (P : Vector n -> Prop) (l : list (Vector n)) :
   forall v, P v -> exists list_coef, v = fold_left Mplus (map (uncurry Matrix.scale) (zipWith pair list_coef l)) Zero. Admitted. *)
+
+  assert (spans_whole_space_Eigen_B : forall v : Vector (2 ^ n)%nat, WF_Matrix v ->
+           exists w1 w2 : Vector (2 ^ n)%nat, WF_Matrix w1 /\ WF_Matrix w2 /\
+             (translateA b) × w1 = w1 /\ (translateA b) × w2 = (Copp C1) .* w2 /\
+               v = w1 .+ w2).
+  { intros.
+    apply eigenpair_to_selective_diagonal'' in Eigen_plus1_B.
+    apply eigenpair_to_selective_diagonal'' in Eigen_minus1_B.
+    specialize (spans_whole_space_idxB v H0).
+
+    rewrite matrix_column_choose_vector_row_choose_selective_diagonal in spans_whole_space_idxB.
+    rewrite selective_diagonal_app_split in spans_whole_space_idxB.
+    rewrite ! Mmult_plus_distr_l, ! Mmult_plus_distr_r in spans_whole_space_idxB.
+    rewrite Mscale_1_l in Eigen_plus1_B.
+    apply @Mmult_inj_r with (k := 1%nat) (m := v) in Eigen_plus1_B.
+    rewrite <- ! Mmult_assoc in spans_whole_space_idxB.
+    exists (UB × selective_diagonal (2 ^ n) plus1idxB × (UB) † × v).
+    exists (UB × selective_diagonal (2 ^ n) minus1idxB × (UB) † × v).
+    rewrite <- ! Mmult_assoc.
+    rewrite Eigen_plus1_B.
+    rewrite Eigen_minus1_B.
+    split; auto with wf_db.
+    split; auto with wf_db.
+    split; trivial.
+    split; distribute_scale; trivial.
+    all : auto with wf_db. }
+
+    (*** Admitted Lemma above ***)
+(** eigenvectors corresponding to different eigenvalues must be orthogonal
+https://books.physics.oregonstate.edu/LinAlg/eigenhermitian.html **)
+  (*
+Lemma Hermitian_different_eigenvalue_orthogonal_eigenvector :
+  forall {n} (v1 v2 : Vector n) (M : Square n) (c1 c2 : C),
+    M † = M -> c1 <> c2 -> M × v1 = c1 .* v1 -> M × v2 = c2 .* v2 ->
+    inner_product v1 v2 = 0.
+
+  assert (plus1space_orthogonal_minus1space : forall v w : Vector (2 ^ n)%nat,
+             (translateA b) × w = w -> (translateA b) × v = (Copp C1) .* v ->
+             inner_product w v = 0).
+  { admit. } *)
+
+
   
+  assert (plus1space_orth_is_minus1space : forall v : Vector (2 ^ n),
+             WF_Matrix v -> 
+             ((forall w : Vector (2 ^ n), WF_Matrix w -> (translateA b) × w = w ->
+                                    inner_product w v = 0) <->
+              (translateA b) × v = (Copp C1) .* v)).
+  { intros.
+    split; intros.
+    - specialize (spans_whole_space_Eigen_B v H0).
+      destruct spans_whole_space_Eigen_B as [w1 [w2 [H2 [H3 [H4 [H5 H6]]]]]].
+      specialize (H1 w1 H2 H4).
+      rewrite H6 in H1.
+      rewrite inner_product_plus_r in H1.
+      assert (inner_product w1 w2 = 0).
+      { apply Hermitian_different_eigenvalue_orthogonal_eigenvector
+          with (M := translateA b) (c1 := C1) (c2 := Copp C1).
+        + assumption.
+        + intro. inversion H7. lra.
+        + rewrite Mscale_1_l. assumption.
+        + assumption. }
+      rewrite H7 in H1.
+      rewrite Cplus_0_r in H1.
+      rewrite inner_product_zero_iff_zero in H1.
+      rewrite H1 in H6.
+      rewrite Mplus_0_l in H6.
+      rewrite H6.
+      all: assumption.
+    - apply Hermitian_different_eigenvalue_orthogonal_eigenvector
+        with (M := translateA b) (c1 := C1) (c2 := Copp C1).
+      + assumption.
+      + intro. inversion H4. lra.
+      + rewrite Mscale_1_l. assumption.
+      + assumption. }
+
+  assert (spans_plus_one_space_idxB : forall (v : Vector (2 ^ n)),
+             Eigenpair (translateA b) (v, C1) -> @WF_Matrix (2^n)%nat 1 v ->  
+             v = matrix_column_choose plus1idxB UB
+                   × (vector_row_choose plus1idxB ((UB)† × v))).
+  { intros. unfold Eigenpair in *; simpl in *.
+    rewrite matrix_column_choose_vector_row_choose_selective_diagonal.
+    apply eigenpair_to_selective_diagonal' in Eigen_plus1_B.
+    apply eigenpair_to_selective_diagonal' in Eigen_minus1_B.
+    specialize (spans_whole_space_idxB v H1).
+    setoid_rewrite matrix_column_choose_vector_row_choose_selective_diagonal in spans_whole_space_idxB.
+    setoid_rewrite selective_diagonal_app_split in spans_whole_space_idxB.
+    setoid_rewrite Mmult_plus_distr_l in spans_whole_space_idxB.
+    setoid_rewrite Mmult_plus_distr_r in spans_whole_space_idxB.
+    remember spans_whole_space_idxB as spans_whole_space_idxB'.
+    clear Heqspans_whole_space_idxB'.
+    apply @Mmult_inj_l with (m := translateA b) (i := (2 ^ n)%nat) (j := (2 ^ n)%nat) in spans_whole_space_idxB'.
+    rewrite H0 in spans_whole_space_idxB'.
+    rewrite Mmult_plus_distr_l in spans_whole_space_idxB'.
+    rewrite <- ! Mmult_assoc in spans_whole_space_idxB'.
+    rewrite Eigen_plus1_B in spans_whole_space_idxB'.
+    rewrite Eigen_minus1_B in spans_whole_space_idxB'.
+    apply (Mplus_double_side spans_whole_space_idxB) in spans_whole_space_idxB'.
+    assert (v .+ C1 .* v = C2 .* v). { lma'. }
+    assert (UB × selective_diagonal (2 ^ n) plus1idxB × ((UB) † × v)
+              .+ UB × selective_diagonal (2 ^ n) minus1idxB × ((UB) † × v)
+              .+ (C1 .* UB × selective_diagonal (2 ^ n) plus1idxB × (UB) † × v
+                    .+ - C1 .* UB × selective_diagonal (2 ^ n) minus1idxB × (UB) † × v) =
+              C2 .* (UB × selective_diagonal (2 ^ n) plus1idxB × (UB) † × v)).
+    { assert (forall (v1 v2 : Vector (2 ^ n)%nat), WF_Matrix v1 -> WF_Matrix v2 -> v1 .+ v2 .+ (C1 .* v1 .+ (- C1)%C .* v2) = C2 .* v1).
+      { intros. lma'. }
+      rewrite <- ! Mmult_assoc.
+      distribute_scale.
+      apply H3.
+      1-2: auto with wf_db. }
+    setoid_rewrite H2 in spans_whole_space_idxB'.
+    setoid_rewrite H3 in spans_whole_space_idxB'.
+    apply (Mscale_inv v (UB × selective_diagonal (2 ^ n) plus1idxB × (UB) † × v) C2) in spans_whole_space_idxB'.
+    rewrite <- Mmult_assoc.
+    all : auto with wf_db.
+    nonzero. }
+
+  assert (spans_minus_one_space_idxB : forall (v : Vector (2 ^ n)),
+             Eigenpair (translateA b) (v, Copp C1) -> @WF_Matrix (2^n)%nat 1 v ->  
+             v = matrix_column_choose minus1idxB UB
+                   × (vector_row_choose minus1idxB ((UB)† × v))).
+  { intros. unfold Eigenpair in *; simpl in *.
+    rewrite matrix_column_choose_vector_row_choose_selective_diagonal.
+    apply eigenpair_to_selective_diagonal' in Eigen_plus1_B.
+    apply eigenpair_to_selective_diagonal' in Eigen_minus1_B.
+    specialize (spans_whole_space_idxB v H1).
+    setoid_rewrite matrix_column_choose_vector_row_choose_selective_diagonal in spans_whole_space_idxB.
+    setoid_rewrite selective_diagonal_app_split in spans_whole_space_idxB.
+    setoid_rewrite Mmult_plus_distr_l in spans_whole_space_idxB.
+    setoid_rewrite Mmult_plus_distr_r in spans_whole_space_idxB.
+    remember spans_whole_space_idxB as spans_whole_space_idxB'.
+    clear Heqspans_whole_space_idxB'.
+    apply @Mmult_inj_l with (m := translateA b) (i := (2 ^ n)%nat) (j := (2 ^ n)%nat) in spans_whole_space_idxB'.
+    rewrite H0 in spans_whole_space_idxB'.
+    rewrite Mmult_plus_distr_l in spans_whole_space_idxB'.
+    rewrite <- ! Mmult_assoc in spans_whole_space_idxB'.
+    rewrite Eigen_plus1_B in spans_whole_space_idxB'.
+    rewrite Eigen_minus1_B in spans_whole_space_idxB'.
+    apply Mscale_inj with (c := (- C1)%C) in spans_whole_space_idxB'.
+    apply (Mplus_double_side spans_whole_space_idxB) in spans_whole_space_idxB'.
+    assert (v .+ - C1 .* (- C1 .* v) = C2 .* v). { lma'. }
+    assert (UB × selective_diagonal (2 ^ n) plus1idxB × ((UB) † × v)
+              .+ UB × selective_diagonal (2 ^ n) minus1idxB × ((UB) † × v)
+              .+ - C1 .* (C1 .* UB × selective_diagonal (2 ^ n) plus1idxB × (UB) † × v
+                            .+ - C1 .* UB × selective_diagonal (2 ^ n) minus1idxB × (UB) † × v) =
+              C2 .* (UB × selective_diagonal (2 ^ n) minus1idxB × (UB) † × v)).
+    { assert (forall (v1 v2 : Vector (2 ^ n)%nat), WF_Matrix v1 -> WF_Matrix v2 -> v1 .+ v2 .+ (- C1)%C .* (C1 .* v1 .+ (- C1)%C .* v2) = C2 .* v2).
+      { intros. lma'. }
+      rewrite <- ! Mmult_assoc.
+      distribute_scale.
+      apply H3.
+      1-2: auto with wf_db. }
+    setoid_rewrite H2 in spans_whole_space_idxB'.
+    setoid_rewrite H3 in spans_whole_space_idxB'.
+    apply (Mscale_inv v (UB × selective_diagonal (2 ^ n) minus1idxB × (UB) † × v) C2) in spans_whole_space_idxB'.
+    rewrite <- Mmult_assoc.
+    all : auto with wf_db.
+    nonzero. }
+  
+  
+  (** U : Unitary
+P Q : Unitary Hermitian Trace-Zero
+
+
+1. { v1, v2, ..., vn, w1, w2, ..., wn } forms an orthonormal basis (for the eigenspaces of P)
+<< WFUUA >>
+
+2. U preserves innerproducts
+<< unfold inner_product, WF_Unitary >>
+
+3. { U v1, U v2, ..., U vn, U w1, U w2, ..., U wn } forms an orthonormal basis.
+
+⋆4. By the assertion {P} U {Q}, given any linear combination v = a1 v1 + ... + an vn, we have QUv = Uv. Thus the span of { U v1, U v2, ..., U vn } is a subspace of the +1 eigenspace of Q.
+<< plusA_Eigen >>
+
+5. The only eigenvalues are +1 and -1. So, the only eigenspaces that exists are +1 and -1 .
+<< Lemma: Unitary_Hermitian_eigenvalue_plusminus1 >>
+
+⋆6. The "dimension of the +1 eigenspace" is equal to the "dimension of the -1 eigenspace".
+<< equal_len_A, half_length_idxA, equal_len_B, half_length_idxB:
+      length plus1idxA = length plus1idxB = length minus1idxB >>
+
+
+⋆⋆ "dimension of the +1 eigenspace of Q"
+= the size of a matrix M such that the columns of M are 'linearly independent' and 'span the +1 eigenspace of Q' (i.e. " forall u, Qu = u -> u = Mα for some column vector α ")
+
+= the size of the matrix that 'spans' it and is 'linear independent' columns of a matrix M 
+ which satisfy the property "forall u, Qu = u -> u = Mα for some column vector α".
+
+= the maximal number of linearly independent columns of a matrix M 
+ which satisfy the property "forall u, Qu = u -> u = Mα for some column vector α".
+
+
+Problems
+1. two ways to define subspace: 1) list of vectors, 2) vectorspace filtered by a Prop
+1) Let (n : nat), (l : list Vector n), and M := (list_vector_to_matrix l). 
+    Define S := { v : Vector n | exists (α : Vector (length l)), v = M α }.
+2) Let (P : Prop). Define S := { v : Vector n | P v }.
+
+
+
+
+2. if S is a " subspace " of S' and if " dim S = dim S' " then S = S'
+
+
+
+equivalence relation? <- spans the same space
+
+S := { v∈R^n | P v }
+v∈S, Q v
+∀v:Vector n, P v -> Q v
+
+
+
+forall v, P v -> Q v, where P defines the subspace and Q defines the application of v.
+usually Q := (v = M × v)
+
+
+m S
+{ n : nat | exists A : Matrix m n, A spans S /\ linearly_independent A}
+
+{ n : nat & {A : Matrix m n | A spans S & linearly_independent A} }
+
+Could be inductive.
+Definition subspace_dimension {m} (S : Subspace m)  (n : nat) : Prop := 
+  exists A : Matrix m n,  A spans S /\ linearly_independent A.
+
+Lemma subspace_dimension_unique : Prop := forall m S n n',
+subspace_dimension S n ->
+subspace_dimension S n' ->
+n = n'.
+
+Lemma subspace_dimension_exists
+
+
+⋆7. Since the whole space has 2n dimension, the "+1 eigenspace has n dimension".
+<< equal_len_A, half_length_idxA >>
+
+8. Hence the span of { U v1, U v2, ..., U vn } is the +1 eigenspace of Q.
+
+9. Hence { U v1, U v2, ..., U vn } forms an orthonormal basis for the +1 eigenspace of Q.
+
+10. Let Q u = u. (u is in the +1 eigenspace of Q)
+      Let V := [v1 v2 ... vn], W := [w1 w2 ... wn], β := (U [V W])† u.
+      Then there exists some α such that U V α = u.
+      Since (U wi)† u = (U wi)† (U V α) = wi† V α = 0 for each i,
+      and since U [V W] β = u, 0 = (U wi)† u = (U wi)† U [V W] β = [0 0..1(ith)..0] β = βi
+      for each i > n. Therefore, βw = 0 and U V (α - βv) = 0 -> α = βv since V is lin. indep.
+   *)
+
+
+  assert (lin_indep_plus1idxA : linearly_independent (matrix_column_choose plus1idxA (translate_prog n g × UA))). { admit. }
+  Search smash.
+  Search linearly_independent.
+  Search linearly_dependent.
+  assert (spans_plus_one_space_B : forall (v : Vector (2 ^ n)),
+             Eigenpair (translateA b) (v, C1) -> @WF_Matrix (2^n)%nat 1 v ->  
+             v = matrix_column_choose
+                   plus1idxA
+                   (translate_prog n g × UA)
+                   × (vector_row_choose plus1idxA ((translate_prog n g × UA)† × v))).
+  { intros.
+    unfold Eigenpair in *; simpl in *.
+    rewrite Mscale_1_l in H0.
+    specialize (spans_whole_space_B v H1).
+    rewrite matrix_column_choose_vector_row_choose_selective_diagonal.
+    apply eigenpair_to_selective_diagonal' in plusA_Eigen.
+    rewrite Mscale_1_l in plusA_Eigen.
+    rewrite matrix_column_choose_vector_row_choose_app_split in spans_whole_space_B.
+    rewrite ! matrix_column_choose_vector_row_choose_selective_diagonal in spans_whole_space_B.
+    rewrite <- ! Mmult_assoc in spans_whole_space_B.
+
+    apply eigenpair_to_selective_diagonal' in Eigen_plus1_B.
+    apply eigenpair_to_selective_diagonal' in Eigen_minus1_B.
+    rewrite Mscale_1_l in Eigen_plus1_B.
+
+    specialize (spans_whole_space_idxB v H1).
+    rewrite matrix_column_choose_vector_row_choose_selective_diagonal in spans_whole_space_idxB.
+    rewrite selective_diagonal_app_split in spans_whole_space_idxB.
+    rewrite Mmult_plus_distr_l in spans_whole_space_idxB.
+    rewrite Mmult_plus_distr_r in spans_whole_space_idxB.
+
+      
+      
+
+
+    
+(* 
+1. { v1, v2, ..., vn, w1, w2, ..., wn } forms an orthonormal basis (for the eigenspaces of P)
+2. U preserves innerproducts
+3. { U v1, U v2, ..., U vn, U w1, U w2, ..., U wn } forms an orthonormal basis.
+
+⋆4. By the assertion {P} U {Q}, given any linear combination v = a1 v1 + ... + an vn, we have QUv = Uv. Thus the span of { U v1, U v2, ..., U vn } is a subspace of the +1 eigenspace of Q.
+<< plusA_Eigen >>
+
+5. The only eigenvalues are +1 and -1. So, the only eigenspaces that exists are +1 and -1 .
+
+⋆6. The "dimension of the +1 eigenspace" is equal to the "dimension of the -1 eigenspace".
+<< equal_len_A, half_length_idxA, equal_len_B, half_length_idxB:
+      length plus1idxA = length plus1idxB = length minus1idxB >>
+
+
+⋆⋆ "dimension of the +1 eigenspace of Q"
+= the size of a matrix M such that the columns of M are 'linearly independent' and 'span the +1 eigenspace of Q' (i.e. " forall u, Qu = u -> u = Mα for some column vector α ") 
+
+
+m S
+{ n : nat | exists A : Matrix m n, A spans S /\ linearly_independent A}
+{ n : nat & {A : Matrix m n | A spans S & linearly_independent A} }
+
+
+Problems
+1. two ways to define subspace: 1) list of vectors, 2) vectorspace filtered by a Prop
+1) Let (n : nat), (l : list Vector n), and M := (list_vector_to_matrix l). 
+    Define S := { v : Vector n | exists (α : Vector (length l)), v = M α }.
+2) Let (P : Prop). Define S := { v : Vector n | P v }.
+
+
+
+
+2. if S is a " subspace " of S' and if " dim S = dim S' " then S = S'
+
+
+
+equivalence relation? <- spans the same space
+
+S := { v∈R^n | P v }
+v∈S, Q v
+∀v:Vector n, P v -> Q v
+
+
+
+forall v, P v -> Q v, where P defines the subspace and Q defines the application of v.
+usually Q := (v = M × v)
+
+
+m S
+{ n : nat | exists A : Matrix m n, A spans S /\ linearly_independent A}
+
+{ n : nat & {A : Matrix m n | A spans S & linearly_independent A} }
+
+Could be inductive.
+Definition subspace_dimension {m} (S : Subspace m)  (n : nat) : Prop := 
+  exists A : Matrix m n,  A spans S /\ linearly_independent A.
+
+Lemma subspace_dimension_unique : Prop := forall m S n n',
+subspace_dimension S n ->
+subspace_dimension S n' ->
+n = n'.
+
+Lemma subspace_dimension_exists
+
+
+⋆7. Since the whole space has 2n dimension, the "+1 eigenspace has n dimension".
+<< equal_len_A, half_length_idxA >>
+
+8. Hence the span of { U v1, U v2, ..., U vn } is the +1 eigenspace of Q.
+
+9. Hence { U v1, U v2, ..., U vn } forms a basis for the +1 eigenspace of Q.
+
+10. Let Q u = u. (u is in the +1 eigenspace of Q)
+      Let V := [v1 v2 ... vn], W := [w1 w2 ... wn], β := (U [V W])† u.
+      Then there exists some α such that U V α = u.
+      Since (U wi)† u = (U wi)† (U V α) = wi† V α = 0 for each i,
+      and since U [V W] β = u, 0 = (U wi)† u = (U wi)† U [V W] β = [0 0..1(ith)..0] β = βi
+      for each i > n. Therefore, βw = 0 and U V (α - βv) = 0 -> α = βv since V is lin. indep.
+ *)
+
+(*
+The span of { U v1, U v2, ..., U vn } is a subspace of the +1 eigenspace of Q.
+
+translateA b × (translate_prog n g × UA)
+                × selective_diagonal (2 ^ n) plus1idxA =
+                translate_prog n g × UA × selective_diagonal (2 ^ n) plus1idxA
+*)
+    (*
+    Suppose {u1, u2, . . . , un} is linearly independent. As in the proof of Theorem 43, if there exists
+v ∉ sp{u1,u2,...,un},
+ then we could add that vector v to the set to obtain a set of n+1 linearly independent vectors. However, since V has dimension n, any set of n+1 vectors is linearly dependent. This shows that every v ∈ V belongs to sp{u1,u2,...,un}. Hence {u1,u2,...,un} spans V and is therefore a basis for V .
+*)                                                              
+    
+    pose (dim_basis := { dim : nat & {A : Matrix (2 ^ n)%nat dim | (forall (v : Vector (2 ^ n)%nat), Eigenpair (translateA b) (v, C1) -> WF_Matrix v -> (exists (u : Vector dim), v = A × u)) /\ linearly_independent A} }).
+(** A can be (matrix_column_choose plus1idxB UB) hence the dimension is (2^(n-1))%nat
+We want to show that A can be (matrix_column_choose plus1idxA (translate_prog n g × UA)) **)
+
+
+    
+    assert (forall db : dim_basis, projT1 db = (2^(n-1))%nat).
+
+    
+    
+    pose (subspace1 := { v : Vector (2^n)%nat | v = translateA b × v }).
+    pose (subspace2 := { v : Vector (2^n)%nat | exists (u : Vector (2^(n-1))%nat), v = (matrix_column_choose plus1idxA (translate_prog n g × UA)) × u }).
+    pose (subspace3 := { v : Vector (2^n)%nat | exists (u : Vector (2^(n-1))%nat), v = (matrix_column_choose plus1idxB UB) × u }).
+    
+    
+    
+
+
+S := { v : Vector n | exists (α : Vector (length l)), v = M α }.
+    
+    assert (vector_row_choose minus1idxA ((translate_prog n g × UA) † × v) = Zero).
+    { unfold vector_row_choose.
+      do 2 (apply functional_extensionality; intros).
+      unfold WF_Matrix in H1.
+     
+Search matrix_column_choose.
+Search vector_row_choose.
+
+
+translateA b × (translate_prog n g × UA)
+                × selective_diagonal (2 ^ n) plus1idxA =
+                translate_prog n g × UA × selective_diagonal (2 ^ n) plus1idxA
+    
+
+     translateA b × v = v
+    
+{ dim : nat & {A : Matrix (2 ^ n)%nat dim | (forall (v : Vector (2 ^ n)%nat), Eigenpair (translateA b) (v, C1) -> WF_Matrix v -> (exists (u : Vector dim), v = A × u)) /\ linearly_independent A} }
+
+{ dim : nat & {A : Matrix (2 ^ n)%nat dim | (forall (v : Vector (2 ^ n)%nat), Eigenpair (translateA b) (v, C1) -> WF_Matrix v -> (exists (u : Vector dim), v = A × u)) /\ linearly_independent A} }
+
+In x minus1idxA -> β x 0 = C0
+
+    β = (translate_prog n g × UA) † × v
+    v = translate_prog n g × UA × β
+
+          matrix_column_choose minus1idxA ((translate_prog n g × UA) †)
+          × vector_row_choose minus1idxA v
+
+          
+
+"Since (U wi)† u = (U wi)† (U V α) = wi† V α = 0 for each i,
+      and since U [V W] β = u, 0 = (U wi)† u = (U wi)† U [V W] β = [0 0..1(ith)..0] β = βi
+      for each i > n. Therefore, βw = 0 and U V (α - βv) = 0 -> α = βv since V is lin. indep."
+
+
+<< WTS >> 
+v = matrix_column_choose plus1idxA (translate_prog n g × UA)
+      × vector_row_choose plus1idxA ((translate_prog n g × UA) † × v)
+      
+(selective_diagonal (2^n)%nat plus1idxA) × (translate_prog n g × UA) † × v
+= (translate_prog n g × UA) † × v
+
+translateA b × matrix_column_choose minus1idxA (translate_prog n g × UA)
+× vector_row_choose minus1idxA ((translate_prog n g × UA) † × v = Zero
+
+vector_row_choose minus1idxA ((translate_prog n g × UA) † × v = Zero
+(matrix_column_choose minus1idxA (I (2^n)%nat)) † × (translate_prog n g × UA) † × v = Zero
+(selective_diagonal (2^n)%nat minus1idxA) × (translate_prog n g × UA) † × v = Zero
+
+
+    
+    
+    Definition subspace_dimension {m} (S : Subspace m)  (n : nat) : Prop := 
+  exists A : Matrix m n,  A spans S /\ linearly_independent A.
+
+    
+
+    T : Matrix n m
+    forall a : Vector m, WF_Matrix a -> T × a = Zero -> a = Zero
+
+    
+    
+    
+9)    forall (u : Vector (2 ^ n)%nat), Eigenpair (translateA b) (u, C1) -> WF_Matrix u ->
+      (exists (α : Vector (2 ^ (n - 1))%nat),
+       u = translate_prog n g × UA × selective_diagonal (2 ^ n) plus1idxA × α)
+
+8?)    forall (α : Vector (2 ^ (n - 1))%nat),
+      translate_prog n g × UA × selective_diagonal (2 ^ n) plus1idxA × α
+      
+      
+translateA b × (translate_prog n g × UA)
+                × selective_diagonal (2 ^ n) plus1idxA =
+                translate_prog n g × UA × selective_diagonal (2 ^ n) plus1idxA
+
+
+dim := (2 ^ (n - 1))%nat
+M : Matrix (2 ^ n)%nat dim
+
+forall (v : Vector (2 ^ n)%nat), Eigenpair (translateA b) (v, C1) -> WF_Matrix v ->
+      (exists (u : Vector dim), v = M × u)
+
+forall a : Vector dim, WF_Matrix a -> M × a = Zero -> a = Zero
+
+
+<< WTS >>
+v = matrix_column_choose plus1idxA (translate_prog n g × UA)
+      × vector_row_choose plus1idxA ((translate_prog n g × UA) † × v)
+
+translateA b × matrix_column_choose minus1idxA (translate_prog n g × UA)
+× vector_row_choose minus1idxA ((translate_prog n g × UA) † × v = Zero
+
+vector_row_choose minus1idxA ((translate_prog n g × UA) † × v = Zero
+
+
+
+    pose (dims := { dim : nat | exists A : Matrix (2 ^ n)%nat dim, (forall (v : Vector (2 ^ n)%nat), Eigenpair (translateA b) (v, C1) -> WF_Matrix v -> (exists (u : Vector dim), v = A × u) /\ linearly_independent A)}).
+    
+    
+    
+    assert (exists Pf, (2 ^ (n - 1))%nat =  proj1_sig (@exist nat
+                       (fun dim => exists A : Matrix (2 ^ n)%nat dim, (forall (v : Vector (2 ^ n)%nat), Eigenpair (translateA b) (v, C1) -> WF_Matrix v -> (exists (u : Vector dim), v = A × u) /\ linearly_independent A))
+                       (2 ^ (n - 1))%nat
+                       Pf) ).
+    { eexists.
+      Unshelve.
+      2: { exists (matrix_column_choose plus1idxB UB).
+           
+           admit. }
+      admit. }
+    destruct H3 as [Pf H3].
+    pose (test := (exist
+          (fun dim : nat =>
+           exists A : Matrix (2 ^ n) dim,
+             forall v : Vector (2 ^ n),
+             Eigenpair (translateA b) (v, C1) ->
+             WF_Matrix v ->
+             (exists u : Vector dim, v = A × u) /\ linearly_independent A)
+          (2 ^ (n - 1))%nat Pf): dims).
+    
+    assert (translateA b × translate_prog n g × UA
+                           × selective_diagonal (2 ^ n) minus1idxA
+                           × (translate_prog n g × UA) † × v =
+           (- C1)%C .* translate_prog n g × UA
+                           × selective_diagonal (2 ^ n) minus1idxA
+                           × (translate_prog n g × UA) † × v). {
+      (* use plusA_Eigen & remember spans_whole_space_B & translateA b × spans_whole_space_B *) admit. }
+
+(** spans_whole_space_B : v =
+                        translate_prog n g × UA
+                        × selective_diagonal (2 ^ n) plus1idxA
+                        × (translate_prog n g × UA) † × v
+                        .+ translate_prog n g × UA
+                           × selective_diagonal (2 ^ n) minus1idxA
+                           × (translate_prog n g × UA) † × v
+
+<< useless result >>
+
+plusA_Eigen : translateA b × (translate_prog n g × UA) ×
+                selective_diagonal (2 ^ n) (plus1idxA ++ minus1idxA)
+                × (translate_prog n g × UA) † × v
+              = matrix_column_choose plus1idxA (translate_prog n g × UA)
+                  × vector_row_choose plus1idxA ((translate_prog n g × UA) † × v)
+                 .+ matrix_column_choose minus1idxb (translate_prog n g × UA)
+                  × vector_row_choose minus1idxb ((translate_prog n g × UA) † × v)
+
+    plusA_Eigen : translateA b ×
+                    matrix_column_choose plus1idxA (translate_prog n g × UA)
+                    × vector_row_choose plus1idxA ((translate_prog n g × UA) † × v) =
+                    matrix_column_choose plus1idxA (translate_prog n g × UA)
+                    × vector_row_choose plus1idxA ((translate_prog n g × UA) † × v) =
+
+    plusA_Eigen : translateA b × (translate_prog n g × UA)
+                × selective_diagonal (2 ^ n) plus1idxA =
+                    translate_prog n g × UA × selective_diagonal (2 ^ n) plus1idxA **)
+
+
+    
+
+
+    Search smash.
+
+
+
+
+    translateA b × (translate_prog n g × UA) × selective_diagonal (2 ^ n) plus1idxA
+      × ((translate_prog n g × UA) † × v)
+   = translate_prog n g × UA × selective_diagonal (2 ^ n) plus1idxA
+      × ((translate_prog n g × UA) † × v)
+
+      
+UB × selective_diagonal (2 ^ n) minus1idxB × (UB) †
+× (translate_prog n g × UA) × selective_diagonal (2 ^ n) plus1idxA
+× ((translate_prog n g × UA) † × v)
+
+translateA b
+× UB × selective_diagonal (2 ^ n) minus1idxB × (UB) †
+× (translate_prog n g × UA) × selective_diagonal (2 ^ n) plus1idxA
+× ((translate_prog n g × UA) † × v)
+= - C1 .* UB × selective_diagonal (2 ^ n) minus1idxB × (UB) †
+                × (translate_prog n g × UA) × selective_diagonal (2 ^ n) plus1idxA
+                × ((translate_prog n g × UA) † × v)
+
+                
+UB × selective_diagonal (2 ^ n) plus1idxB × (UB) †
+× (translate_prog n g × UA) × selective_diagonal (2 ^ n) plus1idxA
+× ((translate_prog n g × UA) † × v)
+
+translateA b
+× UB × selective_diagonal (2 ^ n) plus1idxB × (UB) †
+× (translate_prog n g × UA) × selective_diagonal (2 ^ n) plus1idxA
+× ((translate_prog n g × UA) † × v)
+= UB × selective_diagonal (2 ^ n) plus1idxB × (UB) †
+   × (translate_prog n g × UA) × selective_diagonal (2 ^ n) plus1idxA
+   × ((translate_prog n g × UA) † × v)
+
+translateA b
+× UB × selective_diagonal (2 ^ n) minus1idxB × (UB) †
+× (translate_prog n g × UA) × selective_diagonal (2 ^ n) plus1idxA
+× ((translate_prog n g × UA) † × v)
+  + translateA b
+× UB × selective_diagonal (2 ^ n) plus1idxB × (UB) †
+× (translate_prog n g × UA) × selective_diagonal (2 ^ n) plus1idxA
+× ((translate_prog n g × UA) † × v)
+= - C1 .* UB × selective_diagonal (2 ^ n) minus1idxB × (UB) †
+                × (translate_prog n g × UA) × selective_diagonal (2 ^ n) plus1idxA
+                × ((translate_prog n g × UA) † × v)
+   + UB × selective_diagonal (2 ^ n) plus1idxB × (UB) †
+   × (translate_prog n g × UA) × selective_diagonal (2 ^ n) plus1idxA
+   × ((translate_prog n g × UA) † × v)
+
+-> - C1 .* UB × selective_diagonal (2 ^ n) minus1idxB × (UB) †
+                × (translate_prog n g × UA) × selective_diagonal (2 ^ n) plus1idxA
+                × ((translate_prog n g × UA) † × v)
+   + UB × selective_diagonal (2 ^ n) plus1idxB × (UB) †
+   × (translate_prog n g × UA) × selective_diagonal (2 ^ n) plus1idxA
+   × ((translate_prog n g × UA) † × v)
+= translateA b
+× UB × selective_diagonal (2 ^ n) minus1idxB × (UB) †
+× (translate_prog n g × UA) × selective_diagonal (2 ^ n) plus1idxA
+× ((translate_prog n g × UA) † × v)
+  + translateA b
+× UB × selective_diagonal (2 ^ n) plus1idxB × (UB) †
+× (translate_prog n g × UA) × selective_diagonal (2 ^ n) plus1idxA
+× ((translate_prog n g × UA) † × v)
+= translateA b
+× (translate_prog n g × UA) × selective_diagonal (2 ^ n) plus1idxA
+× ((translate_prog n g × UA) † × v)
+= (translate_prog n g × UA) × selective_diagonal (2 ^ n) plus1idxA
+× ((translate_prog n g × UA) † × v)
+= UB × selective_diagonal (2 ^ n) (plus1idxB ++ minus1idxB) × (UB) †
+   × (translate_prog n g × UA) × selective_diagonal (2 ^ n) plus1idxA
+   × ((translate_prog n g × UA) † × v)
+= UB × selective_diagonal (2 ^ n) minus1idxB × (UB) †
+    × (translate_prog n g × UA) × selective_diagonal (2 ^ n) plus1idxA
+    × ((translate_prog n g × UA) † × v)
+   + UB × selective_diagonal (2 ^ n) plus1idxB × (UB) †
+   × (translate_prog n g × UA) × selective_diagonal (2 ^ n) plus1idxA
+   × ((translate_prog n g × UA) † × v)
+
+-> Zero = UB × selective_diagonal (2 ^ n) minus1idxB × (UB) †
+                × (translate_prog n g × UA) × selective_diagonal (2 ^ n) plus1idxA
+                (* × ((translate_prog n g × UA) † × v) *)
+
+-> UB × selective_diagonal (2 ^ n) plus1idxB × (UB) †
+   × (translate_prog n g × UA) × selective_diagonal (2 ^ n) plus1idxA
+   (* × ((translate_prog n g × UA) † × v) *)
+   = (translate_prog n g × UA) × selective_diagonal (2 ^ n) plus1idxA
+      (* × ((translate_prog n g × UA) † × v) *)
+     
+
+   
+    translate_prog n g × UA × selective_diagonal (2 ^ n) plus1idxA
+      × ((translate_prog n g × UA) † × v)
+=?
+  UB × selective_diagonal (2 ^ n) plus1idxB × ((UB) † × v)
+=
+  v
+
+    
+.  translateA b × v = v
+
+.  v = UB × selective_diagonal (2 ^ n) plus1idxB × ((UB) † × v)
+
+.  Zero = UB × selective_diagonal (2 ^ n) minus1idxB × ((UB) † × v)
+
+.. Zero = vector_row_choose minus1idxB ((UB) † × v)
+
+.  translateA b × UB × selective_diagonal (2 ^ n) plus1idxB
+    = UB × selective_diagonal (2 ^ n) plus1idxB
+
+.  translateA b × UB × selective_diagonal (2 ^ n) minus1idxB
+    = - C1 .* UB × selective_diagonal (2 ^ n) minus1idxB
+
+.  translateA b × (translate_prog n g × UA) × selective_diagonal (2 ^ n) plus1idxA
+    = translate_prog n g × UA × selective_diagonal (2 ^ n) plus1idxA
+
+.  Zero = UB × selective_diagonal (2 ^ n) minus1idxB × (UB) †
+                 × (translate_prog n g × UA) × selective_diagonal (2 ^ n) plus1idxA
+                 (* × ((translate_prog n g × UA) † × v) *)
+
+.. Zero = vector_row_choose minus1idxB
+                (UB) † × (translate_prog n g × UA) × selective_diagonal (2 ^ n) plus1idxA
+                × ((translate_prog n g × UA) † × v)
+
+.  UB × selective_diagonal (2 ^ n) plus1idxB × (UB) †
+    × (translate_prog n g × UA) × selective_diagonal (2 ^ n) plus1idxA
+    (* × ((translate_prog n g × UA) † × v) *)
+    = (translate_prog n g × UA) × selective_diagonal (2 ^ n) plus1idxA
+       (* × ((translate_prog n g × UA) † × v) *)
+(** length plus1idxA = length plus1idxB = length minus1idxB **)
+        (*** matrix_row_choose ***)
+           (** Permutation (List.seq 0 n) list
+                -> linearly_independent M
+                -> linearly_independent (matrix_column_choose list) **)
+
+        matrix_column_choose_vector_row_choose_selective_diagonal
+        vector_row_choose_matrix_column_choose
+        matrix_column_choose_inverse_r'
+         
+  v =
+  translate_prog n g × UA × selective_diagonal (2 ^ n) plus1idxA
+  × ((translate_prog n g × UA) † × v)
+
+
+
+  ...
+
+    (* 
+
+
+
+ translateA b × (translate_prog n g × UA)
+                × selective_diagonal (2 ^ n) plus1idxA =
+                translate_prog n g × UA × selective_diagonal (2 ^ n) plus1idxA
+
+ translateA b × (translate_prog n g × UA)
+                × selective_diagonal (2 ^ n) plus1idxA
+                × (translate_prog n g × UA) † × v
+ =
+                translate_prog n g × UA × selective_diagonal (2 ^ n) plus1idxA
+                × (translate_prog n g × UA) † × v
+
+v =
+                        translate_prog n g × UA
+                        × selective_diagonal (2 ^ n) plus1idxA
+                        × (translate_prog n g × UA) † × v
+                        .+ translate_prog n g × UA
+                           × selective_diagonal (2 ^ n) minus1idxA
+                           × (translate_prog n g × UA) † × v
+
+(translate_prog n g × UA) † × v =
+                        selective_diagonal (2 ^ n) plus1idxA
+                        × (translate_prog n g × UA) † × v
+                        .+ selective_diagonal (2 ^ n) minus1idxA
+                           × (translate_prog n g × UA) † × v
+
+translateA b × (translate_prog n g × UA)
+                × selective_diagonal (2 ^ n) plus1idxA 
+                × (translate_prog n g × UA) † × v
+=
+                translate_prog n g × UA × selective_diagonal (2 ^ n) plus1idxA
+                × (translate_prog n g × UA) † × v
+
+⟨ translate_prog n g × UA
+                        × selective_diagonal (2 ^ n) plus1idxA
+                        × (translate_prog n g × UA) † × v,
+    v ⟩ = 
+⟨ v, translate_prog n g × UA
+                        × selective_diagonal (2 ^ n) plus1idxA
+                        × (translate_prog n g × UA) † × v ⟩
+
+
+
+
+
+
+     *)
+
+    
+    
+
+    destruct (spans_whole_space_Eigen_B v H1) as [w1 [w2 [H2 [H3 [H4 [H5 H6]]]]]].
+    specialize (plus1space_orth_is_minus1space w2 H3).
+    remember H5 as H7. clear HeqH7.
+    rewrite <- plus1space_orth_is_minus1space in H7.
+    specialize (H7 w1 H2 H4).
+    apply Mmult_inj_square_inv_l with (M := translateA b).
+    all : auto 10 with wf_db unit_db.
+    remember H0 as H8. clear HeqH8.
+    rewrite H6 in H8.
+    rewrite Mmult_plus_distr_l in H8.
+    rewrite Mscale_1_l in H8.
+    rewrite H4, H5 in H8.
+    apply Mplus_inv_l with (m := w1) in H8.
+    apply Mplus_inj_l with (m := w2) in H8.
+    rewrite Mplus_opp_r in H8.
+    symmetry in H8.
+    replace (w2 .+ w2) with (C2 .* w2) in H8 by lma'.
+    replace Zero with (@Matrix.scale (2 ^ n)%nat 1%nat C2 Zero) in H8 by lma'.
+    apply Mscale_inv in H8.
+    rewrite H8 in H6.
+    rewrite Mplus_0_r in H6.
+    subst.
+
+    rewrite <- ! Mmult_assoc.
+
+    
+    ..
+
+  
+    admit. all : auto with wf_db. }
+
   
   assert (minusA_Eigen: forall x : nat, In x minus1idxA -> Eigenpair (translateA b) (translate_prog n g × UA × e_i x, Copp C1)).
   { intros.
-    unfold Eigenpair; simpl.
-    unfold Eigenpair in Eigen_minus1_A; simpl in Eigen_minus1_A.
-    unfold Eigenpair in *; simpl in *. 
+    unfold Eigenpair in *; simpl in *.
+    pose (NoDup_app_in_neg_l nat x plus1idxA minus1idxA NoDup_plus1_minus1 H0).
+
+    specialize (Eigen_minus1_A x H0).
     
+    rewrite <- plus1space_orth_is_minus1space.
+    intros.
+
+    setoid_rewrite Mscale_1_l in spans_plus_one_space_B.
+    specialize (spans_plus_one_space_B w H2 H1).
+
+    rewrite matrix_column_choose_vector_row_choose_selective_diagonal in spans_plus_one_space_B.
+    
+    unfold inner_product.
+    rewrite spans_plus_one_space_B.
+
+    distribute_adjoint.
+     rewrite ! adjoint_involutive. 
+    replace (((w) † × (translate_prog n g × UA)
+                × ((selective_diagonal (2 ^ n) plus1idxA) † × ((UA) † × (translate_prog n g) †))
+                × (translate_prog n g × UA × e_i x)))
+      with (w † × (translate_prog n g) × UA
+              × (selective_diagonal (2 ^ n) plus1idxA) † × (UA † × ((translate_prog n g) †
+                                                                      × (translate_prog n g)) × UA) × e_i x)
+      by (rewrite <- ! Mmult_assoc; reflexivity). 
+    destruct WFUUA as [WFUA UUA].
+    destruct WFU_g as [WF_g U_g].
+    rewrite U_g.
+    rewrite Mmult_1_r.
+    rewrite UUA.
+    rewrite Mmult_1_r.
+    rewrite selective_diagonal_hermitian.
+    
+    rewrite ! Mmult_assoc.
+    rewrite selective_diagonal_e_i_zero.
+    rewrite ! Mmult_0_r.
+    lca.
+    all : auto with wf_db. }
+    
+
+    
+
+    (* ⟨ selective_diagonal plus1idxA (I n) × (translate_prog n g × UA) † × w , e_i x ⟩*)
+
+    
+
+
+
+
     
     
     (* Since U is invertible, the assertion {P} U {Q} implies that 
@@ -7502,9 +12355,14 @@ Lemma spans_whole_space {n} (P : Vector n -> Prop) (l : list (Vector n)) :
 
 (* <Q (U A α) = (U A α') :: use if then else to split the multiplication in the Matrix > *)
     (** spans_minus_one_space *)
+
+    
+    (* WRONG *)
     (* ( Let u be a -1 eigenvector of Q. Then Q u = - u  and 
               u = a1 U v1 + ... + an U vn + b1 U w1 + ... + bn U wn  and
               Qu = - u = (a1 U v1 + ... + an U vn) + Q (b1 U w1 + ... + bn U wn).
+              Then 0 = u - u = (Σ_i 2 ai U vi) + (Σ_i bi U wi) + Q (Σ_i bi U wi).
+
               Then 0 = u - u = (b1 U w1 + ... + bn U wn) + Q (b1 U w1 + ... + bn U wn)  so
               Q (b1 U w1 + ... + bn U wn) = - (b1 U w1 + ... + bn U wn).
               Then u = - (a1 U v1 + ... + an U vn) + (b1 U w1 + ... + bn U wn)  and so
@@ -7539,16 +12397,337 @@ forall v,  v in -1 eigenspace -> span_l l v
 
 
      *)
-    admit. } 
 
+  (*** Admitted Lemma above **)
+  (* assert (Eigenvalue_plusminus1: forall (M : Square (2 ^ n)) (v : Vector (2 ^ n)) (c : C), WF_Unitary M -> M † = M -> M × v = c .* v -> (c = C1) \/ (c = Copp C1)).
+  { admit. } *)
+
+  assert (Eigen_plus1_A_inv : forall v : Vector (2 ^ n),
+             Eigenpair (translateA a) (v, C1) ->
+             WF_Matrix v ->
+             v = matrix_column_choose plus1idxA UA ×
+                      vector_row_choose plus1idxA (UA † × v)).
+              (*WRONG:  (exists x, In x plus1idxA /\ UA × e_i x = v)). *)
+  { intros.
+
+    unfold Eigenpair in *; simpl in *.
+
+    rewrite matrix_column_choose_vector_row_choose_selective_diagonal.
+    
+    rewrite <- ! Mmult_assoc.
+
+    
+
+    (* ( Let u be a +1 eigenvector of P. Then P u = u  and 
+              u = a1 v1 + ... + an vn + b1 w1 + ... + bn wn  and
+              P u = u = (a1 v1 + ... + an vn) + P (b1 w1 + ... + bn wn).
+              Then 
+
+              
+              Qu = - u = (a1 U v1 + ... + an U vn) + Q (b1 U w1 + ... + bn U wn).
+              Then 0 = u - u = (Σ_i 2 ai U vi) + (Σ_i bi U wi) + Q (Σ_i bi U wi).
+              << WRONG >>
+              Then 0 = u - u = (b1 U w1 + ... + bn U wn) + Q (b1 U w1 + ... + bn U wn)  so
+              Q (b1 U w1 + ... + bn U wn) = - (b1 U w1 + ... + bn U wn).
+              Then u = - (a1 U v1 + ... + an U vn) + (b1 U w1 + ... + bn U wn)  and so
+              2 u = 2 (b1 U w1 + ... + bn U wn)  which gives
+              u = b1 U w1 + ... + bn U wn. )
+
+              
+              *)(*** 2 ?????? ***)(*
+              2. since { U w1, U w2, ..., U wn } "spans" the 'whole' -1 eigenspace
+                  and since the dimension of { U w1, U w2, ..., U wn } and -1 eigenspace are equal
+                  { U w1, U w2, ..., U wn } is a basis of the -1 eigenspace of Q
+               
+               3. U wi is an -1 eigenvector of Q *)
+
+    
+(*    apply eigenpair_to_selective_diagonal'' in Eigen_plus1_A. *)
+
+
+    specialize (spans_whole_space_A v H1).
+    rewrite matrix_column_choose_vector_row_choose_app_split in spans_whole_space_A.
+    setoid_rewrite matrix_column_choose_vector_row_choose_selective_diagonal in spans_whole_space_A. 
+    rewrite <- ! Mmult_assoc in spans_whole_space_A.
+
+
+
+    apply eigenpair_to_selective_diagonal'' in Eigen_plus1_A.
+    apply eigenpair_to_selective_diagonal'' in Eigen_minus1_A.
+
+    remember spans_whole_space_A as spans_whole_space_A'.
+    clear Heqspans_whole_space_A'.
+    apply @Mmult_inj_l with (i := (2 ^ n)%nat) (j := (2 ^ n)%nat) (k := 1%nat) (m := translateA a) in spans_whole_space_A.
+
+    rewrite Mmult_plus_distr_l with (A := translateA a) (B := UA × selective_diagonal (2 ^ n) plus1idxA × (UA) † × v) (C := UA × selective_diagonal (2 ^ n) minus1idxA × (UA) † × v) in spans_whole_space_A.
+
+    rewrite <- ! Mmult_assoc in spans_whole_space_A.
+
+    rewrite Eigen_minus1_A, Eigen_plus1_A in spans_whole_space_A.
+    rewrite Mscale_1_l in H0, spans_whole_space_A.
+    rewrite H0 in spans_whole_space_A.
+
+    pose (@Mplus_double_side ((2 ^ n)%nat) (1%nat) (v)
+                                 (UA × selective_diagonal (2 ^ n) plus1idxA × (UA) † × v
+                                          .+ - C1 .* UA × selective_diagonal (2 ^ n) minus1idxA
+                                                 × (UA) † × v)
+                                 (v)
+                                 (UA × selective_diagonal (2 ^ n) plus1idxA × (UA) † × v
+                                    .+ UA × selective_diagonal (2 ^ n) minus1idxA × (UA) † × v)
+                                 (spans_whole_space_A)
+                                 (spans_whole_space_A')).
+    replace (v .+ v) with (C2 .* v) in e by lma'.
+
+    assert ((UA × selective_diagonal (2 ^ n) plus1idxA × (UA) † × v
+      .+ - C1 .* UA × selective_diagonal (2 ^ n) minus1idxA × (UA) † × v
+      .+ (UA × selective_diagonal (2 ^ n) plus1idxA × (UA) † × v
+            .+ UA × selective_diagonal (2 ^ n) minus1idxA × (UA) † × v))
+      = (C2 .* (UA × selective_diagonal (2 ^ n) plus1idxA × (UA) † × v))).
+    { rewrite <- Mplus_assoc. distribute_scale.
+      assert (forall n (v1 v2 : Vector n), WF_Matrix v1 -> WF_Matrix v2 -> v1 .+ -C1 .* v2 .+ v1 .+ v2 = C2 .* v1).
+      { intros. lma'. }
+      rewrite H2 with (v1 := UA × selective_diagonal (2 ^ n) plus1idxA × (UA) † × v)
+                      (v2 := UA × selective_diagonal (2 ^ n) minus1idxA × (UA) † × v).
+      all: auto with wf_db. }
+
+    rewrite H2 in e.
+    apply Mscale_inv with (c := C2) in e.
+    assumption.
+    nonzero.
+    all: auto with wf_db. }
+
+
+  
+    assert (Eigen_minus1_A_inv : forall v : Vector (2 ^ n),
+               Eigenpair (translateA a) (v, (- C1)%C) ->
+               WF_Matrix v ->
+               (v = matrix_column_choose minus1idxA UA ×
+                      vector_row_choose minus1idxA (UA † × v))).
+  (*WRONG:  (exists x, In x minus1idxA /\ UA × e_i x = v)). *)
+  { intros.
+
+    unfold Eigenpair in *; simpl in *.
+
+    rewrite matrix_column_choose_vector_row_choose_selective_diagonal.
+    rewrite <- ! Mmult_assoc.
+
+    
+
+    (* ( Let u be a +1 eigenvector of P. Then P u = u  and 
+              u = a1 v1 + ... + an vn + b1 w1 + ... + bn wn  and
+              P u = u = (a1 v1 + ... + an vn) + P (b1 w1 + ... + bn wn).
+              Then 
+
+              
+              Qu = - u = (a1 U v1 + ... + an U vn) + Q (b1 U w1 + ... + bn U wn).
+              Then 0 = u - u = (Σ_i 2 ai U vi) + (Σ_i bi U wi) + Q (Σ_i bi U wi).
+              << WRONG >>
+              Then 0 = u - u = (b1 U w1 + ... + bn U wn) + Q (b1 U w1 + ... + bn U wn)  so
+              Q (b1 U w1 + ... + bn U wn) = - (b1 U w1 + ... + bn U wn).
+              Then u = - (a1 U v1 + ... + an U vn) + (b1 U w1 + ... + bn U wn)  and so
+              2 u = 2 (b1 U w1 + ... + bn U wn)  which gives
+              u = b1 U w1 + ... + bn U wn. )
+
+              
+              *)(*** 2 ?????? ***)(*
+              2. since { U w1, U w2, ..., U wn } "spans" the 'whole' -1 eigenspace
+                  and since the dimension of { U w1, U w2, ..., U wn } and -1 eigenspace are equal
+                  { U w1, U w2, ..., U wn } is a basis of the -1 eigenspace of Q
+               
+               3. U wi is an -1 eigenvector of Q *)
+
+    
+(*    apply eigenpair_to_selective_diagonal'' in Eigen_plus1_A. *)
+
+
+    specialize (spans_whole_space_A v H1).
+    rewrite matrix_column_choose_vector_row_choose_app_split in spans_whole_space_A.
+    setoid_rewrite matrix_column_choose_vector_row_choose_selective_diagonal in spans_whole_space_A.
+    rewrite <- ! Mmult_assoc in spans_whole_space_A.
+
+
+
+    apply eigenpair_to_selective_diagonal'' in Eigen_plus1_A.
+    apply eigenpair_to_selective_diagonal'' in Eigen_minus1_A.
+
+    remember spans_whole_space_A as spans_whole_space_A'.
+    clear Heqspans_whole_space_A'.
+    apply @Mmult_inj_l with (i := (2 ^ n)%nat) (j := (2 ^ n)%nat) (k := 1%nat) (m := translateA a) in spans_whole_space_A.
+
+    rewrite Mmult_plus_distr_l with (A := translateA a) (B := UA × selective_diagonal (2 ^ n) plus1idxA × (UA) † × v) (C := UA × selective_diagonal (2 ^ n) minus1idxA × (UA) † × v) in spans_whole_space_A.
+
+    rewrite <- ! Mmult_assoc in spans_whole_space_A.
+
+    rewrite Eigen_minus1_A, Eigen_plus1_A in spans_whole_space_A.
+    rewrite Mscale_1_l in spans_whole_space_A.
+    rewrite H0 in spans_whole_space_A.
+
+    apply @Mscale_inj with (m := (2 ^ n)%nat) (n := 1%nat) (A := - C1 .* v)
+                             (B := UA × selective_diagonal (2 ^ n) plus1idxA × (UA) † × v
+                                    .+ - C1 .* UA × selective_diagonal (2 ^ n) minus1idxA
+                                           × (UA) † × v)
+                             (c := (- C1)%C) in spans_whole_space_A.
+
+    rewrite Mscale_plus_distr_r in spans_whole_space_A.
+
+    replace (- C1 .* (- C1 .* v)) with v in spans_whole_space_A by lma'.
+    assert (- C1 .* (UA × selective_diagonal (2 ^ n) plus1idxA × (UA) † × v)
+                .+ - C1 .* (- C1 .* UA × selective_diagonal (2 ^ n) minus1idxA × (UA) † × v)
+                     = - C1 .* (UA × selective_diagonal (2 ^ n) plus1idxA × (UA) † × v)
+                           .+ UA × selective_diagonal (2 ^ n) minus1idxA × (UA) † × v).
+    { distribute_scale. lma'; auto 10 with wf_db. }
+    rewrite H2 in spans_whole_space_A.
+    
+    pose (@Mplus_double_side ((2 ^ n)%nat) (1%nat) (v)
+            (- C1 .* (UA × selective_diagonal (2 ^ n) plus1idxA × (UA) † × v)
+                 .+ UA × selective_diagonal (2 ^ n) minus1idxA × (UA) † × v)
+            (v)
+            (UA × selective_diagonal (2 ^ n) plus1idxA × (UA) † × v
+               .+ UA × selective_diagonal (2 ^ n) minus1idxA × (UA) † × v)
+            (spans_whole_space_A)
+            (spans_whole_space_A')).
+    replace (v .+ v) with (C2 .* v) in e by lma'.
+
+    assert (- C1 .* (UA × selective_diagonal (2 ^ n) plus1idxA × (UA) † × v)
+      .+ UA × selective_diagonal (2 ^ n) minus1idxA × (UA) † × v
+      .+ (UA × selective_diagonal (2 ^ n) plus1idxA × (UA) † × v
+          .+ UA × selective_diagonal (2 ^ n) minus1idxA × (UA) † × v)
+           = (C2 .* (UA × selective_diagonal (2 ^ n) minus1idxA × (UA) † × v))).
+    { rewrite <- Mplus_assoc. distribute_scale.
+      assert (forall n (v1 v2 : Vector n), WF_Matrix v1 -> WF_Matrix v2 -> -C1 .* v1 .+ v2 .+ v1 .+ v2 = C2 .* v2).
+      { intros. lma'. }
+      rewrite H3 with (v1 := UA × selective_diagonal (2 ^ n) plus1idxA × (UA) † × v)
+                      (v2 := UA × selective_diagonal (2 ^ n) minus1idxA × (UA) † × v).
+      all: auto with wf_db. }
+
+    rewrite H3 in e.
+    apply Mscale_inv with (c := C2) in e.
+    assumption.
+    nonzero.
+    all: auto with wf_db. }
+  
+   
   unfold Eigenpair in plusA_Eigen, minusA_Eigen; simpl in *.
 
   assert (H': eq_eigs (translateA a) ((translate_prog n g)† × (translateA b) × (translate_prog n g))).
-  { unfold eq_eigs. unfold Eigenpair. intros p H0 H1. destruct p. simpl in *.
-    unfold Eigenpair in *. simpl in *. 
+  { unfold eq_eigs. intros p H0 H1. destruct p. simpl in *.
+
+    specialize (Unitary_Hermitian_eigenvalue_plusminus1 (translateA a) m c Ua Ha H1);
+      intro Unitary_Hermitian_eigenvalue_plusminus1.
+
+    destruct Unitary_Hermitian_eigenvalue_plusminus1 as [H2 | H2]; rewrite H2 in *.
+    - 
+
+(* both the above and below have the same a_x coefficients
+
+      forall x : nat, In x plus1idxA ->
+      translateA a × (∑_x (UA × e_i x) a_x) = C1 .* (∑_x (UA × e_i x) a_x)
+
+      forall x : nat, In x plus1idxA ->
+      translateA b × (translate_prog n g ×  (∑_x (UA × e_i x) a_x) ) =
+        C1 .* (translate_prog n g × (∑_x (UA × e_i x) a_x) )
+ *)
+
+      (** Use lemma : eigenpair_to_selective_diagonal
+
+forall {n : nat} (indices_list : list nat) (c : C) (M1 M2 M3 : Square n),
+WF_Matrix M2 ->
+WF_Matrix M3 ->
+(forall x : nat, In x indices_list -> Eigenpair M1 (M2 × M3 × e_i x, c)) ->
+M1 × M2 × M3 × selective_diagonal n indices_list × (M3) † =
+c .* M2 × M3 × selective_diagonal n indices_list × (M3) †
+
+
+
+      (forall x : nat, In x indices_list ->
+                M1 × M2 × M3 × e_i x = c .* M2 × M3 × e_i x)
+      ->  
+        (forall v : Vector (2 ^ n), v = matrix_column_choose indices_list M3
+                                     × vector_row_choose indices_list ((M3) † × v) ->
+                               M1 × M2 × v = c .* M2 × v)
+       **)
+        
+(** 
+  plusA_Eigen : forall x : nat,
+                In x plus1idxA ->
+                translateA b × (translate_prog n g × UA × e_i x) =
+                C1 .* (translate_prog n g × UA × e_i x)
+          
+  Eigen_plus1_A_inv : forall v : Vector (2 ^ n),
+                      translateA a × v = C1 .* v ->
+                      v =
+                      matrix_column_choose plus1idxA UA
+                      × vector_row_choose plus1idxA ((UA) † × v)
+          
+      forall v : Vector (2 ^ n), translateA a × v = C1 .* v ->
+                            translateA b × (translate_prog n g ×
+                                              (matrix_column_choose plus1idxA UA
+                                               × vector_row_choose plus1idxA ((UA) † × v)) ) =
+                              C1 .* (translate_prog n g ×
+                                       (matrix_column_choose plus1idxA UA
+                                          × vector_row_choose plus1idxA ((UA) † × v)) )
+
+      forall v : Vector (2 ^ n), translateA a × v = C1 .* v ->
+                            translateA b × (translate_prog n g × v) =
+                              C1 .* (translate_prog n g × v)
+*)
+
+       
+
+       
+           
+      specialize (Eigen_plus1_A_inv m H1).
+      apply eigenpair_to_selective_diagonal in plusA_Eigen.
+      rewrite matrix_column_choose_vector_row_choose_selective_diagonal in Eigen_plus1_A_inv.
+      rewrite Eigen_plus1_A_inv.
+      apply @Mmult_inj_l with (i := (2 ^ n)%nat) (m := (translate_prog n g) †) in plusA_Eigen.
+      rewrite <- ! Mmult_assoc in plusA_Eigen.
+      rewrite ! Mscale_mult_dist_r  in plusA_Eigen.
+      rewrite ! Mscale_mult_dist_l in plusA_Eigen.
+      destruct WFU_g as [WF_g U_g].
+      rewrite U_g in plusA_Eigen.
+      rewrite Mmult_1_l in plusA_Eigen.
+      unfold Eigenpair.
+      simpl.
+      rewrite <- ! Mmult_assoc.
+      rewrite plusA_Eigen.
+      distribute_scale.
+      reflexivity.
+      all: auto with wf_db.
+    - specialize (Eigen_minus1_A_inv m  H1).
+      apply eigenpair_to_selective_diagonal in minusA_Eigen.
+      rewrite matrix_column_choose_vector_row_choose_selective_diagonal in Eigen_minus1_A_inv.
+      rewrite Eigen_minus1_A_inv.
+      apply @Mmult_inj_l with (i := (2 ^ n)%nat) (m := (translate_prog n g) †) in minusA_Eigen.
+      rewrite <- ! Mmult_assoc in minusA_Eigen.
+      rewrite ! Mscale_mult_dist_r  in minusA_Eigen.
+      rewrite ! Mscale_mult_dist_l in minusA_Eigen.
+      destruct WFU_g as [WF_g U_g].
+      rewrite U_g in minusA_Eigen.
+      rewrite Mmult_1_l in minusA_Eigen.
+      unfold Eigenpair.
+      simpl.
+      rewrite <- ! Mmult_assoc.
+      rewrite minusA_Eigen.
+      distribute_scale.
+      reflexivity.
+      all: auto with wf_db. }
+
+  apply eq_eigs_implies_eq_unit in H'.
+  apply @Mmult_inj_l with (i := (2 ^ n)%nat) (m := translate_prog n g) in H'.
+  rewrite <- ! Mmult_assoc in H'.
+  destruct WFU_g as [WF_g U_g].
+  apply Minv_flip in U_g.
+  rewrite U_g in H'.
+  rewrite Mmult_1_l in H'.
+  assumption.
+  all: auto with wf_db.
+  auto with unit_db.
+  Admitted. (*** Qed. ***)
     (* 1. there exists only two eigenvalues: +1 or -1
 --> eigenvalue norm is 1: https://books.physics.oregonstate.edu/LinAlg/eigenunitary.html
---> eigenvalue is real : ???
+--> eigenvalue is real : https://books.physics.oregonstate.edu/LinAlg/eigenhermitian.html **)
+
 
         2. for each eigenvalue, the corresponding eigenvector is spanned by (UA × e_i x). 
 
@@ -7568,6 +12747,8 @@ U maps the -1-eigenspace of P precisely "onto" the -1-eigenspace of Q:
             and since { U v1, U v2, ..., U vn, U w1, U w2, ..., U wn } forms an orthonormal basis,
             { U w1, U w2, ..., U wn } "spans" the 'whole' -1 eigenspace.
 
+
+            (* WRONG *)
             ( Let u be a -1 eigenvector of Q. Then Q u = - u  and 
               u = a1 U v1 + ... + an U vn + b1 U w1 + ... + bn U wn  and
               Qu = - u = (a1 U v1 + ... + an U vn) + Q (b1 U w1 + ... + bn U wn).
@@ -7579,8 +12760,9 @@ U maps the -1-eigenspace of P precisely "onto" the -1-eigenspace of Q:
 
 
 *)
-
-  
+    
+    (** the following may be redundant if we can figure it out in the above *)
+  (*
   intros H0 H1 H2. 
   unfold vecSatisfiesP in *.
   unfold vecSatisfies in *.
@@ -7588,7 +12770,10 @@ U maps the -1-eigenspace of P precisely "onto" the -1-eigenspace of Q:
   assert (H': eq_eigs (translateA a) ((translate_prog n g)† × (translateA b) × (translate_prog n g))).
   { unfold eq_eigs. intros p H3 H4.
     destruct p. simpl in *.
-    apply eig_unit_conv; auto with unit_db. Admitted. (*
+    apply eig_unit_conv; auto with unit_db. *)
+
+Admitted.
+(*
     specialize (H2 m).
     simpl in *.
     assert (WF_Matrix m /\ Eigenpair (translateA a) (m, c)). { auto. } *)
