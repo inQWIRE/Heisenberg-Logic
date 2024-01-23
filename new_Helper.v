@@ -3,7 +3,6 @@ Require Import String.
 Require Import Program.
 Require Import List.
 
- 
 Require Export QuantumLib.Complex.
 Require Export QuantumLib.Matrix.
 Require Export QuantumLib.Quantum.

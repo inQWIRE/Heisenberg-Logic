@@ -7447,7 +7447,9 @@ Qed.
 (** eigenvalue is real : https://books.physics.oregonstate.edu/LinAlg/eigenhermitian.html **)
 Lemma Hermitian_eigenvalue_is_real : forall {n} (M : Square n) (v : Vector n) (c : C),
     M † = M -> M × v = c .* v -> c ^* = c.
-Proof. Admitted.
+Proof. intros n M v c H0 H1. 
+
+Admitted.
 (** TBD **)
 
   
@@ -8397,7 +8399,7 @@ Qed.
   
 (* Lemma 19 Suppose V is a vector space, u1,u2,...,un are vectors in V, and v ∈ sp{u1,u2,...,un}. Then
 sp{u1,u2,...,un,v} = sp{u1,u2,...,un}. *)
-(*** May not be needed *)
+
 Lemma equal_span_reduce_col : forall {n m : nat} (M : Matrix n (s m)) (i : nat),
     (i < s m)%nat -> span (reduce_col M i) (get_vec i M) ->
     (forall (u : Vector n), span M u -> span (reduce_col M i) u).
@@ -11023,51 +11025,110 @@ Definition dimension {n : nat} (P : Vector n -> Prop) := { d : nat & {A : Matrix
 
 (* Theorem 41 Let V be a nontrivial vector space over a field F, and suppose {u1,u2,...,um} spans V. Then a subset of {u1,u2,...,um} is a basis for V. *)
 Lemma temp : forall {n m : nat} (P : Vector n -> Prop) (M : Matrix n m),
-    subspace P -> (forall i, (i < m)%nat -> P (get_vec i M)) -> (forall v, P v -> span M v) ->
-    (exists v, v <> Zero /\ P v) ->
+    WF_Matrix M -> (m > 0)%nat -> subspace P -> (forall i, (i < m)%nat -> P (get_vec i M)) -> (forall v, P v -> span M v) ->
+    (exists v, v <> Zero /\ P v) -> 
     (exists indices_list, incl indices_list (List.seq 0 m)
                      /\ basis P (matrix_column_choose indices_list M)).
-Proof. Admitted.
+Proof. intros n m P M H0 H1 H2 H3 H4 H5.
+  (*** Classical Logic used ***)
+  destruct (Classical_Prop.classic (linearly_dependent M)).
+  - induction m.
+    + inversion H1.
+    + destruct m.
+      * assert (M <> Zero).
+        { (*** Classical Logic used ***)
+          destruct (Classical_Prop.classic (M = Zero)).
+          - destruct H5 as [v [H5 H5']].
+            specialize (H4 v H5').
+            unfold span in H4.
+            destruct H4 as [a [H4 H4']].
+            rewrite H4' in H5.
+            rewrite H7 in H5.
+             rewrite Mmult_0_l in H5.
+             contradiction.
+          - assumption. }
+        pose (lin_indep_vec M H0 H7) as H8.
+        apply lindep_implies_not_linindep in H6.
+        contradiction.
+      * destruct (lin_dep_gen_elem M H0 H6) as [i [H7 [v [H8 H9]]]].
+        assert (span (reduce_col M i) (get_vec i M)).
+        { unfold span.
+          exists ((Copp C1) .* v).
+          split; auto with wf_db.
+          distribute_scale.
+          rewrite H9.
+          distribute_scale.
+          lma'. }
+        pose (equal_span_reduce_col M i H7 H10) as H11.
+        assert (WF_Matrix (reduce_col M i)).
+        (*** Temporarily Admitted. ***)
+        { admit. }
+        assert (s m > 0)%nat.
+        (*** Temporarily Admitted. ***)
+        { admit. }
+        assert (forall i0 : nat, (i0 < s m)%nat -> P (get_vec i0 (reduce_col M i))).
+        (*** Temporarily Admitted. ***)
+        { admit. }
+        assert (forall v : Vector n, P v -> span (reduce_col M i) v).
+        (*** Temporarily Admitted. ***)
+        { admit. }
+  (*** Classical Logic used ***)
+        destruct (Classical_Prop.classic (linearly_dependent (reduce_col M i))).
+        -- specialize (IHm (reduce_col M i) H12 H13 H14 H15 H16).
+           destruct IHm as [indices_list [incl_indices_list basis_P]].
+           exists (map (fun n => if (n <? i) then n else s m) indices_list).
+           split.
+           ++ unfold incl.
+              intros a H17.
+              rewrite in_map_iff in H17.
+              destruct H17 as [x [H17 H18]].
+              bdestruct (x <? i).
+              ** simpl in H17.
+                 rewrite <- H17.
+                 rewrite in_seq.
+                 lia.
+              ** simpl in H17.
+                 rewrite <- H17.
+                 unfold incl in incl_indices_list.
+                 specialize (incl_indices_list x H18).
+                 rewrite in_seq in incl_indices_list.
+                 rewrite in_seq.
+                 lia.
+           ++ unfold basis.
+              assert ((matrix_column_choose (map (fun n0 : nat => if n0 <? i then n0 else s m) indices_list) M) = (matrix_column_choose indices_list (reduce_col M i))).
+                 (*** Temporarily Admitted. ***)
+              { admit. }
+              rewrite ! H17.
+              destruct basis_P as [subspaceP [in_P [spans_P lin_ind]]].
+              rewrite ! map_length.
+              repeat (split; auto).
+        -- apply not_lindep_implies_linindep in H16.
+           exists (delete_nth (List.seq 0 (s (s m))) i).
+           split.
+           ++ (*** Temporarily Admitted. ***)
+             admit.
+           ++ unfold basis.
+              rewrite <- ! reduce_col_matrix_column_choose_delete; auto.
+              2: rewrite seq_length; assumption.
+              rewrite ! matrix_column_choose_original; auto.
+              rewrite ! length_delete_nth.
+              2: rewrite seq_length; assumption.
+              rewrite ! seq_length.
+              replace ((s (s m)) - 1)%nat with (s m) by lia.
+              repeat (split; auto).
+  - apply not_lindep_implies_linindep in H6.
+    exists (List.seq 0 m).
+    split.
+    + apply incl_refl.
+    + unfold basis.
+      rewrite matrix_column_choose_original; auto.
+      rewrite ! seq_length.
+      repeat (split; try assumption).
+Qed.
 
 
-
-
-
-Lemma invariant : forall {n m : nat} (M : Matrix n m),
-  forall j, (j < m)%nat ->
-       (exists indices_list, length indices_list = (m - j)%nat /\ incl indices_list (List.seq 0 m) /\
-                         
-         (linearly_independent (matrix_column_choose indices_list M) \/
-           (forall v, span M v <-> (span (matrix_column_choose indices_list M) v))))
-         
-           
-
-    ???
+..
           
-
-
-
- (** separate lemma of invariant for Theorem 34 *)
-Lemma invariant_span : forall {n m o : nat} (P : Vector n -> Prop) (M : Matrix n m) (A : Matrix n o),
-    WF_Matrix M -> WF_Matrix A -> basis P M ->
-    (forall i : nat, (i < o)%nat -> P (get_vec i A)) -> (o > m)%nat ->
-    (forall i : nat, (i < m)%nat -> get_vec i M <> Zero) ->
-    (forall i : nat, (i < o)%nat -> get_vec i A <> Zero) ->
-    forall j , (j <= m)%nat ->
-          (linearly_dependent (submatrix_column j A) \/
-             (exists indices_list : list nat,
-                 length indices_list = (m - j)%nat /\
-                   incl indices_list (List.seq 0 m) /\
-                   (forall v : Vector n,
-                       span M v <->
-                         (span
-                            (smash
-                               (submatrix_column j A)
-                               (matrix_column_choose indices_list M))
-                            v)))).
-
-
-
 
 
 
