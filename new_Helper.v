@@ -305,7 +305,7 @@ Lemma skipn_nil_length : forall {X : Type} (n : nat) (ls : list X),
 Proof. intros. 
        rewrite <- (firstn_skipn n ls).
        rewrite H. 
-       rewrite <- app_nil_end.
+       rewrite app_nil_r.
        apply firstn_le_length.
 Qed.
 
