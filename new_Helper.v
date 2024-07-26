@@ -466,7 +466,7 @@ Proof. reflexivity. Qed.
 
 
 (* Heisenberg.v line 1588 *)
-Ltac pauli_matrix_computation :=
+Ltac matrix_compute :=
   repeat
     (try apply mat_equiv_eq;
      match goal with
@@ -492,6 +492,13 @@ Ltac pauli_matrix_computation :=
     end).
 
 
+Lemma WF_Unitary_implies_WF_Matrix : forall {n} (U : Square n),
+    WF_Unitary U -> WF_Matrix U.
+Proof. intros. unfold WF_Unitary in H. destruct H. assumption. Qed.
+
+#[export] Hint Resolve WF_Unitary_implies_WF_Matrix : wf_db unit_db.
+
+
 (* defining program application *)
 (* Heisenberg.v line 2355 *)
 Definition prog_simpl_app (prg_len : nat) (U : Square 2) (bit : nat) : Square (2^prg_len) :=
@@ -511,6 +518,16 @@ Proof. intros.
        auto with unit_db.
 Qed.
 
+#[export] Hint Resolve unit_prog_simpl_app : unit_db.
+
+Lemma WF_Matrix_prog_simpl_app : forall (prg_len : nat) (U : Square 2) (bit : nat),
+  WF_Matrix U -> WF_Matrix (prog_simpl_app prg_len U bit).
+Proof. intros.
+  unfold prog_simpl_app.
+  bdestruct_all; auto with wf_db.
+Qed.
+
+#[export] Hint Resolve WF_Matrix_prog_simpl_app : wf_db.
 
 (* Heisenberg.v line 2374 *)
 Definition prog_ctrl_app (prg_len : nat) (U : Square 2) (ctrl targ : nat) : Square (2^prg_len) :=
@@ -673,6 +690,22 @@ Proof. intros.
            lia. 
 Qed.
 
+#[export] Hint Resolve unit_prog_ctrl_app : unit_db.
+
+Lemma WF_Matrix_prog_ctrl_app : forall (prg_len : nat) (U : Square 2) (ctrl targ : nat),
+  WF_Matrix U -> WF_Matrix (prog_ctrl_app prg_len U ctrl targ). 
+Proof. intros.
+  unfold prog_ctrl_app.
+  bdestruct_all; simpl; auto with wf_db;
+    apply WF_kron;
+    try (replace (2 ^ (targ - ctrl) + (2 ^ (targ - ctrl) + 0))
+        with (2 ^ (1 + (targ - ctrl)))
+        by (rewrite Nat.pow_add_r; simpl; auto);
+         rewrite <- ! Nat.pow_add_r; f_equal; lia);
+    auto with wf_db.
+Qed.
+
+#[export] Hint Resolve WF_Matrix_prog_ctrl_app : wf_db.
 
 
 (* Heisenberg.v line 2888 *)
