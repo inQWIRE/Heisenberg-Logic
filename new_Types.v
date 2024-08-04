@@ -21,6 +21,16 @@ Open Scope Predicate_scope.
 (* Helper Lemmas *)
 (************************)
 
+Lemma eq_implies_JMeq : forall (A : Type) (x y : A), 
+    x = y -> JMeq x y.
+Proof. intros A x y H. rewrite H. reflexivity. Qed.
+
+Lemma eq_eq_dep : forall (U : Type) (P : U -> Type) (p : U) (x y : P p),
+  x = y -> EqdepFacts.eq_dep U P p x p y.
+Proof. intros. apply JMeq_eq_dep; auto. 
+  apply eq_implies_JMeq; auto. 
+Qed.
+
 Lemma WF_Unitary_implies_WF_Matrix : forall {n} (U : Square n),
     WF_Unitary U -> WF_Matrix U.
 Proof. intros. unfold WF_Unitary in H. destruct H. assumption. Qed.
@@ -607,6 +617,7 @@ Inductive Predicate (n : nat) : Type :=
 | G : AType n -> Predicate n
 | Cap : Predicate n -> Predicate n -> Predicate n
 | Cup : Predicate n -> Predicate n -> Predicate n
+| Sep : forall (l : list nat), Predicate (length l) -> Predicate n
 | Err : Predicate n.
 
 Arguments G {n}.
@@ -616,11 +627,40 @@ Arguments Err {n}.
 
 Definition defaultP (n : nat) : Predicate n := G (defaultA n).
 
+Fixpoint pad_Sep_listP (m : nat) (Ln : list nat) (Lp : list Pauli) :=
+  match Ln with
+  | [] => repeat gI m
+  | n :: Ln' => 
+    match Lp with
+    | [] => repeat gI m
+    | p :: Lp' => switch (pad_Sep_listP m Ln' Lp') p n
+    end
+  end.
+
+Definition pad_Sep_TType {n : nat} (m : nat) (l : list nat) (t : TType n) := (fst t, pad_Sep_listP m l (snd t)).
+
+Definition pad_Sep_AType {n : nat} (m : nat) (l : list nat) (a : AType n) := map (fun t => pad_Sep_TType m l t) a.
+
+Fixpoint pad_Sep_Predicate {n : nat} (m : nat) (l : list nat) (p : Predicate n) := 
+  match p with
+  | G a => G (pad_Sep_AType m l a)
+  | Cap a b => Cap (pad_Sep_Predicate m l a) (pad_Sep_Predicate m l b)
+  | Cup a b => Cup (pad_Sep_Predicate m l a) (pad_Sep_Predicate m l b)
+  | Sep _ l' a' => Sep m l' a'
+  | Err => Err
+  end.
+
+
 Definition translateP {n} (A : Predicate n) :=
   match A with
   | G a => translateA a
-  | Cap a b => Zero
-  | Cup a b => Zero
+  | Cap _ _ => Zero
+  | Cup _ _ => Zero
+  | Sep _ l a => 
+    match pad_Sep_Predicate n l a with
+    | G a' => translateA a'
+    | _ => Zero
+    end
   | Err => Zero
   end.
 
@@ -663,6 +703,7 @@ Fixpoint scale {n} (c : Coef) (A : Predicate n) : Predicate n :=
   | G a => G (gScaleA c a)
   | Cap a b => Cap (scale c a) (scale c b)
   | Cup a b => Cup (scale c a) (scale c b)
+  | Sep _ l a => Sep n l (scale c a)
   | Err => Err
   end.
 
@@ -673,7 +714,7 @@ Notation "+i A" := (scale Ci A)  (at level 35, right associativity) : Predicate_
 Notation "-i A" := (scale (Copp Ci) A)  (at level 35, right associativity) : Predicate_scope.
 
 Lemma neg_inv : forall {n : nat} (p : Predicate n), (- (- p)) = p.
-Proof. intros. induction p; simpl; try (rewrite IHp1, IHp2); auto.
+Proof. intros. induction p; simpl; try (rewrite IHp1, IHp2); try rewrite IHp; auto.
   rewrite gScaleA_merge.
   replace (- C1 * - C1) with C1 by lca.
   rewrite gScaleA_1. auto.
@@ -684,8 +725,9 @@ Infix "*'" := mul (at level 40, left associativity) : Predicate_scope.
 Infix "·'" := scale (at level 43, left associativity) : Predicate_scope.
 Infix "+'" := add (at level 50, left associativity) : Predicate_scope.
 
-Notation "A ∩ B" := (Cap A B) (at level 60, no associativity) : Predicate_scope.
-Notation "A ⊍ B" := (Cup A B) (at level 60, no associativity) : Predicate_scope.
+Notation "A ∩ B" := (Cap A B) (at level 61, left associativity) : Predicate_scope.
+Notation "A ⊍ B" := (Cup A B) (at level 61, left associativity) : Predicate_scope.
+Notation "A _{ l : n }" := (Sep n l A) (at level 30, no associativity) : Predicate_scope.
 
 
 (******************************************************************************)
@@ -818,63 +860,132 @@ Notation tYI := (C1, [gY; gI]).
 Notation tIY := (C1, [gI; gY]).
 Notation tYY := (C1, [gY; gY]).
 Notation tYX := (C1, [gY; gX]).
+Notation tXY := (C1, [gX; gY]).
 Notation tZY := (C1, [gZ; gY]).
+Notation tYZ := (C1, [gY; gZ]).
 Notation tXZ := (C1, [gX; gZ]).
+Notation tZX := (C1, [gZ; gX]).
 Notation tZI := (C1, [gZ; gI]).
 Notation tIZ := (C1, [gI; gZ]).
 Notation tZZ := (C1, [gZ; gZ]).
+Notation mtI := ((- C1)%C, [gI]).
+Notation mtX := ((- C1)%C, [gX]).
+Notation mtY := ((- C1)%C, [gY]).
+Notation mtZ := ((- C1)%C, [gZ]).
+Notation mtII := ((- C1)%C, [gI; gI]).
+Notation mtXI := ((- C1)%C, [gX; gI]).
+Notation mtIX := ((- C1)%C, [gI; gX]).
+Notation mtXX := ((- C1)%C, [gX; gX]).
+Notation mtYI := ((- C1)%C, [gY; gI]).
+Notation mtIY := ((- C1)%C, [gI; gY]).
+Notation mtYY := ((- C1)%C, [gY; gY]).
+Notation mtYX := ((- C1)%C, [gY; gX]).
+Notation mtXY := ((- C1)%C, [gX; gY]).
+Notation mtZY := ((- C1)%C, [gZ; gY]).
+Notation mtYZ := ((- C1)%C, [gY; gZ]).
+Notation mtXZ := ((- C1)%C, [gX; gZ]).
+Notation mtZX := ((- C1)%C, [gZ; gX]).
+Notation mtZI := ((- C1)%C, [gZ; gI]).
+Notation mtIZ := ((- C1)%C, [gI; gZ]).
+Notation mtZZ := ((- C1)%C, [gZ; gZ]).
 
-Notation aI := [(C1, [gI])].
-Notation aX := [(C1, [gX])].
-Notation aY := [(C1, [gY])].
-Notation aZ := [(C1, [gZ])].
-Notation aII := [(C1, [gI; gI])].
-Notation aXI := [(C1, [gX; gI])].
-Notation aIX := [(C1, [gI; gX])].
-Notation aXX := [(C1, [gX; gX])].
-Notation aYI := [(C1, [gY; gI])].
-Notation aIY := [(C1, [gI; gY])].
-Notation aYY := [(C1, [gY; gY])].
-Notation aYX := [(C1, [gY; gX])].
-Notation aZY := [(C1, [gZ; gY])].
-Notation aXZ := [(C1, [gX; gZ])].
-Notation aZI := [(C1, [gZ; gI])].
-Notation aIZ := [(C1, [gI; gZ])].
-Notation aZZ := [(C1, [gZ ;gZ])].
+Notation aI := [tI].
+Notation aX := [tX].
+Notation aY := [tY].
+Notation aZ := [tZ].
+Notation aII := [tII].
+Notation aXI := [tXI].
+Notation aIX := [tIX].
+Notation aXX := [tXX].
+Notation aYI := [tYI].
+Notation aIY := [tIY].
+Notation aYY := [tYY].
+Notation aYX := [tYX].
+Notation aXY := [tXY].
+Notation aZY := [tZY].
+Notation aYZ := [tYZ].
+Notation aXZ := [tXZ].
+Notation aZX := [tZX].
+Notation aZI := [tZI].
+Notation aIZ := [tIZ].
+Notation aZZ := [tZZ].
+Notation maI := [mtI].
+Notation maX := [mtX].
+Notation maY := [mtY].
+Notation maZ := [mtZ].
+Notation maII := [mtII].
+Notation maXI := [mtXI].
+Notation maIX := [mtIX].
+Notation maXX := [mtXX].
+Notation maYI := [mtYI].
+Notation maIY := [mtIY].
+Notation maYY := [mtYY].
+Notation maYX := [mtYX].
+Notation maXY := [mtXY].
+Notation maZY := [mtZY].
+Notation maYZ := [mtYZ].
+Notation maXZ := [mtXZ].
+Notation maZX := [mtZX].
+Notation maZI := [mtZI].
+Notation maIZ := [mtIZ].
+Notation maZZ := [mtZZ].
 Notation aXY2 := (gScaleA (C1/√2)%C [(C1, [gX]); (C1, [gY])]).
 Notation aYX2 := (gScaleA (C1/√2)%C [(C1, [gY]); (C1, [gX])]).
 Notation aX2Y2 := [((C1/√2)%C, [gX]); ((C1/√2)%C, [gY])].
 Notation aY2X2 := [((C1/√2)%C, [gY]); ((C1/√2)%C, [gX])].
 Notation aYmX2 := (gScaleA (C1/√2)%C [(C1, [gY]); ((- C1)%C, [gX])]).
-Notation aXmY2 := (gScaleA (C1/√2)%C [(C1, [gX]); ((- C1)%C, [gY])]).
+Notation amXY2 := (gScaleA (C1/√2)%C [((- C1)%C, [gX]); (C1, [gY])]).
 Notation aY2mX2 := [((C1/√2)%C, [gY]); (((C1/√2) * (- C1))%C, [gX])].
 Notation amX2Y2 := [(((C1/√2) * (- C1))%C, [gX]); ((C1/√2)%C, [gY])].
 
-Notation pI := (@G 1 [(C1, [gI])]).
-Notation pX := (@G 1 [(C1, [gX])]).
-Notation pY := (@G 1 [(C1, [gY])]).
-Notation pZ := (@G 1 [(C1, [gZ])]).
-Notation pII := (@G 2 [(C1, [gI; gI])]).
-Notation pXI := (@G 2 [(C1, [gX; gI])]).
-Notation pIX := (@G 2 [(C1, [gI; gX])]).
-Notation pXX := (@G 2 [(C1, [gX; gX])]).
-Notation pYI := (@G 2 [(C1, [gY; gI])]).
-Notation pIY := (@G 2 [(C1, [gI; gY])]).
-Notation pYY := (@G 2 [(C1, [gY; gY])]).
-Notation pYX := (@G 2 [(C1, [gY; gX])]).
-Notation pZY := (@G 2 [(C1, [gZ; gY])]).
-Notation pXZ := (@G 2 [(C1, [gX; gZ])]).
-Notation pZI := (@G 2 [(C1, [gZ; gI])]).
-Notation pIZ := (@G 2 [(C1, [gI; gZ])]).
-Notation pZZ := (@G 2 [(C1, [gZ ;gZ])]).
-Notation pXY2 := (@G 1 (gScaleA (C1/√2)%C [(C1, [gX]); (C1, [gY])])).
-Notation pYX2 := (@G 1 (gScaleA (C1/√2)%C [(C1, [gY]); (C1, [gX])])).
-Notation pX2Y2 := (@G 1 [((C1/√2)%C, [gX]); ((C1/√2)%C, [gY])]).
-Notation pY2X2 := (@G 1 [((C1/√2)%C, [gY]); ((C1/√2)%C, [gX])]).
-Notation pYmX2 := (@G 1 (gScaleA (C1/√2)%C [(C1, [gY]); ((- C1)%C, [gX])])).
-Notation pmXY2 := (@G 1 (gScaleA (C1/√2)%C [((- C1)%C, [gX]); (C1, [gY])])).
-Notation pY2mX2 := (@G 1 [((C1/√2)%C, [gY]); (((C1/√2) * (- C1))%C, [gX])]).
-Notation pmX2Y2 := (@G 1 [(((C1/√2) * (- C1))%C, [gX]); ((C1/√2)%C, [gY])]).
+Notation pI := (@G 1 aI).
+Notation pX := (@G 1 aX).
+Notation pY := (@G 1 aY).
+Notation pZ := (@G 1 aZ).
+Notation pII := (@G 2 aII).
+Notation pXI := (@G 2 aXI).
+Notation pIX := (@G 2 aIX).
+Notation pXX := (@G 2 aXX).
+Notation pYI := (@G 2 aYI).
+Notation pIY := (@G 2 aIY).
+Notation pYY := (@G 2 aYY).
+Notation pYX := (@G 2 aYX).
+Notation pXY := (@G 2 aXY).
+Notation pZY := (@G 2 aZY).
+Notation pYZ := (@G 2 aYZ).
+Notation pXZ := (@G 2 aXZ).
+Notation pZX := (@G 2 aZX).
+Notation pZI := (@G 2 aZI).
+Notation pIZ := (@G 2 aIZ).
+Notation pZZ := (@G 2 aZZ).
+Notation mpI := (@G 1 maI).
+Notation mpX := (@G 1 maX).
+Notation mpY := (@G 1 maY).
+Notation mpZ := (@G 1 maZ).
+Notation mpII := (@G 2 maII).
+Notation mpXI := (@G 2 maXI).
+Notation mpIX := (@G 2 maIX).
+Notation mpXX := (@G 2 maXX).
+Notation mpYI := (@G 2 maYI).
+Notation mpIY := (@G 2 maIY).
+Notation mpYY := (@G 2 maYY).
+Notation mpYX := (@G 2 maYX).
+Notation mpXY := (@G 2 maXY).
+Notation mpZY := (@G 2 maZY).
+Notation mpYZ := (@G 2 maYZ).
+Notation mpXZ := (@G 2 maXZ).
+Notation mpZX := (@G 2 maZX).
+Notation mpZI := (@G 2 maZI).
+Notation mpIZ := (@G 2 maIZ).
+Notation mpZZ := (@G 2 maZZ).
+Notation pXY2 := (@G 1 aXY2).
+Notation pYX2 := (@G 1 aYX2).
+Notation pX2Y2 := (@G 1 aX2Y2).
+Notation pY2X2 := (@G 1 aY2X2).
+Notation pYmX2 := (@G 1 aYmX2).
+Notation pmXY2 := (@G 1 amXY2).
+Notation pY2mX2 := (@G 1 aY2mX2).
+Notation pmX2Y2 := (@G 1 amX2Y2).
 
 
 Lemma Y_is_iXZ : pY = (+i (pX *' pZ)).
@@ -2170,11 +2281,6 @@ Proof. intro.
       apply trace_zero_syntax_nonempty in H.
       contradiction.
 Qed.
-
-
-Lemma eq_implies_JMeq : forall (A : Type) (x y : A), 
-    x = y -> JMeq x y.
-Proof. intros A x y H. rewrite H. reflexivity. Qed.
 
 Lemma restricted_addition_semantic_non_nil : forall {n : nat},
     ~ (@restricted_addition_semantic n []).
@@ -4258,11 +4364,12 @@ Proof. intros. destruct t1, t2. simpl in *.
     rewrite zipWith_gMul_base_symmetric; easy.
 Qed.
 
-Fixpoint uni_Predicate {n} (A : Predicate n) :=
-  match A with
-  | G a => WF_Unitary (translateA a)
+Fixpoint uni_Predicate {n} (P : Predicate n) :=
+  match P with
+  | G _ => WF_Unitary (translateP P)
   | Cap a b => (uni_Predicate a) /\ (uni_Predicate b)
   | Cup a b => (uni_Predicate a) /\ (uni_Predicate b)
+  | Sep _ _ _ => WF_Unitary (translateP P)
   | Err => False
   end.
 
@@ -4490,58 +4597,63 @@ Declare Scope AType_scope.
 Delimit Scope AType_scope with A.
 Open Scope AType_scope.
 
-
-Definition eq_AType {n} (A1 A2 : AType n) := translateA A1 = translateA A2.
+Check EqdepFacts.eq_dep.
+Inductive eq_AType {n1 n2} (A1 : AType n1) (A2 : AType n2) := 
+| A_eq : n1 = n2 -> EqdepFacts.eq_dep nat (fun n => Square (2 ^ n)%nat) n1 (translateA A1) n2 (translateA A2) -> eq_AType A1 A2.
 Infix "≡" := eq_AType (at level 70, no associativity): AType_scope.
 
 
 (* will now show this is an equivalence relation *)
 Lemma eq_AType_refl : forall {n} (A : AType n), A ≡ A.
-Proof. intros n A. 
-       unfold eq_AType. easy.
-Qed.
+Proof. intros. constructor; auto. Qed.
 
-Lemma eq_AType_sym : forall {n} (A B : AType n), A ≡ B -> B ≡ A.
-Proof. intros n A B H. 
-       unfold eq_AType in *.
-       symmetry. easy. 
-Qed.
+Lemma eq_AType_sym : forall {n1 n2} (A : AType n1) (B : AType n2), A ≡ B -> B ≡ A.
+Proof. intros. inversion H; subst; constructor; auto. Qed.
 
-Lemma eq_AType_trans : forall {n} (A B C : AType n),
+Lemma eq_AType_trans : forall {n1 n2 n3} (A : AType n1) (B : AType n2) (C : AType n3),
     A ≡ B -> B ≡ C -> A ≡ C.
 Proof.
-  intros n A B C HAB HBC.
-  unfold eq_AType in *.
-  transitivity (translateA B); easy.
-Qed.
+  intros.
+  inversion H; inversion H0; subst; constructor; auto.
+  apply eq_dep_eq in H2, H4.
+  apply JMeq_eq_dep; auto. 
+  apply eq_implies_JMeq.
+  rewrite H2; auto.
+  Qed.
 
-
-Add Parametric Relation n : (AType n) (@eq_AType n)
+Add Parametric Relation n : (AType n) eq_AType
   reflexivity proved by eq_AType_refl
   symmetry proved by eq_AType_sym
   transitivity proved by eq_AType_trans
     as eq_AType_rel.
 
 
-Lemma permutation_preserves_additive_types :
-  forall {n} (A A' : AType n),
-    Permutation A A' -> A ≡ A'.
-Proof. intros n A A' H.
-       unfold "≡".
-  induction H; simpl; try easy;
-    unfold translateA in *; simpl in *;
-    try (rewrite IHPermutation1, IHPermutation2; easy);
-    rewrite ! fold_left_Mplus.
+Lemma permutation_preserves_eq_AType :
+  forall {n} (A B : AType n),
+    Permutation A B -> A ≡ B.
+Proof. intros. constructor; auto.
+  apply JMeq_eq_dep; auto. apply eq_implies_JMeq.
+  induction H; simpl; auto;
+  unfold translateA in *; simpl in *; 
+    try rewrite ! fold_left_Mplus;
+    try rewrite IHPermutation1; auto. 
   - rewrite IHPermutation; easy.
-  - rewrite Mplus_assoc. symmetry. rewrite Mplus_assoc.
-    assert (translate x .+ translate y = translate y .+ translate x)%M.
-    { rewrite Mplus_comm; easy. }
-    rewrite H; easy.
+  - rewrite ! Mplus_assoc. f_equal. rewrite Mplus_comm. auto. 
 Qed.
 
-Lemma AType_comm : forall {n} (a b : AType n) c, gScaleA c (a ++ b) ≡ gScaleA c (b ++ a).
-Proof. intros n a b c.
-       unfold "≡".
+Lemma eq_AType_rel_app_translateA : forall {n} (a b c : AType n),
+    a ++ b ≡ c <-> ((translateA a) .+ (translateA b))%M = translateA c.
+Proof. intros. unfold translateA in *. 
+       split; intros. 
+      - rewrite <- fold_left_Mplus_app_Zero, <- map_app.
+        inversion H; subst. apply eq_dep_eq in H1. auto.
+      - rewrite <- fold_left_Mplus_app_Zero, <- map_app in H.
+        constructor; auto. apply eq_eq_dep; auto.
+Qed.
+
+Lemma eq_AType_gScaleA_app_comm : forall {n} (a b : AType n) c, gScaleA c (a ++ b) ≡ gScaleA c (b ++ a).
+Proof. intros. constructor; auto. 
+  apply eq_eq_dep.
   induction a; simpl; try rewrite app_nil_r; try easy.
   unfold translateA in *; simpl.
   rewrite fold_left_Mplus. 
@@ -4556,22 +4668,13 @@ Proof. intros n a b c.
   easy.
 Qed.
 
-Lemma translateA_app_equiv : forall {n} (a b c : AType n),
-    a ++ b ≡ c <-> ((translateA a) .+ (translateA b))%M = translateA c.
-Proof. intros n a b c. unfold "≡", translateA in *.
-       split; intros H;
-         [rewrite map_app in H | rewrite map_app];
-         [rewrite fold_left_Mplus_app_Zero in H | rewrite fold_left_Mplus_app_Zero];
-         assumption. 
-Qed.
-
-Lemma gAddA_comm : forall {n} (a b : AType n) c, gScaleA c (gAddA a b) ≡ gScaleA c (gAddA b a).
+Lemma eq_AType_gScaleA_gAddA_comm : forall {n} (a b : AType n) c, gScaleA c (gAddA a b) ≡ gScaleA c (gAddA b a).
 Proof. intros n a b.
        unfold gAddA.
-       apply AType_comm.
+       apply eq_AType_gScaleA_app_comm.
 Qed.
 
-Lemma gMulA_is_gMulA' : forall {n} (a b : AType n), gMulA a b ≡ gMulA' a b.
+Lemma eq_Atype_gMulA_gMulA' : forall {n} (a b : AType n), gMulA a b ≡ gMulA' a b.
 Proof.
   intros n a b.
   unfold gMulA, gMulA'.
@@ -4579,8 +4682,10 @@ Proof.
   - induction b.
     + reflexivity.
     + simpl. easy.
-  - rewrite translateA_app_equiv.
-    rewrite IHa. clear IHa.
+  - rewrite eq_AType_rel_app_translateA.
+    inversion IHa; subst; clear IHa.
+    apply eq_dep_eq in H0.
+    rewrite H0. clear H0.
     induction b.
     + compute. autorewrite with R_db. reflexivity.
     + simpl.
@@ -4595,7 +4700,7 @@ Proof.
                   (map (fun x : TType n => translate (gMulT x a1)) a0 ++
                      map translate (gMulA' a0 b)) Zero) .+  translate (gMulT a a1) )%M.
       { rewrite Mplus_comm. easy. }
-      setoid_rewrite H.
+      setoid_rewrite H0.
       rewrite ! fold_left_Mplus_app_Zero.
       rewrite <- ! Mplus_assoc.
       assert (fold_left Mplus (map (fun x : TType n => translate (gMulT a x)) b) Zero
@@ -4604,13 +4709,13 @@ Proof.
                 fold_left Mplus (map (fun x : TType n => translate (gMulT x a1)) a0) Zero
                   .+ fold_left Mplus (map (fun x : TType n => translate (gMulT a x)) b) Zero)%M.
       { rewrite Mplus_comm. easy. }
-      rewrite H0. unfold gMulA'.
+      rewrite H1. unfold gMulA'.
       unfold translateA in IHb.
       f_equal. rewrite Mplus_assoc. rewrite IHb.
       reflexivity.
 Qed.
 
-Lemma gTensorA_is_gTensorA' : forall {n m} (a : AType n) (b : AType m),
+Lemma eq_AType_gTensorA_gTensorA' : forall {n m} (a : AType n) (b : AType m),
     gTensorA a b ≡ gTensorA' a b.
 Proof. intros n m a b. 
   induction a.
@@ -4618,7 +4723,10 @@ Proof. intros n m a b.
     + reflexivity.
     + simpl. easy. 
   - simpl.
-    rewrite translateA_app_equiv with (a:=map (fun x : TType n => gTensorT a x) b) (b:=gTensorA a0 b) (c:=gTensorA' (a :: a0) b). unfold "≡" in IHa. rewrite IHa at 1. clear IHa.
+    rewrite eq_AType_rel_app_translateA. 
+    inversion IHa; subst; clear IHa.
+    apply eq_dep_eq in H0.
+    rewrite H0. clear H0.
     induction b.
     + compute. autorewrite with R_db. reflexivity.
     + simpl.
@@ -4634,7 +4742,7 @@ Proof. intros n m a b.
                map translate (gTensorA' a0 b)) Zero)
                  .+ translate (gTensorT a a1))%M.
       { rewrite Mplus_comm. easy. }
-      setoid_rewrite H.
+      setoid_rewrite H0.
       rewrite ! fold_left_Mplus_app_Zero.
       setoid_rewrite Mplus_assoc at 2.
       setoid_rewrite <- IHb.
@@ -4646,19 +4754,19 @@ Proof. intros n m a b.
       { rewrite Mplus_comm. easy. }
       rewrite <- ! Mplus_assoc.
       symmetry.
-      setoid_rewrite H0.
-      rewrite -> ! Mplus_assoc.
-      reflexivity.
+      setoid_rewrite H1.
+      f_equal.
 Qed.
 
 
 
 
 (** G : equivalently, Cap&Cup: pointwise **)
-Inductive eq_Predicate {n} : Predicate n -> Predicate n -> Prop :=
-| G_eq : forall a b : AType n, translateA a = translateA b -> eq_Predicate (G a) (G b)
-| Cap_eq : forall T1 T'1 T2 T'2 : Predicate n, T1 = T'1 -> T2 = T'2 -> eq_Predicate (Cap T1 T2) (Cap T'1 T'2)
-| Arr_eq : forall T1 T'1 T2 T'2 : Predicate n, T1 = T'1 -> T2 = T'2 -> eq_Predicate (Cup T1 T2) (Cup T'1 T'2)
+Inductive eq_Predicate {n1 n2} : Predicate n1 -> Predicate n2 -> Prop :=
+| G_eq : forall (a : AType n1) (b : AType n2), n1 = n2 -> EqdepFacts.eq_dep nat (fun n => Square (2 ^ n)%nat) n1 (translateA a) n2 (translateA b) -> eq_Predicate (G a) (G b)
+| Cap_eq : forall (T1 T1' : Predicate n1) (T2 T2' : Predicate n2), n1 = n2 -> EqdepFacts.eq_dep nat Predicate n1 T1 n2 T2 -> EqdepFacts.eq_dep nat Predicate n1 T1' n2 T2' -> eq_Predicate (Cap T1 T1') (Cap T2 T2')
+| Arr_eq : forall (T1 T1' : Predicate n1) (T2 T2' : Predicate n2), n1 = n2 -> EqdepFacts.eq_dep nat Predicate n1 T1 n2 T2 -> EqdepFacts.eq_dep nat Predicate n1 T1' n2 T2' -> eq_Predicate (Cup T1 T1') (Cup T2 T2')
+| Sep_eq : forall (l1 l2 : list nat) (T1 : Predicate (length l1)) (T2 : Predicate (length l2)), n1 = n2 -> l1 = l2 -> EqdepFacts.eq_dep (list nat) (fun L => Predicate (length L)) l1 T1 l2 T2 -> eq_Predicate (Sep n1 l1 T1) (Sep n2 l2 T2)
 | Err_eq : eq_Predicate Err Err.
 
 
@@ -4670,24 +4778,30 @@ Infix "≡" := eq_Predicate (at level 70, no associativity): Predicate_scope.
 
 (* will now show this is an equivalence relation *)
 Lemma eq_Predicate_refl : forall {n} (A : Predicate n), A ≡ A.
-Proof. intros n A. destruct A; constructor; easy.
+Proof. intros n A. destruct A; try constructor; try easy.
+
 Qed.
 
-Lemma eq_Predicate_sym : forall {n} (A B : Predicate n), A ≡ B -> B ≡ A.
-Proof. intros n A B H. destruct A, B; inversion H; try discriminate; try constructor; try easy.
+Lemma eq_Predicate_sym : forall {n1 n2} (A : Predicate n1) (B : Predicate n2), A ≡ B -> B ≡ A.
+Proof. intros.
+inversion H; try easy; try constructor; auto. 
 Qed.
 
-Lemma eq_Predicate_trans : forall {n} (A B C : Predicate n),
+Lemma eq_Predicate_trans : forall {n1 n2 n3} (A : Predicate n1) (B : Predicate n2) (C : Predicate n3),
     A ≡ B -> B ≡ C -> A ≡ C.
 Proof.
-  intros n A B C HAB HBC.
-  destruct A, B, C; inversion HAB; inversion HBC; subst;
-    try discriminate; try constructor; try easy.
-    try (transitivity (translateA a0); easy).
-Qed.
+  intros.
+  inversion H; inversion H0; subst; try discriminate; try easy; try constructor; auto;
+  repeat match goal with
+  | H' : context[EqdepFacts.eq_dep] |- _ => try apply eq_dep_eq in H'
+  | |- context[EqdepFacts.eq_dep] => apply JMeq_eq_dep
+  | |- context[JMeq] => apply eq_implies_JMeq
+  end; subst; auto; try (inversion H9; subst; auto).
+  inversion H7; subst. rewrite H2; auto.
+  Qed.
 
 
-Add Parametric Relation n : (Predicate n) (@eq_Predicate n)
+Add Parametric Relation n : (Predicate n) eq_Predicate
   reflexivity proved by eq_Predicate_refl
   symmetry proved by eq_Predicate_sym
   transitivity proved by eq_Predicate_trans
@@ -4695,45 +4809,32 @@ Add Parametric Relation n : (Predicate n) (@eq_Predicate n)
 
 
 
-
-
-Lemma AType_Predicate_equiv_compat : forall{n} (A A' : AType n),
-    (A ≡ A')%A -> (G A ≡ G A')%P.
-Proof. intros n A A' H.
-       unfold "≡"%A in *.
-       constructor.
-       assumption.
+Lemma eq_AType_implies_eq_Predicate : forall{n1 n2} (A : AType n1) (B : AType n2),
+    (A ≡ B)%A -> (G A ≡ G B)%P.
+Proof. intros.
+  inversion H; subst; clear H.
+  apply eq_dep_eq in H1.
+  constructor; auto.
+  apply eq_eq_dep; auto.
 Qed.
-       
+
 Add Parametric Morphism (n : nat) : G
-  with signature @eq_AType n ==> @eq_Predicate n as AType_Predicate_mor.
+  with signature (@eq_AType n n) ==> (@eq_Predicate n n) as AType_Predicate_mor.
 Proof.
   intros.
-  apply AType_Predicate_equiv_compat; easy.
+  apply eq_AType_implies_eq_Predicate; easy.
 Qed.
 
 
-Lemma add_comm : forall {n} (A A' : Predicate n) c, c ·' (A +' A') ≡ c ·' (A' +' A).
-Proof. intros n A A' c.    
+Lemma eq_Predicate_scale_add_comm : forall {n} (A A' : Predicate n) c, c ·' (A +' A') ≡ c ·' (A' +' A).
+Proof. intros n A A' c.
   destruct A, A'; simpl; try easy.
-  constructor. apply gAddA_comm.
+  constructor; auto.
+  apply eq_eq_dep.
+  pose (eq_AType_gScaleA_gAddA_comm a a0 c) as E.
+  inversion E; subst; clear E.
+  apply eq_dep_eq in H0; auto.
 Qed.
-
-
-
-#[export] Hint Resolve add_comm : base_types_db.
-#[export] Hint Resolve add_comm : typing_db.
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -5036,7 +5137,7 @@ Lemma switch_neg : forall n (A : Predicate n) (c : Coef), - (c ·' A) = c ·' (-
   induction A; simpl; try rewrite IHA1, IHA2; try easy.
   f_equal. unfold gScaleA. rewrite 2 map_map. f_equal.
   apply functional_extensionality. intros x. destruct x.
-  simpl. f_equal. lca.
+  simpl. f_equal. lca. f_equal. auto.
 Qed.
 
 
@@ -5103,6 +5204,7 @@ Proof. intros.
         -- rewrite IHa. f_equal. destruct a. simpl. f_equal. lca.
   - rewrite IHA1, IHA2. easy.
   - rewrite IHA1, IHA2. easy.
+  - f_equal. auto.
 Qed.
 
 Lemma i_dist_l : forall (n : nat) (A B : Predicate n), 
@@ -5133,6 +5235,7 @@ Proof. intros.
         -- rewrite IHa. f_equal. destruct a. simpl. f_equal. lca.
   - rewrite IHA1, IHA2; auto.
   - rewrite IHA1, IHA2; auto.
+  - f_equal. auto.
 Qed.
 
 
@@ -5352,9 +5455,10 @@ Definition vecSatisfies {n} (v : Vector n) (U : Square n) : Prop :=
 
 Fixpoint vecSatisfiesP {n} (v : Vector (2 ^ n)) (P : Predicate n) : Prop :=
   match P with
-  | G A => vecSatisfies v (translateA A)
+  | G _ => vecSatisfies v (translateP P)
   | Cap a b => (vecSatisfiesP v a) /\ (vecSatisfiesP v b)
   | Cup a b => (vecSatisfiesP v a) \/ (vecSatisfiesP v b)
+  | Sep _ _ _ => vecSatisfies v (translateP P)
   | Err => False
   end.
 
@@ -5459,6 +5563,7 @@ Definition PauliPred {n} (t : TType n) :=
  *)
 
 Inductive implies {n} : Predicate n -> Predicate n -> Prop :=
+| ID_implies : forall (A : Predicate n), A ⇒ A
 | CapElim : forall (A B : Predicate n), (Cap A B) ⇒ (A)
 | CapComm : forall (A B : Predicate n), (Cap A B) ⇒ (Cap B A)
 | CapAssoc1 : forall (A B C : Predicate n), (Cap A (Cap B C)) ⇒ (Cap (Cap A B) C)
@@ -5521,6 +5626,7 @@ Lemma interpret_implies {n} (A B : Predicate n) :
 Proof.
   intros H0 v H1.
   destruct H0.
+  - auto.
   - destruct H1. easy.
   - destruct H1. constructor; easy.
   - do 2 destruct H1. try do 2 constructor; easy.
@@ -5570,7 +5676,7 @@ Proof.
     constructor.
     + easy.
     + destruct H3.
-      unfold vecSatisfiesP in *.
+      unfold vecSatisfiesP, translateP in *.
       unfold vecSatisfies in *.
       destruct H1.
       split; try easy.
@@ -6163,7 +6269,7 @@ Qed.
 Lemma Ceqb_eq : forall c1 c2, c1 = c2 <-> Ceqb c1 c2 = true.
 Proof. intros.
   unfold Ceqb.
-  destruct (Ceq_dec c1 c2); intuition.
+  destruct (Ceq_dec c1 c2); auto with *.
 Qed.
 
 Infix "=?" := Ceqb.
@@ -15120,7 +15226,7 @@ Proof.
   assumption.
 Qed.
 
-Lemma CAP : forall {n : nat} (A A' B B' : Predicate n) (g : prog),
+Lemma CAP : forall {n : nat} {A A' B B' : Predicate n} {g : prog},
     {{ A }} g {{ A' }} -> {{ B }} g {{ B' }} -> {{ A ∩ B }} g {{ A' ∩ B' }}.
 Proof. intros n A A' B B' g H0 H1.
   unfold triple in *.
@@ -15131,7 +15237,7 @@ Proof. intros n A A' B B' g H0 H1.
   split; auto.
 Qed.
 
-Lemma CUP : forall {n : nat} (A A' B B' : Predicate n) (g : prog),
+Lemma CUP : forall {n : nat} {A A' B B' : Predicate n} {g : prog},
     {{ A }} g {{ A' }} -> {{ B }} g {{ B' }} -> {{ A ⊍ B }} g {{ A' ⊍ B' }}.
 Proof. intros n A A' B B' g H0 H1.
   unfold triple in *.
@@ -15143,9 +15249,9 @@ Proof. intros n A A' B B' g H0 H1.
     simpl. right. auto.
 Qed.
 
-Lemma CONS : forall {n : nat} (A' A B B' : Predicate n) (g : prog),
+Lemma CONS : forall {n : nat} (A B : Predicate n) {A' B' : Predicate n} {g : prog},
     A' ⇒ A -> B ⇒ B' -> {{ A }} g {{ B }} -> {{ A' }} g {{ B' }}.
-Proof. intros n A' A B B' g H0 H1 H2.
+Proof. intros n A B A' B' g H0 H1 H2. 
   unfold triple in *.
   intros v H3.
   apply (interpret_implies B B' H1 (translate_prog n g × v)).
@@ -15182,6 +15288,32 @@ Lemma SCALE' : forall {n : nat} (c : Coef) (a a' : AType n) {a0 a0' : AType n} {
     {{ G a }} g {{ G a' }} -> {{ G a0 }} g {{ G a0' }}.
 Proof. intros n c a a' a0 a0' g H0 H1 H2 H3 H4.
   subst. apply SCALE; auto.
+Qed.
+
+Lemma UNFLIP : forall {n : nat} (a a' : AType n) {a0 a0' : AType n} {g : prog},
+    WF_AType n a -> WF_AType n a' -> a0 = gScaleA (- C1)%C a -> a0' = gScaleA (- C1)%C a' -> {{ G a }} g {{ G a' }} -> {{ G a0 }} g {{ G a0' }}.
+Proof. intros n c a a' a0 a0' g H0 H1 H2 H3 H4.
+  subst. apply SCALE; auto.
+Qed.
+
+Lemma FLIP : forall {n : nat} (a a' : AType n) {a0 a0' : AType n} {g : prog},
+    WF_AType n a -> WF_AType n a' -> a = gScaleA (- C1)%C a0 -> a' = gScaleA (- C1)%C a0' -> {{ G a }} g {{ G a' }} -> {{ G a0 }} g {{ G a0' }}.
+Proof. intros n a a' a0 a0' g H0 H1 H2 H3 H4.
+  subst. eapply UNFLIP. Unshelve. 
+  6 : apply (gScaleA (- C1)%C a0). 6 : apply (gScaleA (- C1)%C a0').
+  all : auto.
+  - unfold gScaleA. rewrite map_map.
+    assert ((fun x : TType n => gScaleT (- C1)%C (gScaleT (- C1)%C x)) = fun x => x).
+    + apply functional_extensionality. intros x.
+      rewrite gScaleT_merge. replace (- C1 * - C1)%C with C1 by lca.
+      rewrite gScaleT_1. auto.
+    + rewrite H2. rewrite map_id. auto.
+  - unfold gScaleA. rewrite map_map.
+    assert ((fun x : TType n => gScaleT (- C1)%C (gScaleT (- C1)%C x)) = fun x => x).
+    + apply functional_extensionality. intros x.
+      rewrite gScaleT_merge. replace (- C1 * - C1)%C with C1 by lca.
+      rewrite gScaleT_1. auto.
+    + rewrite H2. rewrite map_id. auto.
 Qed.
 
 Lemma MUL : forall {n : nat} (a b a' b' : AType n) (g : prog),
@@ -17001,6 +17133,20 @@ Proof. intros n g Lc Lht H0 H1 H2 H3 H4.
 Qed.
 
 Lemma LINCOMB' :
+  forall {n : nat} {g : prog} {pr po : AType n} (Lc : list C) (Lpr Lpo : list (AType n))
+     (Lht : list (HoareTriple n)),
+    length Lc = length Lpr -> length Lpr = length Lpo -> Lc <> [] -> 
+    Forall (WF_AType n) Lpr -> Forall (WF_AType n) Lpo -> Forall (fun ht => circuit ht = g) Lht ->
+    map precond Lht = Lpr -> map postcond Lht = Lpo ->
+    pr = lincombCA Lc Lpr -> po = lincombCA Lc Lpo ->
+    {{G pr }} g {{G po }}.
+Proof. intros n g pr po Lc Lpr Lpo Lht H0 H1 H2 H3 H4 H5 H6 H7 H8 H9.
+  subst. apply LINCOMB; rewrite ! map_length in *; auto.
+  - intro; subst; simpl in *. rewrite length_zero_iff_nil in H0; auto.
+  - rewrite <- Forall_map; auto.
+  - rewrite <- Forall_map; auto.
+Qed.
+(* Lemma LINCOMB' :
   forall {n : nat} {g : prog} (Lc : list C) (Lht : list (HoareTriple n)) {pr po : AType n},
     length Lc = length Lht -> Lht <> [] -> Forall (fun ht => WF_AType n (precond ht)) Lht ->
     Forall (fun ht => WF_AType n (postcond ht)) Lht -> Forall (fun ht => circuit ht = g) Lht ->
@@ -17008,53 +17154,7 @@ Lemma LINCOMB' :
     {{G pr }} g {{G po }}.
 Proof. intros n g Lc Lht pr po H0 H1 H2 H3 H4 H5 H6.
   subst. apply LINCOMB; auto.
-Qed.
-(** I'm not sure if this can be proved.
-Lemma LINCOMB'' :
-  forall {n : nat} {g : prog} {pr po : AType n} (Lc : list C) (Lpr Lpo : list (AType n)),
-    length Lc = length Lpr -> length Lpr = length Lpo -> 
-    Lc <> [] -> Forall (WF_AType n) Lpr -> Forall (WF_AType n) Lpo ->
-    Forall (fun p => @triple n (@G n (fst p)) g (@G n (snd p))) (combine Lpr Lpo) ->
-    pr = lincombCA Lc Lpr -> po = lincombCA Lc Lpo ->
-    {{G pr }} g {{G po }}.
-Proof. intros n g pr po Lc Lpr Lpo H0 H1 H2 H3 H4 H5 H6 H7.
-  subst. rewrite Forall_forall in H5.
-  assert (forall x : AType n * prog * AType n,
-    In x (combine (combine Lpr (repeat g (length Lpr))) Lpo) ->
-      (uncurry (uncurry (fun A g B => @triple n (G A) g (G B)))) x).
-  intros x H6.
-  unfold uncurry; simpl.
-  destruct x. destruct p. simpl.
-  specialize (H5 (a0, a)).
-  assert (In (a0, a) (combine Lpr Lpo)).
-
-  assert (forall (A B C : Type) (a1 : A) (a2 : B) (a3 : C) (l1 : list A) (l2 : list B) (l3 : list C),  
-    length l1 = length l2 -> length l2 = length l3 ->
-    In (a1, a2, a3) (combine (combine l1 l2) l3) -> In (a1, a3) (combine l1 l3)).
-  { intros A. clear -A. intros B C a1 a2 a3 l1 l2 l3 H0 H1 H2. 
-    gen a1 a2 a3 l2 l3. induction l1 as [ | a1' l1]; intros; simpl in *; try contradiction.
-    destruct l2 as [ | a2' l2]; simpl in *; try contradiction.
-    destruct l3 as [ | a3' l3]; simpl in *; try contradiction.
-    destruct H2.
-    - inversion H2; subst; clear H2; left; auto.
-    - right. apply IHl1 with (a2 := a2) (l2 := l2); auto. }
-  
-  apply H7 with (a2 := g) (l2 := (repeat g (length Lpr)));
-    try rewrite repeat_length; auto.
-  remember H6 as H6'. clear HeqH6'.
-  apply in_combine_l in H6. apply in_combine_r in H6.
-  apply repeat_spec in H6. subst. auto.
-  
-  apply H5 in H7. simpl in *.
-  apply in_combine_l in H6. apply in_combine_r in H6.
-  apply repeat_spec in H6. subst. auto.
-
-  pose (combine (combine Lpr (repeat g (length Lpr))) Lpo) as Lcond.
-
-  remember H6 as H6'. clear HeqH6'.
-  rewrite <- Forall_forall in H6'.
-**)
-
+Qed. *)
 
 
 (** Not needed??
@@ -17468,10 +17568,10 @@ Proof. intros bit c l U H0 H1 H2.
     subst; auto with wf_db.
 Qed.
 
-Lemma TEN_ID' : forall (bit len : nat) (c : Coef) (l : list Pauli) (U : nat -> prog),
-    bit < len -> len = length l -> simpl_prog U -> nth bit l gI = gI ->
-    @triple (len) ( G [(c, l)] ) (U bit) ( G [(c, l)] ).
-Proof. intros bit len c l U H0 H1 H2 H3.
+Lemma TEN_ID' : forall {bit len : nat} {c c' : Coef} {l l' : list Pauli} {U : nat -> prog},
+    bit < len -> len = length l -> simpl_prog U -> nth bit l gI = gI -> l = l' -> c = c' ->
+    @triple (len) ( G [(c, l)] ) (U bit) ( G [(c', l')] ).
+Proof. intros bit len c c' l l' U H0 H1 H2 H3 H4 H5.
   subst; apply TEN_ID; auto.
 Qed.
 
@@ -17854,23 +17954,25 @@ Lemma hd_skipn_nth : forall {A : Type} (d : A) (l : list A) (m : nat),
 Proof. intros A d l m.
   gen m.
   induction l; intros m;  destruct m; simpl; auto.
-Qed. 
+Qed.
 
 
-Lemma TEN2 : forall (l : list Pauli) (ctrl targ : nat) (A B : Pauli) (c : Coef),
+Lemma TEN2 : forall (l : list Pauli) (ctrl targ : nat) (pm c : Coef) (A B : Pauli),
     ctrl < length l -> targ < length l -> ctrl <> targ ->
     not_gI (nth ctrl l gI) \/ not_gI (nth targ l gI) -> not_gI A \/ not_gI B ->
-    triple  (@G 2 [(C1, [nth ctrl l gI; nth targ l gI])]) (CNOT 0 1) (@G 2 [(C1, [A; B])])  ->
+    pm = C1 \/ pm = (- C1)%C ->
+    triple  (@G 2 [(C1, [nth ctrl l gI; nth targ l gI])]) (CNOT 0 1) (@G 2 [(pm, [A; B])])  ->
     triple
       (@G (length l) [(c, l)])
       (CNOT ctrl targ)
-      (@G (length l) [(c, switch (switch l A ctrl) B targ)]).
-Proof. intros l ctrl targ A B c ctrl_bounded targ_bounded ctrl_targ_different not_both_gI_ctrl_targ not_both_gI_A_B H0.
+      (@G (length l) [((c * pm)%C, switch (switch l A ctrl) B targ)]).
+Proof. intros l ctrl targ pm c A B ctrl_bounded targ_bounded ctrl_targ_different not_both_gI_ctrl_targ not_both_gI_A_B pm_1 H0.
   apply Heisenberg_Eigenvector_semantics.
   apply Eigenvector_Heisenberg_semantics in H0.
 
     unfold translateA, translate in H0; simpl in H0.
     rewrite ! Mplus_0_l, ! Mscale_1_l, ! kron_1_r in H0.
+    setoid_rewrite <- Mscale_kron_dist_r in H0.
 
     unfold prog_ctrl_app in H0.
     simpl in H0.
@@ -17882,6 +17984,7 @@ Proof. intros l ctrl targ A B c ctrl_bounded targ_bounded ctrl_targ_different no
 
     rewrite ! map_length, ! switch_len.
     rewrite Mscale_mult_dist_r,  Mscale_mult_dist_l.
+    rewrite <- Mscale_assoc.
     apply Mscale_inj.
 
     bdestruct (ctrl <? targ).
@@ -17892,694 +17995,162 @@ Proof. intros l ctrl targ A B c ctrl_bounded targ_bounded ctrl_targ_different no
     rewrite TEN2_helper2 with (ctrl := ctrl) (targ := targ).
     rewrite TEN2_helper3 with (ctrl := ctrl) (targ := targ).
 
+    repeat setoid_rewrite <- kron_assoc.
+    repeat rewrite ! kron_1_l.
+    repeat rewrite ! kron_1_r.
+
+    rewrite ! map_length.
+    rewrite ! firstn_length.
+    rewrite ! skipn_length.
+    minmax_breakdown.
+    rewrite ! Nat.sub_add_distr.
+
+    setoid_rewrite <- Mscale_mult_dist_l with (x := pm).
+    setoid_rewrite <- Mscale_kron_dist_l with (x := pm).
+    setoid_rewrite <- Mscale_kron_dist_r with (x := pm).
+
     repeat setoid_rewrite kron_assoc. 
-    rewrite ! kron_1_l. 
-    
     setoid_rewrite kron_mixed_product'.
+    rewrite ! Mmult_1_l.
+    rewrite ! Mmult_1_r.
+    f_equal.
 
-    replace ((⨂ map translate_P (firstn 1 (skipn ctrl l)))
-        ⊗ ((⨂ map translate_P (firstn (targ - ctrl - 1) (skipn (ctrl + 1) l)))
-           ⊗ ((⨂ map translate_P (firstn 1 (skipn targ l)))
-                ⊗ (⨂ map translate_P (skipn (targ + 1) l)))))
-      with (((⨂ map translate_P (firstn 1 (skipn ctrl l)))
-        ⊗ (⨂ map translate_P (firstn (targ - ctrl - 1) (skipn (ctrl + 1) l)))
-           ⊗ (⨂ map translate_P (firstn 1 (skipn targ l))))
-              ⊗ (⨂ map translate_P (skipn (targ + 1) l)))
-      by (repeat setoid_rewrite kron_assoc; auto with wf_db).
-replace 
-(@kron (Datatypes.S (Datatypes.S O)) (Datatypes.S (Datatypes.S O))
-             (Init.Nat.mul (Datatypes.S O)
-                (Init.Nat.mul
-                   (Nat.pow (Datatypes.S (Datatypes.S O))
-                      (@length
-                         (Matrix (Datatypes.S (Datatypes.S O))
-                            (Datatypes.S (Datatypes.S O)))
-                         (@map Pauli
-                            (Matrix (Datatypes.S (Datatypes.S O))
-                               (Datatypes.S (Datatypes.S O))) translate_P
-                            (@firstn Pauli
-                               (Init.Nat.sub (Init.Nat.sub targ ctrl)
-                                  (Datatypes.S O))
-                               (@skipn Pauli (Init.Nat.add ctrl (Datatypes.S O)) l)))))
-                   (Init.Nat.mul
-                      (Nat.pow (Datatypes.S (Datatypes.S O))
-                         (@length
-                            (Matrix (Datatypes.S (Datatypes.S O))
-                               (Datatypes.S (Datatypes.S O)))
-                            (@map Pauli
-                               (Matrix (Datatypes.S (Datatypes.S O))
-                                  (Datatypes.S (Datatypes.S O))) translate_P
-                               (@cons Pauli B (@nil Pauli)))))
-                      (Nat.pow (Datatypes.S (Datatypes.S O))
-                         (@length
-                            (Matrix (Datatypes.S (Datatypes.S O))
-                               (Datatypes.S (Datatypes.S O)))
-                            (@map Pauli
-                               (Matrix (Datatypes.S (Datatypes.S O))
-                                  (Datatypes.S (Datatypes.S O))) translate_P
-                               (@skipn Pauli (Init.Nat.add targ (Datatypes.S O)) l)))))))
-             (Init.Nat.mul (Datatypes.S O)
-                (Init.Nat.mul
-                   (Nat.pow (Datatypes.S (Datatypes.S O))
-                      (@length
-                         (Matrix (Datatypes.S (Datatypes.S O))
-                            (Datatypes.S (Datatypes.S O)))
-                         (@map Pauli
-                            (Matrix (Datatypes.S (Datatypes.S O))
-                               (Datatypes.S (Datatypes.S O))) translate_P
-                            (@firstn Pauli
-                               (Init.Nat.sub (Init.Nat.sub targ ctrl)
-                                  (Datatypes.S O))
-                               (@skipn Pauli (Init.Nat.add ctrl (Datatypes.S O)) l)))))
-                   (Init.Nat.mul
-                      (Nat.pow (Datatypes.S (Datatypes.S O))
-                         (@length
-                            (Matrix (Datatypes.S (Datatypes.S O))
-                               (Datatypes.S (Datatypes.S O)))
-                            (@map Pauli
-                               (Matrix (Datatypes.S (Datatypes.S O))
-                                  (Datatypes.S (Datatypes.S O))) translate_P
-                               (@cons Pauli B (@nil Pauli)))))
-                      (Nat.pow (Datatypes.S (Datatypes.S O))
-                         (@length
-                            (Matrix (Datatypes.S (Datatypes.S O))
-                               (Datatypes.S (Datatypes.S O)))
-                            (@map Pauli
-                               (Matrix (Datatypes.S (Datatypes.S O))
-                                  (Datatypes.S (Datatypes.S O))) translate_P
-                               (@skipn Pauli (Init.Nat.add targ (Datatypes.S O)) l)))))))
-             (translate_P A)
-             (@kron
-                (Nat.pow (Datatypes.S (Datatypes.S O))
-                   (@length
-                      (Matrix (Datatypes.S (Datatypes.S O))
-                         (Datatypes.S (Datatypes.S O)))
-                      (@map Pauli
-                         (Matrix (Datatypes.S (Datatypes.S O))
-                            (Datatypes.S (Datatypes.S O))) translate_P
-                         (@firstn Pauli
-                            (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O))
-                            (@skipn Pauli (Init.Nat.add ctrl (Datatypes.S O)) l)))))
-                (Nat.pow (Datatypes.S (Datatypes.S O))
-                   (@length
-                      (Matrix (Datatypes.S (Datatypes.S O))
-                         (Datatypes.S (Datatypes.S O)))
-                      (@map Pauli
-                         (Matrix (Datatypes.S (Datatypes.S O))
-                            (Datatypes.S (Datatypes.S O))) translate_P
-                         (@firstn Pauli
-                            (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O))
-                            (@skipn Pauli (Init.Nat.add ctrl (Datatypes.S O)) l)))))
-                (Init.Nat.mul
-                   (Nat.pow (Datatypes.S (Datatypes.S O))
-                      (@length
-                         (Matrix (Datatypes.S (Datatypes.S O))
-                            (Datatypes.S (Datatypes.S O)))
-                         (@map Pauli
-                            (Matrix (Datatypes.S (Datatypes.S O))
-                               (Datatypes.S (Datatypes.S O))) translate_P
-                            (@cons Pauli B (@nil Pauli)))))
-                   (Nat.pow (Datatypes.S (Datatypes.S O))
-                      (@length
-                         (Matrix (Datatypes.S (Datatypes.S O))
-                            (Datatypes.S (Datatypes.S O)))
-                         (@map Pauli
-                            (Matrix (Datatypes.S (Datatypes.S O))
-                               (Datatypes.S (Datatypes.S O))) translate_P
-                            (@skipn Pauli (Init.Nat.add targ (Datatypes.S O)) l)))))
-                (Init.Nat.mul
-                   (Nat.pow (Datatypes.S (Datatypes.S O))
-                      (@length
-                         (Matrix (Datatypes.S (Datatypes.S O))
-                            (Datatypes.S (Datatypes.S O)))
-                         (@map Pauli
-                            (Matrix (Datatypes.S (Datatypes.S O))
-                               (Datatypes.S (Datatypes.S O))) translate_P
-                            (@cons Pauli B (@nil Pauli)))))
-                   (Nat.pow (Datatypes.S (Datatypes.S O))
-                      (@length
-                         (Matrix (Datatypes.S (Datatypes.S O))
-                            (Datatypes.S (Datatypes.S O)))
-                         (@map Pauli
-                            (Matrix (Datatypes.S (Datatypes.S O))
-                               (Datatypes.S (Datatypes.S O))) translate_P
-                            (@skipn Pauli (Init.Nat.add targ (Datatypes.S O)) l)))))
-                (@big_kron (Datatypes.S (Datatypes.S O))
-                   (Datatypes.S (Datatypes.S O))
-                   (@map Pauli
-                      (Matrix (Datatypes.S (Datatypes.S O))
-                         (Datatypes.S (Datatypes.S O))) translate_P
-                      (@firstn Pauli
-                         (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O))
-                         (@skipn Pauli (Init.Nat.add ctrl (Datatypes.S O)) l))))
-                (@kron (Datatypes.S (Datatypes.S O)) (Datatypes.S (Datatypes.S O))
-                   (Init.Nat.mul (Datatypes.S O)
-                      (Nat.pow (Datatypes.S (Datatypes.S O))
-                         (@length
-                            (Matrix (Datatypes.S (Datatypes.S O))
-                               (Datatypes.S (Datatypes.S O)))
-                            (@map Pauli
-                               (Matrix (Datatypes.S (Datatypes.S O))
-                                  (Datatypes.S (Datatypes.S O))) translate_P
-                               (@skipn Pauli (Init.Nat.add targ (Datatypes.S O)) l)))))
-                   (Init.Nat.mul (Datatypes.S O)
-                      (Nat.pow (Datatypes.S (Datatypes.S O))
-                         (@length
-                            (Matrix (Datatypes.S (Datatypes.S O))
-                               (Datatypes.S (Datatypes.S O)))
-                            (@map Pauli
-                               (Matrix (Datatypes.S (Datatypes.S O))
-                                  (Datatypes.S (Datatypes.S O))) translate_P
-                               (@skipn Pauli (Init.Nat.add targ (Datatypes.S O)) l)))))
-                   (translate_P B)
-                   (@big_kron (Datatypes.S (Datatypes.S O))
-                      (Datatypes.S (Datatypes.S O))
-                      (@map Pauli
-                         (Matrix (Datatypes.S (Datatypes.S O))
-                            (Datatypes.S (Datatypes.S O))) translate_P
-                         (@skipn Pauli (Init.Nat.add targ (Datatypes.S O)) l))))))
+    3 : repeat setoid_rewrite <- kron_assoc;
+    try setoid_rewrite kron_mixed_product';
+    try rewrite ! Mmult_1_l;
+    try rewrite ! Mmult_1_r.
+
+    3 : f_equal.
     
-  with ((translate_P A ⊗ (⨂ map translate_P (firstn (targ - ctrl - 1) (skipn (ctrl + 1) l)))
-           ⊗ translate_P B) ⊗ (⨂ map translate_P (skipn (targ + 1) l))).
-  2:{ repeat setoid_rewrite kron_assoc; auto with wf_db.
-      f_equal.
-      1-2: compute; auto.
-      f_equal.
-      f_equal.
-      1-2: compute; auto. }
-  
-  setoid_rewrite kron_mixed_product'.
+    3 : setoid_rewrite kron_assoc;
+    replace (I (2 ^ (targ - ctrl - 1)) ⊗ I 2) with (I (2 * (2 ^ (targ - ctrl - 1))))
+      by (rewrite id_kron; f_equal; lia);
+    try setoid_rewrite <- kron_assoc.
+    3 : rewrite ! firstn1_singleton with (d := gI);
+    try rewrite ! hd_skipn_nth.
+    3 : replace (⨂ map translate_P [nth ctrl l gI])
+      with (translate_P (nth ctrl l gI)) by (simpl; rewrite kron_1_r; auto).
+    3 : replace (⨂ map translate_P [nth targ l gI])
+      with (translate_P (nth targ l gI)) by (simpl; rewrite kron_1_r; auto).
+    3 : replace (length [A]) with 1 by auto;
+      replace (length [B]) with 1 by auto;
+      replace (2 ^ 1)%nat with 2 by auto;
+      replace (Init.Nat.mul (Datatypes.S (Datatypes.S O))
+                (Init.Nat.mul (Datatypes.S (Datatypes.S O))
+                   (Nat.pow (Datatypes.S (Datatypes.S O))
+                      (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O)))))
+        with (Init.Nat.mul
+                 (Init.Nat.mul (Datatypes.S (Datatypes.S O))
+                    (Nat.pow (Datatypes.S (Datatypes.S O))
+                       (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O))))
+                 (Datatypes.S (Datatypes.S O)))
+        by lia;
+      replace 
+        (@Mplus
+           (Init.Nat.mul
+              (Init.Nat.mul (Datatypes.S (Datatypes.S O))
+                 (Nat.pow (Datatypes.S (Datatypes.S O))
+                    (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O))))
+              (Datatypes.S (Datatypes.S O)))
+           (Init.Nat.mul
+              (Init.Nat.mul (Datatypes.S (Datatypes.S O))
+                 (Nat.pow (Datatypes.S (Datatypes.S O))
+                    (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O))))
+              (Datatypes.S (Datatypes.S O)))
+           (@kron (Datatypes.S (Datatypes.S O)) (Datatypes.S (Datatypes.S O))
+              (Init.Nat.mul
+                 (Nat.pow (Datatypes.S (Datatypes.S O))
+                    (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O)))
+                 (Datatypes.S (Datatypes.S O)))
+              (Init.Nat.mul
+                 (Nat.pow (Datatypes.S (Datatypes.S O))
+                    (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O)))
+                 (Datatypes.S (Datatypes.S O)))
+              (@Mmult (Datatypes.S (Datatypes.S O)) (Datatypes.S O)
+                 (Datatypes.S (Datatypes.S O)) qubit0
+                 (@adjoint (Datatypes.S (Datatypes.S O)) (Datatypes.S O) qubit0))
+              (I
+                 (Init.Nat.mul (Datatypes.S (Datatypes.S O))
+                    (Nat.pow (Datatypes.S (Datatypes.S O))
+                       (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O))))))
+           (@kron
+              (Init.Nat.mul (Datatypes.S (Datatypes.S O))
+                 (Nat.pow (Datatypes.S (Datatypes.S O))
+                    (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O))))
+              (Init.Nat.mul (Datatypes.S (Datatypes.S O))
+                 (Nat.pow (Datatypes.S (Datatypes.S O))
+                    (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O))))
+              (Datatypes.S (Datatypes.S O)) (Datatypes.S (Datatypes.S O))
+              (@kron (Datatypes.S (Datatypes.S O)) (Datatypes.S (Datatypes.S O))
+                 (Nat.pow (Datatypes.S (Datatypes.S O))
+                    (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O)))
+                 (Nat.pow (Datatypes.S (Datatypes.S O))
+                    (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O)))
+                 (@Mmult (Datatypes.S (Datatypes.S O)) (Datatypes.S O)
+                    (Datatypes.S (Datatypes.S O)) qubit1
+                    (@adjoint (Datatypes.S (Datatypes.S O)) (Datatypes.S O) qubit1))
+                 (I
+                    (Nat.pow (Datatypes.S (Datatypes.S O))
+                       (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O))))) σx))
+        with
+        (@Mplus
+           (Init.Nat.mul (Datatypes.S (Datatypes.S O))
+              (Init.Nat.mul (Datatypes.S (Datatypes.S O))
+                 (Nat.pow (Datatypes.S (Datatypes.S O))
+                    (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O)))))
+           (Init.Nat.mul (Datatypes.S (Datatypes.S O))
+              (Init.Nat.mul (Datatypes.S (Datatypes.S O))
+                 (Nat.pow (Datatypes.S (Datatypes.S O))
+                    (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O)))))
+           (@kron (Datatypes.S (Datatypes.S O)) (Datatypes.S (Datatypes.S O))
+              (Init.Nat.mul (Datatypes.S (Datatypes.S O))
+                 (Nat.pow (Datatypes.S (Datatypes.S O))
+                    (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O))))
+              (Init.Nat.mul (Datatypes.S (Datatypes.S O))
+                 (Nat.pow (Datatypes.S (Datatypes.S O))
+                    (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O))))
+              (@Mmult (Datatypes.S (Datatypes.S O)) (Datatypes.S O)
+                 (Datatypes.S (Datatypes.S O)) qubit0
+                 (@adjoint (Datatypes.S (Datatypes.S O)) (Datatypes.S O) qubit0))
+              (I
+                 (Init.Nat.mul (Datatypes.S (Datatypes.S O))
+                    (Nat.pow (Datatypes.S (Datatypes.S O))
+                       (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O))))))
+           (@kron
+              (Init.Nat.mul (Datatypes.S (Datatypes.S O))
+                 (Nat.pow (Datatypes.S (Datatypes.S O))
+                    (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O))))
+              (Init.Nat.mul (Datatypes.S (Datatypes.S O))
+                 (Nat.pow (Datatypes.S (Datatypes.S O))
+                    (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O))))
+              (Datatypes.S (Datatypes.S O)) (Datatypes.S (Datatypes.S O))
+              (@kron (Datatypes.S (Datatypes.S O)) (Datatypes.S (Datatypes.S O))
+                 (Nat.pow (Datatypes.S (Datatypes.S O))
+                    (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O)))
+                 (Nat.pow (Datatypes.S (Datatypes.S O))
+                    (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O)))
+                 (@Mmult (Datatypes.S (Datatypes.S O)) (Datatypes.S O)
+                    (Datatypes.S (Datatypes.S O)) qubit1
+                    (@adjoint (Datatypes.S (Datatypes.S O)) (Datatypes.S O) qubit1))
+                 (I
+                    (Nat.pow (Datatypes.S (Datatypes.S O))
+                       (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O))))) σx))
+         by (f_equal; try ring_simplify; replace 4 with (2^2)%nat by (simpl; lia);
+            try rewrite <- ! Nat.pow_add_r; f_equal; ring_simplify; lia);
+      eapply @cnot_conv_inc with (n := (targ - ctrl - 1))
+                                           (a := translate_P (nth ctrl l gI))
+                                           (b := translate_P (nth targ l gI))
+                                           (a' := translate_P A) (b' := pm .* (translate_P B))
+                                           (C := (⨂ map translate_P (firstn (targ - ctrl - 1) (skipn (ctrl + 1) l))))
+                                           (C' := (⨂ map translate_P (firstn (targ - ctrl - 1) (skipn (ctrl + 1) l)))).
 
-  rewrite ! Mmult_1_l.
-
-  replace
-  (@Mmult
-          (Nat.pow (Datatypes.S (Datatypes.S O))
-             (@length
-                (Matrix (Datatypes.S (Datatypes.S O)) (Datatypes.S (Datatypes.S O)))
-                (@map Pauli
-                   (Matrix (Datatypes.S (Datatypes.S O))
-                      (Datatypes.S (Datatypes.S O))) translate_P
-                   (@firstn Pauli ctrl l))))
-          (Nat.pow (Datatypes.S (Datatypes.S O))
-             (@length
-                (Matrix (Datatypes.S (Datatypes.S O)) (Datatypes.S (Datatypes.S O)))
-                (@map Pauli
-                   (Matrix (Datatypes.S (Datatypes.S O))
-                      (Datatypes.S (Datatypes.S O))) translate_P
-                   (@firstn Pauli ctrl l))))
-          (Nat.pow (Datatypes.S (Datatypes.S O)) ctrl)
-          (@big_kron (Datatypes.S (Datatypes.S O)) (Datatypes.S (Datatypes.S O))
-             (@map Pauli
-                (Matrix (Datatypes.S (Datatypes.S O)) (Datatypes.S (Datatypes.S O)))
-                translate_P (@firstn Pauli ctrl l)))
-          (I (Nat.pow (Datatypes.S (Datatypes.S O)) ctrl)))
-    with
-    (@Mmult
-          (Nat.pow (Datatypes.S (Datatypes.S O)) ctrl)
-          (Nat.pow (Datatypes.S (Datatypes.S O)) ctrl)
-          (Nat.pow (Datatypes.S (Datatypes.S O)) ctrl)
-          (@big_kron (Datatypes.S (Datatypes.S O)) (Datatypes.S (Datatypes.S O))
-             (@map Pauli
-                (Matrix (Datatypes.S (Datatypes.S O)) (Datatypes.S (Datatypes.S O)))
-                translate_P (@firstn Pauli ctrl l)))
-          (I (Nat.pow (Datatypes.S (Datatypes.S O)) ctrl)))
-    by (rewrite ! map_length; rewrite firstn_length;
-        replace (Nat.min ctrl (length l)) with ctrl by lia;
-        auto).
-
-  replace
-    (@Mmult
-             (Nat.pow (Datatypes.S (Datatypes.S O))
-                (@length
-                   (Matrix (Datatypes.S (Datatypes.S O))
-                      (Datatypes.S (Datatypes.S O)))
-                   (@map Pauli
-                      (Matrix (Datatypes.S (Datatypes.S O))
-                         (Datatypes.S (Datatypes.S O))) translate_P
-                      (@skipn Pauli (Init.Nat.add targ (Datatypes.S O)) l))))
-             (Nat.pow (Datatypes.S (Datatypes.S O))
-                (@length
-                   (Matrix (Datatypes.S (Datatypes.S O))
-                      (Datatypes.S (Datatypes.S O)))
-                   (@map Pauli
-                      (Matrix (Datatypes.S (Datatypes.S O))
-                         (Datatypes.S (Datatypes.S O))) translate_P
-                      (@skipn Pauli (Init.Nat.add targ (Datatypes.S O)) l))))
-             (Nat.pow (Datatypes.S (Datatypes.S O))
-                (Init.Nat.sub (Init.Nat.sub (@length Pauli l) targ) (Datatypes.S O)))
-             (@big_kron (Datatypes.S (Datatypes.S O)) (Datatypes.S (Datatypes.S O))
-                (@map Pauli
-                   (Matrix (Datatypes.S (Datatypes.S O))
-                      (Datatypes.S (Datatypes.S O))) translate_P
-                   (@skipn Pauli (Init.Nat.add targ (Datatypes.S O)) l)))
-             (I
-                (Nat.pow (Datatypes.S (Datatypes.S O))
-                   (Init.Nat.sub (Init.Nat.sub (@length Pauli l) targ)
-                      (Datatypes.S O)))))
-    with
-    (@Mmult
-             (Nat.pow (Datatypes.S (Datatypes.S O))
-                (Init.Nat.sub (Init.Nat.sub (@length Pauli l) targ) (Datatypes.S O)))
-             (Nat.pow (Datatypes.S (Datatypes.S O))
-                (Init.Nat.sub (Init.Nat.sub (@length Pauli l) targ) (Datatypes.S O)))
-             (Nat.pow (Datatypes.S (Datatypes.S O))
-                (Init.Nat.sub (Init.Nat.sub (@length Pauli l) targ) (Datatypes.S O)))
-             (@big_kron (Datatypes.S (Datatypes.S O)) (Datatypes.S (Datatypes.S O))
-                (@map Pauli
-                   (Matrix (Datatypes.S (Datatypes.S O))
-                      (Datatypes.S (Datatypes.S O))) translate_P
-                   (@skipn Pauli (Init.Nat.add targ (Datatypes.S O)) l)))
-             (I
-                (Nat.pow (Datatypes.S (Datatypes.S O))
-                   (Init.Nat.sub (Init.Nat.sub (@length Pauli l) targ)
-                      (Datatypes.S O)))))
-    by (rewrite ! map_length; rewrite ! skipn_length;
-        replace (Init.Nat.sub (@length Pauli l) (Init.Nat.add targ (Datatypes.S O)))
-          with (Init.Nat.sub (Init.Nat.sub (@length Pauli l) targ) (Datatypes.S O))
-     by lia; auto).
-
-  rewrite ! Mmult_1_r.
-
-  f_equal.
-  5 : f_equal.
-  9 : { rewrite id_kron.
-        replace (2 ^ (targ - ctrl - 1) * 2) with (2 * (2 ^ (targ - ctrl - 1))) by lia.
-        replace
-          (@Mmult
-             (Init.Nat.mul
-                (Init.Nat.mul (Datatypes.S (Datatypes.S O))
-                   (Nat.pow (Datatypes.S (Datatypes.S O))
-                      (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O))))
-                (Datatypes.S (Datatypes.S O)))
-             (Init.Nat.mul
-                (Init.Nat.mul (Datatypes.S (Datatypes.S O))
-                   (Nat.pow (Datatypes.S (Datatypes.S O))
-                      (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O))))
-                (Datatypes.S (Datatypes.S O)))
-             (Init.Nat.mul
-                (Init.Nat.mul
-                   (Nat.pow (Datatypes.S (Datatypes.S O))
-                      (@length
-                         (Matrix (Datatypes.S (Datatypes.S O))
-                            (Datatypes.S (Datatypes.S O)))
-                         (@map Pauli
-                            (Matrix (Datatypes.S (Datatypes.S O))
-                               (Datatypes.S (Datatypes.S O))) translate_P
-                            (@firstn Pauli (Datatypes.S O) (@skipn Pauli ctrl l)))))
-                   (Nat.pow (Datatypes.S (Datatypes.S O))
-                      (@length
-                         (Matrix (Datatypes.S (Datatypes.S O))
-                            (Datatypes.S (Datatypes.S O)))
-                         (@map Pauli
-                            (Matrix (Datatypes.S (Datatypes.S O))
-                               (Datatypes.S (Datatypes.S O))) translate_P
-                            (@firstn Pauli
-                               (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O))
-                               (@skipn Pauli (Init.Nat.add ctrl (Datatypes.S O)) l))))))
-                (Nat.pow (Datatypes.S (Datatypes.S O))
-                   (@length
-                      (Matrix (Datatypes.S (Datatypes.S O)) (Datatypes.S (Datatypes.S O)))
-                      (@map Pauli
-                         (Matrix (Datatypes.S (Datatypes.S O))
-                            (Datatypes.S (Datatypes.S O))) translate_P
-                         (@firstn Pauli (Datatypes.S O) (@skipn Pauli targ l))))))
-             (@Mplus
-                (Init.Nat.mul
-                   (Init.Nat.mul (Datatypes.S (Datatypes.S O))
-                      (Nat.pow (Datatypes.S (Datatypes.S O))
-                         (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O))))
-                   (Datatypes.S (Datatypes.S O)))
-                (Init.Nat.mul
-                   (Init.Nat.mul (Datatypes.S (Datatypes.S O))
-                      (Nat.pow (Datatypes.S (Datatypes.S O))
-                         (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O))))
-                   (Datatypes.S (Datatypes.S O)))
-                (@kron (Datatypes.S (Datatypes.S O)) (Datatypes.S (Datatypes.S O))
-                   (Init.Nat.mul (Datatypes.S (Datatypes.S O))
-                      (Nat.pow (Datatypes.S (Datatypes.S O))
-                         (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O))))
-                   (Init.Nat.mul (Datatypes.S (Datatypes.S O))
-                      (Nat.pow (Datatypes.S (Datatypes.S O))
-                         (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O))))
-                   (@Mmult (Datatypes.S (Datatypes.S O)) (Datatypes.S O)
-                      (Datatypes.S (Datatypes.S O)) qubit0
-                      (@adjoint (Datatypes.S (Datatypes.S O)) (Datatypes.S O) qubit0))
-                   (I
-                      (Init.Nat.mul (Datatypes.S (Datatypes.S O))
-                         (Nat.pow (Datatypes.S (Datatypes.S O))
-                            (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O))))))
-                (@kron (Datatypes.S (Datatypes.S O)) (Datatypes.S (Datatypes.S O))
-                   (Init.Nat.mul (Datatypes.S (Datatypes.S O))
-                      (Nat.pow (Datatypes.S (Datatypes.S O))
-                         (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O))))
-                   (Init.Nat.mul (Datatypes.S (Datatypes.S O))
-                      (Nat.pow (Datatypes.S (Datatypes.S O))
-                         (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O))))
-                   (@Mmult (Datatypes.S (Datatypes.S O)) (Datatypes.S O)
-                      (Datatypes.S (Datatypes.S O)) qubit1
-                      (@adjoint (Datatypes.S (Datatypes.S O)) (Datatypes.S O) qubit1))
-                   (@kron
-                      (Nat.pow (Datatypes.S (Datatypes.S O))
-                         (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O)))
-                      (Nat.pow (Datatypes.S (Datatypes.S O))
-                         (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O)))
-                      (Datatypes.S (Datatypes.S O)) (Datatypes.S (Datatypes.S O))
-                      (I
-                         (Nat.pow (Datatypes.S (Datatypes.S O))
-                            (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O)))) σx)))
-             (@kron
-                (Init.Nat.mul
-                   (Nat.pow (Datatypes.S (Datatypes.S O))
-                      (@length
-                         (Matrix (Datatypes.S (Datatypes.S O))
-                            (Datatypes.S (Datatypes.S O)))
-                         (@map Pauli
-                            (Matrix (Datatypes.S (Datatypes.S O))
-                               (Datatypes.S (Datatypes.S O))) translate_P
-                            (@firstn Pauli (Datatypes.S O) (@skipn Pauli ctrl l)))))
-                   (Nat.pow (Datatypes.S (Datatypes.S O))
-                      (@length
-                         (Matrix (Datatypes.S (Datatypes.S O))
-                            (Datatypes.S (Datatypes.S O)))
-                         (@map Pauli
-                            (Matrix (Datatypes.S (Datatypes.S O))
-                               (Datatypes.S (Datatypes.S O))) translate_P
-                            (@firstn Pauli
-                               (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O))
-                               (@skipn Pauli (Init.Nat.add ctrl (Datatypes.S O)) l))))))
-                (Init.Nat.mul
-                   (Nat.pow (Datatypes.S (Datatypes.S O))
-                      (@length
-                         (Matrix (Datatypes.S (Datatypes.S O))
-                            (Datatypes.S (Datatypes.S O)))
-                         (@map Pauli
-                            (Matrix (Datatypes.S (Datatypes.S O))
-                               (Datatypes.S (Datatypes.S O))) translate_P
-                            (@firstn Pauli (Datatypes.S O) (@skipn Pauli ctrl l)))))
-                   (Nat.pow (Datatypes.S (Datatypes.S O))
-                      (@length
-                         (Matrix (Datatypes.S (Datatypes.S O))
-                            (Datatypes.S (Datatypes.S O)))
-                         (@map Pauli
-                            (Matrix (Datatypes.S (Datatypes.S O))
-                               (Datatypes.S (Datatypes.S O))) translate_P
-                            (@firstn Pauli
-                               (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O))
-                               (@skipn Pauli (Init.Nat.add ctrl (Datatypes.S O)) l))))))
-                (Nat.pow (Datatypes.S (Datatypes.S O))
-                   (@length
-                      (Matrix (Datatypes.S (Datatypes.S O)) (Datatypes.S (Datatypes.S O)))
-                      (@map Pauli
-                         (Matrix (Datatypes.S (Datatypes.S O))
-                            (Datatypes.S (Datatypes.S O))) translate_P
-                         (@firstn Pauli (Datatypes.S O) (@skipn Pauli targ l)))))
-                (Nat.pow (Datatypes.S (Datatypes.S O))
-                   (@length
-                      (Matrix (Datatypes.S (Datatypes.S O)) (Datatypes.S (Datatypes.S O)))
-                      (@map Pauli
-                         (Matrix (Datatypes.S (Datatypes.S O))
-                            (Datatypes.S (Datatypes.S O))) translate_P
-                         (@firstn Pauli (Datatypes.S O) (@skipn Pauli targ l)))))
-                (@kron
-                   (Nat.pow (Datatypes.S (Datatypes.S O))
-                      (@length
-                         (Matrix (Datatypes.S (Datatypes.S O))
-                            (Datatypes.S (Datatypes.S O)))
-                         (@map Pauli
-                            (Matrix (Datatypes.S (Datatypes.S O))
-                               (Datatypes.S (Datatypes.S O))) translate_P
-                            (@firstn Pauli (Datatypes.S O) (@skipn Pauli ctrl l)))))
-                   (Nat.pow (Datatypes.S (Datatypes.S O))
-                      (@length
-                         (Matrix (Datatypes.S (Datatypes.S O))
-                            (Datatypes.S (Datatypes.S O)))
-                         (@map Pauli
-                            (Matrix (Datatypes.S (Datatypes.S O))
-                               (Datatypes.S (Datatypes.S O))) translate_P
-                            (@firstn Pauli (Datatypes.S O) (@skipn Pauli ctrl l)))))
-                   (Nat.pow (Datatypes.S (Datatypes.S O))
-                      (@length
-                         (Matrix (Datatypes.S (Datatypes.S O))
-                            (Datatypes.S (Datatypes.S O)))
-                         (@map Pauli
-                            (Matrix (Datatypes.S (Datatypes.S O))
-                               (Datatypes.S (Datatypes.S O))) translate_P
-                            (@firstn Pauli
-                               (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O))
-                               (@skipn Pauli (Init.Nat.add ctrl (Datatypes.S O)) l)))))
-                   (Nat.pow (Datatypes.S (Datatypes.S O))
-                      (@length
-                         (Matrix (Datatypes.S (Datatypes.S O))
-                            (Datatypes.S (Datatypes.S O)))
-                         (@map Pauli
-                            (Matrix (Datatypes.S (Datatypes.S O))
-                               (Datatypes.S (Datatypes.S O))) translate_P
-                            (@firstn Pauli
-                               (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O))
-                               (@skipn Pauli (Init.Nat.add ctrl (Datatypes.S O)) l)))))
-                   (@big_kron (Datatypes.S (Datatypes.S O)) (Datatypes.S (Datatypes.S O))
-                      (@map Pauli
-                         (Matrix (Datatypes.S (Datatypes.S O))
-                            (Datatypes.S (Datatypes.S O))) translate_P
-                         (@firstn Pauli (Datatypes.S O) (@skipn Pauli ctrl l))))
-                   (@big_kron (Datatypes.S (Datatypes.S O)) (Datatypes.S (Datatypes.S O))
-                      (@map Pauli
-                         (Matrix (Datatypes.S (Datatypes.S O))
-                            (Datatypes.S (Datatypes.S O))) translate_P
-                         (@firstn Pauli
-                            (Init.Nat.sub (Init.Nat.sub targ ctrl) (Datatypes.S O))
-                            (@skipn Pauli (Init.Nat.add ctrl (Datatypes.S O)) l)))))
-                (@big_kron (Datatypes.S (Datatypes.S O)) (Datatypes.S (Datatypes.S O))
-                   (@map Pauli
-                      (Matrix (Datatypes.S (Datatypes.S O)) (Datatypes.S (Datatypes.S O)))
-                      translate_P (@firstn Pauli (Datatypes.S O) (@skipn Pauli targ l))))))
-          with
-          (@Mmult
-             (Init.Nat.mul
-                (Init.Nat.mul (Datatypes.S (Datatypes.S O))
-                   (Nat.pow (Datatypes.S (Datatypes.S O))
-                      (Init.Nat.sub (Init.Nat.sub targ ctrl)
-                         (Datatypes.S O))))
-                (Datatypes.S (Datatypes.S O)))
-             (Init.Nat.mul
-                (Init.Nat.mul (Datatypes.S (Datatypes.S O))
-                   (Nat.pow (Datatypes.S (Datatypes.S O))
-                      (Init.Nat.sub (Init.Nat.sub targ ctrl)
-                         (Datatypes.S O))))
-                (Datatypes.S (Datatypes.S O)))
-             (Init.Nat.mul
-                (Init.Nat.mul (Datatypes.S (Datatypes.S O))
-                   (Nat.pow (Datatypes.S (Datatypes.S O))
-                      (Init.Nat.sub (Init.Nat.sub targ ctrl)
-                         (Datatypes.S O))))
-                (Datatypes.S (Datatypes.S O)))
-             (@Mplus
-                (Init.Nat.mul (Datatypes.S (Datatypes.S O))
-                   (Init.Nat.mul (Datatypes.S (Datatypes.S O))
-                      (Nat.pow (Datatypes.S (Datatypes.S O))
-                         (Init.Nat.sub 
-                            (Init.Nat.sub targ ctrl)
-                            (Datatypes.S O)))))
-                (Init.Nat.mul (Datatypes.S (Datatypes.S O))
-                   (Init.Nat.mul (Datatypes.S (Datatypes.S O))
-                      (Nat.pow (Datatypes.S (Datatypes.S O))
-                         (Init.Nat.sub 
-                            (Init.Nat.sub targ ctrl)
-                            (Datatypes.S O)))))
-                (@kron (Datatypes.S (Datatypes.S O))
-                   (Datatypes.S (Datatypes.S O))
-                   (Init.Nat.mul (Datatypes.S (Datatypes.S O))
-                      (Nat.pow (Datatypes.S (Datatypes.S O))
-                         (Init.Nat.sub 
-                            (Init.Nat.sub targ ctrl)
-                            (Datatypes.S O))))
-                   (Init.Nat.mul (Datatypes.S (Datatypes.S O))
-                      (Nat.pow (Datatypes.S (Datatypes.S O))
-                         (Init.Nat.sub 
-                            (Init.Nat.sub targ ctrl)
-                            (Datatypes.S O))))
-                   (@Mmult (Datatypes.S (Datatypes.S O))
-                      (Datatypes.S O) (Datatypes.S (Datatypes.S O))
-                      qubit0
-                      (@adjoint (Datatypes.S (Datatypes.S O))
-                         (Datatypes.S O) qubit0))
-                   (I
-                      (Init.Nat.mul (Datatypes.S (Datatypes.S O))
-                         (Nat.pow (Datatypes.S (Datatypes.S O))
-                            (Init.Nat.sub 
-                               (Init.Nat.sub targ ctrl)
-                               (Datatypes.S O))))))
-                (@kron
-                   (Init.Nat.mul (Datatypes.S (Datatypes.S O))
-                      (Nat.pow (Datatypes.S (Datatypes.S O))
-                         (Init.Nat.sub 
-                            (Init.Nat.sub targ ctrl)
-                            (Datatypes.S O))))
-                   (Init.Nat.mul (Datatypes.S (Datatypes.S O))
-                      (Nat.pow (Datatypes.S (Datatypes.S O))
-                         (Init.Nat.sub 
-                            (Init.Nat.sub targ ctrl)
-                            (Datatypes.S O))))
-                   (Datatypes.S (Datatypes.S O))
-                   (Datatypes.S (Datatypes.S O))
-                   (@kron (Datatypes.S (Datatypes.S O))
-                      (Datatypes.S (Datatypes.S O))
-                      (Nat.pow (Datatypes.S (Datatypes.S O))
-                         (Init.Nat.sub 
-                            (Init.Nat.sub targ ctrl)
-                            (Datatypes.S O)))
-                      (Nat.pow (Datatypes.S (Datatypes.S O))
-                         (Init.Nat.sub 
-                            (Init.Nat.sub targ ctrl)
-                            (Datatypes.S O)))
-                      (@Mmult (Datatypes.S (Datatypes.S O))
-                         (Datatypes.S O)
-                         (Datatypes.S (Datatypes.S O)) qubit1
-                         (@adjoint (Datatypes.S (Datatypes.S O))
-                            (Datatypes.S O) qubit1))
-                      (I
-                         (Nat.pow (Datatypes.S (Datatypes.S O))
-                            (Init.Nat.sub 
-                               (Init.Nat.sub targ ctrl)
-                               (Datatypes.S O))))) σx))
-             (@kron
-                (Init.Nat.mul (Datatypes.S (Datatypes.S O))
-                   (Nat.pow (Datatypes.S (Datatypes.S O))
-                      (Init.Nat.sub (Init.Nat.sub targ ctrl)
-                         (Datatypes.S O))))
-                (Init.Nat.mul (Datatypes.S (Datatypes.S O))
-                   (Nat.pow (Datatypes.S (Datatypes.S O))
-                      (Init.Nat.sub (Init.Nat.sub targ ctrl)
-                         (Datatypes.S O))))
-                (Datatypes.S (Datatypes.S O))
-                (Datatypes.S (Datatypes.S O))
-                (@kron (Datatypes.S (Datatypes.S O))
-                   (Datatypes.S (Datatypes.S O))
-                   (Nat.pow (Datatypes.S (Datatypes.S O))
-                      (Init.Nat.sub (Init.Nat.sub targ ctrl)
-                         (Datatypes.S O)))
-                   (Nat.pow (Datatypes.S (Datatypes.S O))
-                      (Init.Nat.sub (Init.Nat.sub targ ctrl)
-                         (Datatypes.S O)))
-                   (@big_kron (Datatypes.S (Datatypes.S O))
-                      (Datatypes.S (Datatypes.S O))
-                      (@map Pauli
-                         (Matrix (Datatypes.S (Datatypes.S O))
-                            (Datatypes.S (Datatypes.S O)))
-                         translate_P
-                         (@firstn Pauli 
-                            (Datatypes.S O) 
-                            (@skipn Pauli ctrl l))))
-                   (@big_kron (Datatypes.S (Datatypes.S O))
-                      (Datatypes.S (Datatypes.S O))
-                      (@map Pauli
-                         (Matrix (Datatypes.S (Datatypes.S O))
-                            (Datatypes.S (Datatypes.S O)))
-                         translate_P
-                         (@firstn Pauli
-                            (Init.Nat.sub 
-                               (Init.Nat.sub targ ctrl)
-                               (Datatypes.S O))
-                            (@skipn Pauli
-                               (Init.Nat.add ctrl (Datatypes.S O))
-                               l)))))
-                (@big_kron (Datatypes.S (Datatypes.S O))
-                   (Datatypes.S (Datatypes.S O))
-                   (@map Pauli
-                      (Matrix (Datatypes.S (Datatypes.S O))
-                         (Datatypes.S (Datatypes.S O))) translate_P
-                      (@firstn Pauli (Datatypes.S O)
-                         (@skipn Pauli targ l)))))).
-        2 : { rewrite ! map_length.
-              rewrite ! firstn_length.
-              rewrite ! skipn_length.
-              f_equal.
-              minmax_breakdown.
-              1 : compute; auto.
-              f_equal.
-              1-2 : lia.
-              setoid_rewrite kron_assoc.
-              f_equal.
-              1-2 : lia.
-              1-3 : auto with wf_db.
-              f_equal.
-              1-4 : minmax_breakdown;
-              try lia; compute; auto.
-              f_equal.
-              1-4 : minmax_breakdown;
-              compute; auto. }
-
-        rewrite @cnot_conv_inc
-          with (n := (targ - ctrl - 1)) (a := (⨂ map translate_P (firstn 1 (skipn ctrl l))))
-               (C := (⨂ map translate_P (firstn (targ - ctrl - 1) (skipn (ctrl + 1) l))))
-               (b := (⨂ map translate_P (firstn 1 (skipn targ l))))
-               (a' := translate_P A) (b' := translate_P B)
-               (C' := (⨂ map translate_P (firstn (targ - ctrl - 1) (skipn (ctrl + 1) l))));
-          auto with wf_db.
-        rewrite ! map_length.
-        rewrite ! firstn_length.
-        rewrite ! skipn_length.
-        minmax_breakdown.
-        do 2 f_equal.
-        1-2 : lia.
-        setoid_rewrite kron_assoc;
-          auto with wf_db.
-        f_equal.
-        1-2 : lia.
-        1-3 : pose (WF_big_kron' 2 2) as WF;
-        match goal with
-        | |- context [ WF_Matrix (⨂ ?l) ] => specialize (WF l)
-        end;
-        rewrite ! map_length in WF;
-        rewrite ! firstn_length in WF;
-        rewrite ! skipn_length in WF;
-        minmax_breakdown_context;
-        apply WF;
-        intros A0 H1;
-        rewrite in_map_iff in H1;
-        destruct H1 as [x [H1 H2]];
-        rewrite <- H1;
-        auto with wf_db.
-
-        setoid_rewrite <- H0.
-        do 2 f_equal.
-        destruct l.
-        inversion ctrl_bounded.
-        
-        destruct ctrl.
-        rewrite skipn_O.
-        rewrite firstn_cons.
-        rewrite firstn_O.
-        simpl.
-        rewrite kron_1_r.
-        auto.
-        rewrite skipn_cons.
-        rewrite (firstn1_singleton gI (skipn ctrl l)).
-        simpl.
-        rewrite nth_helper with (x := gI).
-        simpl.
-        rewrite kron_1_r.
-        auto.
-        1-2 : simpl in ctrl_bounded;
-          apply PeanoNat.lt_S_n in ctrl_bounded.
-        auto.
-        intro.
-        apply skipn_nil_length in H1.
-        lia.
-        rewrite (firstn1_singleton gI (skipn targ l)).
-        simpl.
-        rewrite nth_helper with (x := gI); auto.
-        simpl.
-        rewrite kron_1_r.
-        auto.
-        intro.
-        apply skipn_nil_length in H1.
-        lia. } 
   all : repeat (try rewrite ! map_length; try rewrite ! firstn_length;
                 try rewrite ! skipn_length; minmax_breakdown;
+                minmax_breakdown_context;
                 repeat rewrite ! Nat.sub_add_distr;
+                auto;
                 match goal with
+                | |- skipn _ _ <> [] => intro H'; apply skipn_nil_length in H'; lia
                 | |- (_ <> _)%nat => try (intro; lia)
                 | |- trace_zero_syntax _ => simpl;
                                           try (destruct not_both_gI_ctrl_targ
@@ -18594,16 +18165,16 @@ replace
                                           end;
                                           try (apply trace_zero_syntax_L; constructor);
                                           try (apply trace_zero_syntax_R; constructor)
-                | |- proper_length_AType_nil _ _ => repeat constructor; try (intro; lia)
+                | |- proper_length_AType_nil _ _ => repeat constructor; try (intro; lia) 
                 | |- WF_Unitary _ =>
                     apply restricted_addition_semantic_implies_Unitary;
-                    repeat constructor
+                    do 2 constructor; simpl; auto
                 | |- adjoint _ = _ =>
                     apply restricted_addition_semantic_implies_Hermitian;
-                    repeat constructor
+                    do 2 constructor ; simpl; auto
                 | |- trace _ = _ =>
                     apply restricted_addition_semantic_implies_trace_zero;
-                    repeat constructor
+                    do 2 constructor; simpl; auto
                 | |- _ > _ => try lia
                 | |- _ < _ => try lia
                 | |- WF_Matrix (_ ⊗ _) => apply WF_kron
@@ -18627,17 +18198,22 @@ replace
                     rewrite <- H'1;
                     auto with wf_db
                 | |- WF_Matrix _ => auto with wf_db
-                | |- _ => simpl; ring_simplify; auto;
-                        replace 4%nat with (2^2)%nat by auto;
-                        repeat setoid_rewrite <- Nat.pow_add_r;
-                        try match goal with
-                        | |- (2 ^ _ = 2 ^ _)%nat =>  f_equal
-                        end;
-                        repeat rewrite ! Nat.sub_add_distr;
-                        try lia
+                | |- proper_length_TType _ _ => split; simpl; auto; try (intro; lia)
+                | |- context[(2*?n)%nat] => 
+                    replace (2*n)%nat with (2^1 * n)%nat 
+                    by (simpl; auto)
+                | |- context[(?n*2)%nat] => 
+                    replace (n*2)%nat with (n * 2^1)%nat 
+                    by (simpl; auto)
+                | |- (2 ^ _ = 2 ^ _)%nat =>  f_equal; simpl; try lia
+                | |- _ => try rewrite ! Nat.mul_1_l; try rewrite ! Nat.mul_1_r;
+                        repeat setoid_rewrite <- Nat.pow_add_r
                 end).
 
   Unshelve.
+  
+  rewrite Mscale_kron_dist_r in H0.
+  rewrite <- Mscale_kron_dist_l in H0.
   
   assert (targ_lt_ctrl : targ < ctrl) by lia.
   clear H1.
@@ -18647,83 +18223,187 @@ replace
   rewrite switch_switch_diff; try lia.
   rewrite TEN2_helper3 with (ctrl := targ) (targ := ctrl); auto with wf_db.
 
-  repeat setoid_rewrite <- kron_assoc. 
+  repeat setoid_rewrite <- kron_assoc.
   repeat rewrite ! kron_1_l.
   repeat rewrite ! kron_1_r.
-    
-  setoid_rewrite kron_mixed_product'.
 
-  rewrite ! Mmult_1_l.
   rewrite ! map_length.
   rewrite ! firstn_length.
   rewrite ! skipn_length.
   minmax_breakdown.
   rewrite ! Nat.sub_add_distr.
+
+  setoid_rewrite <- Mscale_mult_dist_l with (x := pm).
+  setoid_rewrite <- Mscale_kron_dist_l with (x := pm).
+  setoid_rewrite <- Mscale_kron_dist_r with (x := pm).
+
+  repeat setoid_rewrite kron_assoc. 
+  setoid_rewrite kron_mixed_product'.
+  rewrite ! Mmult_1_l.
   rewrite ! Mmult_1_r.
   f_equal.
-  3 : repeat setoid_rewrite kron_assoc;
-  try setoid_rewrite kron_mixed_product';
+ 
+  3 : repeat setoid_rewrite <- kron_assoc.
+  3 : setoid_rewrite kron_mixed_product';
   try rewrite ! Mmult_1_l;
   try rewrite ! Mmult_1_r.
   3 : f_equal.
-  5 : repeat setoid_rewrite <- kron_assoc.
-  5 : rewrite ! id_kron.
-  5 : { apply cnot_conv in H0; auto with wf_db.
-        rewrite ! firstn1_singleton with (d := gI).
-        rewrite ! hd_skipn_nth.
-        replace (⨂ map translate_P [nth targ l gI])
-          with (translate_P (nth targ l gI))
-          by (simpl; rewrite kron_1_r; auto).
-        replace (⨂ map translate_P [nth ctrl l gI])
-          with (translate_P (nth ctrl l gI))
-          by (simpl; rewrite kron_1_r; auto).
-        
-        assert (WF_Matrix (translate_P (nth targ l gI))) by (auto with wf_db).
-        assert (WF_Matrix (translate_P B)) by (auto with wf_db).
-        assert (WF_Matrix (translate_P (nth ctrl l gI))) by (auto with wf_db).
-        assert (WF_Matrix (translate_P A)) by (auto with wf_db).
-        assert (WF_Matrix (⨂ map translate_P (firstn (ctrl - targ - 1) (skipn (targ + 1) l))))
-          by (auto with wf_db).
-        assert (⨂ map translate_P (firstn (ctrl - targ - 1) (skipn (targ + 1) l)) =
-                  ⨂ map translate_P (firstn (ctrl - targ - 1) (skipn (targ + 1) l))) by auto.
-        
-        rewrite ! map_length in H5.
-        rewrite ! firstn_length in H5.
-        rewrite ! skipn_length in H5.
-        minmax_breakdown_context.
-        
-        pose (@notc_conv_inc (ctrl - targ - 1) (translate_P (nth targ l gI)) (translate_P B)
-                (translate_P (nth ctrl l gI)) (translate_P A)
-                (⨂ map translate_P (firstn (ctrl - targ - 1) (skipn (targ + 1) l)))
-                (⨂ map translate_P (firstn (ctrl - targ - 1) (skipn (targ + 1) l)))
-                H1 H2 H3 H4 H5 H0 H6) as e.
-        
-        rewrite <- ! Nat.pow_add_r.
-        simpl.
-        replace (2 ^ (ctrl - targ - 1) + (2 ^ (ctrl - targ - 1) + 0))
-          with (2 * 2 ^ (ctrl - targ - 1))
-          by auto.
-        assert (H' : forall n : nat, n + n = 2 * n) by (intros; lia).
-        rewrite ! Nat.add_0_r.
-        rewrite ! H'.
-        replace (2 * 2 ^ (ctrl - targ - 1 + 1))
-          with ((2 * (2 ^ (ctrl - targ - 1))) * 2)
-          by (rewrite Nat.pow_add_r; rewrite Nat.pow_1_r; auto; lia).
-        replace
-          (Init.Nat.mul 2
-             (Init.Nat.mul (Nat.pow 2 (Init.Nat.sub (Init.Nat.sub ctrl targ) 1)) 2))
-          with
+  
+  3 : replace (I 2 ⊗ I (2 ^ (ctrl - targ - 1))) with (I (2 * (2 ^ (ctrl - targ - 1))))
+    by (rewrite id_kron; f_equal; lia).
+  3 : rewrite ! firstn1_singleton with (d := gI);
+  try rewrite ! hd_skipn_nth.
+  3 : replace (⨂ map translate_P [nth ctrl l gI])
+    with (translate_P (nth ctrl l gI)) by (simpl; rewrite kron_1_r; auto).
+  3 : replace (⨂ map translate_P [nth targ l gI])
+    with (translate_P (nth targ l gI)) by (simpl; rewrite kron_1_r; auto).
+  3 : replace (length [A]) with 1 by auto;
+  replace (length [B]) with 1 by auto;
+  replace (2 ^ 1)%nat with 2 by auto;
+  replace (Init.Nat.mul (Datatypes.S (Datatypes.S O))
+             (Init.Nat.mul (Datatypes.S (Datatypes.S O))
+                (Nat.pow (Datatypes.S (Datatypes.S O))
+                   (Init.Nat.sub (Init.Nat.sub ctrl targ) (Datatypes.S O)))))
+    with (Init.Nat.mul
+            (Init.Nat.mul (Datatypes.S (Datatypes.S O))
+               (Nat.pow (Datatypes.S (Datatypes.S O))
+                  (Init.Nat.sub (Init.Nat.sub ctrl targ) (Datatypes.S O))))
+            (Datatypes.S (Datatypes.S O)))
+    by lia;
+  replace 
+    (@Mplus
+       (Init.Nat.mul
+          (Init.Nat.mul (Datatypes.S (Datatypes.S O))
+             (Nat.pow (Datatypes.S (Datatypes.S O))
+                (Init.Nat.sub (Init.Nat.sub ctrl targ) (Datatypes.S O))))
+          (Datatypes.S (Datatypes.S O)))
+       (Init.Nat.mul
+          (Init.Nat.mul (Datatypes.S (Datatypes.S O))
+             (Nat.pow (Datatypes.S (Datatypes.S O))
+                (Init.Nat.sub (Init.Nat.sub ctrl targ) (Datatypes.S O))))
+          (Datatypes.S (Datatypes.S O)))
+       (@kron (Datatypes.S (Datatypes.S O)) (Datatypes.S (Datatypes.S O))
           (Init.Nat.mul
-             (Init.Nat.mul 2 (Nat.pow 2 (Init.Nat.sub (Init.Nat.sub ctrl targ) 1))) 2)
-          by lia.    
-        apply e.
-        1 - 2 : intro H'; apply skipn_nil_length in H'; lia. }
+             (Nat.pow (Datatypes.S (Datatypes.S O))
+                (Init.Nat.sub (Init.Nat.sub ctrl targ) (Datatypes.S O)))
+             (Datatypes.S (Datatypes.S O)))
+          (Init.Nat.mul
+             (Nat.pow (Datatypes.S (Datatypes.S O))
+                (Init.Nat.sub (Init.Nat.sub ctrl targ) (Datatypes.S O)))
+             (Datatypes.S (Datatypes.S O)))
+          (@Mmult (Datatypes.S (Datatypes.S O)) (Datatypes.S O)
+             (Datatypes.S (Datatypes.S O)) qubit0
+             (@adjoint (Datatypes.S (Datatypes.S O)) (Datatypes.S O) qubit0))
+          (I
+             (Init.Nat.mul (Datatypes.S (Datatypes.S O))
+                (Nat.pow (Datatypes.S (Datatypes.S O))
+                   (Init.Nat.sub (Init.Nat.sub ctrl targ) (Datatypes.S O))))))
+       (@kron
+          (Init.Nat.mul (Datatypes.S (Datatypes.S O))
+             (Nat.pow (Datatypes.S (Datatypes.S O))
+                (Init.Nat.sub (Init.Nat.sub ctrl targ) (Datatypes.S O))))
+          (Init.Nat.mul (Datatypes.S (Datatypes.S O))
+             (Nat.pow (Datatypes.S (Datatypes.S O))
+                (Init.Nat.sub (Init.Nat.sub ctrl targ) (Datatypes.S O))))
+          (Datatypes.S (Datatypes.S O)) (Datatypes.S (Datatypes.S O))
+          (@kron (Datatypes.S (Datatypes.S O)) (Datatypes.S (Datatypes.S O))
+             (Nat.pow (Datatypes.S (Datatypes.S O))
+                (Init.Nat.sub (Init.Nat.sub ctrl targ) (Datatypes.S O)))
+             (Nat.pow (Datatypes.S (Datatypes.S O))
+                (Init.Nat.sub (Init.Nat.sub ctrl targ) (Datatypes.S O)))
+             (@Mmult (Datatypes.S (Datatypes.S O)) (Datatypes.S O)
+                (Datatypes.S (Datatypes.S O)) qubit1
+                (@adjoint (Datatypes.S (Datatypes.S O)) (Datatypes.S O) qubit1))
+             (I
+                (Nat.pow (Datatypes.S (Datatypes.S O))
+                   (Init.Nat.sub (Init.Nat.sub ctrl targ) (Datatypes.S O))))) σx))
+    with
+    (@Mplus
+       (Init.Nat.mul (Datatypes.S (Datatypes.S O))
+          (Init.Nat.mul (Datatypes.S (Datatypes.S O))
+             (Nat.pow (Datatypes.S (Datatypes.S O))
+                (Init.Nat.sub (Init.Nat.sub ctrl targ) (Datatypes.S O)))))
+       (Init.Nat.mul (Datatypes.S (Datatypes.S O))
+          (Init.Nat.mul (Datatypes.S (Datatypes.S O))
+             (Nat.pow (Datatypes.S (Datatypes.S O))
+                (Init.Nat.sub (Init.Nat.sub ctrl targ) (Datatypes.S O)))))
+       (@kron (Datatypes.S (Datatypes.S O)) (Datatypes.S (Datatypes.S O))
+          (Init.Nat.mul (Datatypes.S (Datatypes.S O))
+             (Nat.pow (Datatypes.S (Datatypes.S O))
+                (Init.Nat.sub (Init.Nat.sub ctrl targ) (Datatypes.S O))))
+          (Init.Nat.mul (Datatypes.S (Datatypes.S O))
+             (Nat.pow (Datatypes.S (Datatypes.S O))
+                (Init.Nat.sub (Init.Nat.sub ctrl targ) (Datatypes.S O))))
+          (@Mmult (Datatypes.S (Datatypes.S O)) (Datatypes.S O)
+             (Datatypes.S (Datatypes.S O)) qubit0
+             (@adjoint (Datatypes.S (Datatypes.S O)) (Datatypes.S O) qubit0))
+          (I
+             (Init.Nat.mul (Datatypes.S (Datatypes.S O))
+                (Nat.pow (Datatypes.S (Datatypes.S O))
+                   (Init.Nat.sub (Init.Nat.sub ctrl targ) (Datatypes.S O))))))
+       (@kron
+          (Init.Nat.mul (Datatypes.S (Datatypes.S O))
+             (Nat.pow (Datatypes.S (Datatypes.S O))
+                (Init.Nat.sub (Init.Nat.sub ctrl targ) (Datatypes.S O))))
+          (Init.Nat.mul (Datatypes.S (Datatypes.S O))
+             (Nat.pow (Datatypes.S (Datatypes.S O))
+                (Init.Nat.sub (Init.Nat.sub ctrl targ) (Datatypes.S O))))
+          (Datatypes.S (Datatypes.S O)) (Datatypes.S (Datatypes.S O))
+          (@kron (Datatypes.S (Datatypes.S O)) (Datatypes.S (Datatypes.S O))
+             (Nat.pow (Datatypes.S (Datatypes.S O))
+                (Init.Nat.sub (Init.Nat.sub ctrl targ) (Datatypes.S O)))
+             (Nat.pow (Datatypes.S (Datatypes.S O))
+                (Init.Nat.sub (Init.Nat.sub ctrl targ) (Datatypes.S O)))
+             (@Mmult (Datatypes.S (Datatypes.S O)) (Datatypes.S O)
+                (Datatypes.S (Datatypes.S O)) qubit1
+                (@adjoint (Datatypes.S (Datatypes.S O)) (Datatypes.S O) qubit1))
+             (I
+                (Nat.pow (Datatypes.S (Datatypes.S O))
+                   (Init.Nat.sub (Init.Nat.sub ctrl targ) (Datatypes.S O))))) σx))
+    by (f_equal; try ring_simplify; replace 4 with (2^2)%nat by (simpl; lia);
+        try rewrite <- ! Nat.pow_add_r; f_equal; ring_simplify; lia).
+
+  3 : apply cnot_conv in H0;
+  try eapply @notc_conv_inc with (n := (ctrl - targ - 1))
+                             (a := translate_P (nth targ l gI))
+                             (b := translate_P (nth ctrl l gI))
+                             (a' := translate_P B) (b' := pm .* (translate_P A))
+                             (C := (⨂ map translate_P (firstn (ctrl - targ - 1) (skipn (targ + 1) l))))
+                             (C' := (⨂ map translate_P (firstn (ctrl - targ - 1) (skipn (targ + 1) l)))).
 
   all : repeat (try rewrite ! map_length; try rewrite ! firstn_length;
                 try rewrite ! skipn_length; minmax_breakdown;
+                minmax_breakdown_context;
                 repeat rewrite ! Nat.sub_add_distr;
+                auto;
                 match goal with
+                | |- skipn _ _ <> [] => intro H'; apply skipn_nil_length in H'; lia
                 | |- (_ <> _)%nat => try (intro; lia)
+                | |- trace_zero_syntax _ => simpl;
+                                          try (destruct not_both_gI_ctrl_targ
+                                              as [[not_gI | [not_gI | not_gI]]  | [not_gI | [not_gI | not_gI]]];
+                                               rewrite not_gI);
+                                          try (destruct not_both_gI_A_B
+                                              as [[not_gI | [not_gI | not_gI]]  | [not_gI | [not_gI | not_gI]]];
+                                               rewrite ! not_gI);
+                                          match goal with
+                                          | |- trace_zero_syntax [?x; ?y] =>
+                                              replace [x; y] with ([x] ++ [y]) by auto
+                                          end;
+                                          try (apply trace_zero_syntax_L; constructor);
+                                          try (apply trace_zero_syntax_R; constructor)
+                | |- proper_length_AType_nil _ _ => repeat constructor; try (intro; lia) 
+                | |- WF_Unitary _ =>
+                    apply restricted_addition_semantic_implies_Unitary;
+                    do 2 constructor; simpl; auto
+                | |- adjoint _ = _ =>
+                    apply restricted_addition_semantic_implies_Hermitian;
+                    do 2 constructor ; simpl; auto
+                | |- trace _ = _ =>
+                    apply restricted_addition_semantic_implies_trace_zero;
+                    do 2 constructor; simpl; auto
+                | |- _ > _ => try lia
+                | |- _ < _ => try lia
                 | |- WF_Matrix (_ ⊗ _) => apply WF_kron
                 | |- WF_Matrix (⨂ ?l) =>
                     let WF := fresh "WF" in
@@ -18745,27 +18425,30 @@ replace
                     rewrite <- H'1;
                     auto with wf_db
                 | |- WF_Matrix _ => auto with wf_db
-                | |- _ => simpl; ring_simplify; auto;
-                        replace 4%nat with (2^2)%nat by auto;
-                        repeat setoid_rewrite <- Nat.pow_add_r;
-                        try match goal with
-                        | |- (2 ^ _ = 2 ^ _)%nat =>  f_equal
-                        end;
-                        repeat rewrite ! Nat.sub_add_distr;
-                        try lia
+                | |- proper_length_TType _ _ => split; simpl; auto; try (intro; lia)
+                | |- context[(2*?n)%nat] => 
+                    replace (2*n)%nat with (2^1 * n)%nat 
+                    by (simpl; auto)
+                | |- context[(?n*2)%nat] => 
+                    replace (n*2)%nat with (n * 2^1)%nat 
+                    by (simpl; auto)
+                | |- (2 ^ _ = 2 ^ _)%nat =>  f_equal; simpl; try lia
+                | |- _ => try rewrite ! Nat.mul_1_l; try rewrite ! Nat.mul_1_r;
+                        repeat setoid_rewrite <- Nat.pow_add_r
                 end).
 Qed.
 
-Lemma TEN2' : forall {len : nat} {l l' : list Pauli} {ctrl targ : nat} (A B A' B' : Pauli) {c : Coef},
+Lemma TEN2' : forall {l l' : list Pauli} {len ctrl targ : nat} (pm : Coef) {c c' : Coef} (A B A' B' : Pauli),
     ctrl < len -> targ < len -> ctrl <> targ ->
     not_gI A \/ not_gI B -> not_gI A' \/ not_gI B' -> len = length l ->
     A = nth ctrl l gI -> B = nth targ l gI -> l' = switch (switch l A' ctrl) B' targ ->
-    @triple 2  (G [(C1, [A; B])]) (CNOT 0 1) (G [(C1, [A'; B'])])  ->
-    @triple len (G [(c, l)]) (CNOT ctrl targ) (G [(c, l')]).
-Proof. intros len l l' ctrl targ A B A' B' c H0 H1 H2 H3 H4 H5 H6 H7 H8 H9. 
+    pm = C1 \/ pm = (- C1)%C -> c' = (c * pm)%C ->
+    @triple 2  (G [(C1, [A; B])]) (CNOT 0 1) (G [(pm, [A'; B'])])  ->
+    @triple len (G [(c, l)]) (CNOT ctrl targ) (G [(c', l')]).
+Proof. intros l l' len ctrl targ pm c c' A B A' B' H0 H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11. 
   subst. apply TEN2; auto.
 Qed.
-  
+
 Lemma WF_TEN3 : forall (l : list Pauli) (ctrl targ len : nat) (A B : Pauli) (c : Coef),
     ctrl < len -> targ < len -> ctrl <> targ -> len = length l -> c = C1 \/ c = (- C1)%C ->
     not_gI (nth ctrl l gI) \/ not_gI (nth targ l gI) ->
@@ -18945,10 +18628,11 @@ Proof. intros l ctrl targ c H0 H1 H2 H3 H4.
                 end).
 Qed.
 
-Lemma TEN_ID2' : forall (l : list Pauli) (ctrl targ len : nat) (c : Coef),
-    ctrl < len -> targ < len -> ctrl <> targ -> len = length l-> nth ctrl l gI = gI -> nth targ l gI = gI ->
-    triple (@G (len) [(c, l)]) (CNOT ctrl targ) (@G (len) [(c, l)]).
-Proof. intros l ctrl targ len c H0 H1 H2 H3 H4 H5.
+Lemma TEN_ID2' : forall {ctrl targ len : nat} {c c' : Coef} {l l' : list Pauli},
+    ctrl < len -> targ < len -> ctrl <> targ -> len = length l-> 
+    nth ctrl l gI = gI -> nth targ l gI = gI -> c = c' -> l = l' ->
+    triple (@G (len) [(c, l)]) (CNOT ctrl targ) (@G (len) [(c', l')]).
+Proof. intros ctrl targ len c c' l l' H0 H1 H2 H3 H4 H5 H6 H7. 
   subst; apply TEN_ID2; auto.
 Qed.
 
@@ -19227,17 +18911,28 @@ Proof. intros n a b b' g H0 H1 H2 H3 H4.
   apply Eigenvector_Heisenberg_semantics'; auto.
 Qed.
 
+Ltac trace_zero_auto listP :=
+  match listP with
+  | gI :: ?t => replace (gI :: t) with ([gI] ++ t) by auto;
+              apply trace_zero_syntax_R; trace_zero_auto t
+  | gX :: ?t => replace (gX :: t) with ([gX] ++ t) by auto;
+              apply trace_zero_syntax_L; apply trace_zero_syntax_X
+  | gY :: ?t => replace (gY :: t) with ([gY] ++ t) by auto;
+              apply trace_zero_syntax_L; apply trace_zero_syntax_Y
+  | gZ :: ?t => replace (gZ :: t) with ([gZ] ++ t) by auto;
+              apply trace_zero_syntax_L; apply trace_zero_syntax_Z
+  | nil => idtac
+  end.
+
+
 Ltac WF_auto :=
   repeat (auto; match goal with
-   | |- Forall (fun ht : HoareTriple _ => WF_AType _ (precond ht)) _ => 
-          constructor; try (rewrite precond_packHT)
-   | |- Forall (fun ht : HoareTriple _ => WF_AType _ (postcond ht)) _ => 
-          constructor; try (rewrite postcond_packHT)
+   | |- Forall (WF_AType _) _ => constructor
    | |- Forall (fun ht : HoareTriple _ => circuit ht = _) _ =>
           constructor; try (rewrite circuit_packHT)
-   | |- context [lincombCA _ _] =>
-         unfold lincombCA, zipWith, precond, postcond; simpl; auto;
-           repeat (try lca; try R_field_simplify; try lra; f_equal; simpl; auto)
+   | |- context [lincombCA _ _] => unfold lincombCA; simpl; Csimpl
+   | |- context [cBigMul (zipWith gMul_Coef _ _)] => 
+       unfold cBigMul, zipWith, gMul_Coef, uncurry; simpl; Csimpl
     | |- WF_AType _
           (gScaleA
              (Cdiv (RtoC (IZR (Zpos xH))) (RtoC (sqrt (IZR (Zpos (xO xH))))))
@@ -19296,6 +18991,45 @@ Ltac WF_auto :=
                      (Cdiv (RtoC (IZR (Zpos xH))) (RtoC (sqrt (IZR (Zpos (xO xH))))))
                      [(C1, l1); (c2, l2)]))
       by (simpl; rewrite Cmult_1_r; auto); setoid_rewrite Htemp
+    | |- WF_AType ?n [
+            ((?c1 * (Cdiv (RtoC (IZR (Zpos xH))) (RtoC (sqrt (IZR (Zpos (xO xH)))))))%C, ?l1);
+            ((?c2 * (Cdiv (RtoC (IZR (Zpos xH))) (RtoC (sqrt (IZR (Zpos (xO xH)))))))%C, ?l2)
+          ] =>
+        auto with wf_db;
+        let Htemp := fresh "Htemp" in
+        assert (Htemp : [
+              ((c1 * (Cdiv (RtoC (IZR (Zpos xH))) (RtoC (sqrt (IZR (Zpos (xO xH)))))))%C, l1);
+              ((c2 * (Cdiv (RtoC (IZR (Zpos xH))) (RtoC (sqrt (IZR (Zpos (xO xH)))))))%C, l2)
+          ] = [
+              (((Cdiv (RtoC (IZR (Zpos xH))) (RtoC (sqrt (IZR (Zpos (xO xH)))))) * c1)%C, l1);
+              (((Cdiv (RtoC (IZR (Zpos xH))) (RtoC (sqrt (IZR (Zpos (xO xH)))))) * c2)%C, l2)])
+      by (rewrite Cmult_comm; auto); setoid_rewrite Htemp
+    | |- WF_AType ?n [
+            ((?c1 * (Cdiv (RtoC (IZR (Zpos xH))) (RtoC (sqrt (IZR (Zpos (xO xH)))))))%C, ?l1);
+            (((Cdiv (RtoC (IZR (Zpos xH))) (RtoC (sqrt (IZR (Zpos (xO xH)))))))%C, ?l2)
+          ] =>
+        auto with wf_db;
+        let Htemp := fresh "Htemp" in
+        assert (Htemp : [
+              ((c1 * (Cdiv (RtoC (IZR (Zpos xH))) (RtoC (sqrt (IZR (Zpos (xO xH)))))))%C, l1);
+              (((Cdiv (RtoC (IZR (Zpos xH))) (RtoC (sqrt (IZR (Zpos (xO xH)))))))%C, l2)
+          ] = [
+              (((Cdiv (RtoC (IZR (Zpos xH))) (RtoC (sqrt (IZR (Zpos (xO xH)))))) * c1)%C, l1);
+              (((Cdiv (RtoC (IZR (Zpos xH))) (RtoC (sqrt (IZR (Zpos (xO xH)))))))%C, l2)])
+      by (rewrite Cmult_comm; auto); setoid_rewrite Htemp
+    | |- WF_AType ?n [
+            (((Cdiv (RtoC (IZR (Zpos xH))) (RtoC (sqrt (IZR (Zpos (xO xH)))))))%C, ?l1);
+            ((?c2 * (Cdiv (RtoC (IZR (Zpos xH))) (RtoC (sqrt (IZR (Zpos (xO xH)))))))%C, ?l2)
+          ] =>
+        auto with wf_db;
+        let Htemp := fresh "Htemp" in
+        assert (Htemp : [
+              (((Cdiv (RtoC (IZR (Zpos xH))) (RtoC (sqrt (IZR (Zpos (xO xH)))))))%C, l1);
+              ((c2 * (Cdiv (RtoC (IZR (Zpos xH))) (RtoC (sqrt (IZR (Zpos (xO xH)))))))%C, l2)
+          ] = [
+                (((Cdiv (RtoC (IZR (Zpos xH))) (RtoC (sqrt (IZR (Zpos (xO xH)))))))%C, l1);
+                (((Cdiv (RtoC (IZR (Zpos xH))) (RtoC (sqrt (IZR (Zpos (xO xH)))))) * c2)%C, l2)])
+          by (rewrite Cmult_comm; auto); setoid_rewrite Htemp
    | |- WF_AType _ (gScaleA _ [_]) => auto with wf_db; simpl
    | |- WF_AType _ [_] => auto with wf_db; do 2 constructor; simpl
    | |- WF_TType _ _ => auto with wf_db; constructor; simpl
@@ -19312,12 +19046,17 @@ Ltac WF_auto :=
    | |- _ = C1 \/ _ = (- C1)%C => try (left; lca); try (right; lca)
    | |- C1 = _ => try lca
    | |- (- C1)%C = _ => try lca
-   | |- trace_zero_syntax [?a; ?b] =>
-         replace [a; b] with ([a] ++ [b]) by (simpl; auto);
-          try (apply trace_zero_syntax_L; constructor);
-          try (apply trace_zero_syntax_R; constructor)
-   | |- trace_zero_syntax [_] => try constructor
-   | |- {{_}} _ {{_}} => auto with ht_db
+   | |- trace_zero_syntax ?l => trace_zero_auto l
+   | |- {{ G [(?c, _)] }} _ {{ G [(?c', _)] }} => 
+       auto with ht_db; simpl; auto with ht_db; field_simplify c c'; Csimpl; auto with ht_db
+   | |- {{ _ }} _ {{ G [(?c, _)] }} => 
+       auto with ht_db; simpl; auto with ht_db; field_simplify c; Csimpl; auto with ht_db
+   | |- {{ G [(?c, _)] }} ?g {{ _ }} => 
+       match g with
+       | T _ => auto with ht_db; simpl; auto with ht_db; Csimpl; auto with ht_db
+       | _ => auto with ht_db; simpl; auto with ht_db; field_simplify c; Csimpl; auto with ht_db
+       end
+   | |- {{_}} _ {{_}} => auto with ht_db; simpl; auto with ht_db; Csimpl; auto with ht_db
    | |- simpl_prog _ => try (left; easy); try (right; left; easy); try (right; right; easy)
    | |- _ /\ _ => split
    | |- _ \/ False => left
@@ -19334,16 +19073,14 @@ Ltac WF_auto :=
        try (right; right; right; easy)
    | |- anticommute_AType_syntactic [] _ => simpl
    | |- anticommute_TType_AType _ _ => simpl
-   | |- context [cBigMul (zipWith gMul_Coef _ _)] =>
-       simpl; compute; repeat (try R_field_simplify; try lra; f_equal)
    | |- context [translateA _] =>
-        simpl; unfold translateA;
-         simpl; unfold translate;
-         simpl; matrix_compute
+       simpl; unfold translateA;
+       simpl; unfold translate;
+       simpl; matrix_compute
    | |- anticommute_Pauli _ _ => unfold anticommute_Pauli; simpl; matrix_compute
    | |- _ < _ => simpl; auto; try lia
    | |- _ > _ => simpl; auto; try lia
-   | |- _ = _ => simpl; auto; repeat (try lca; try R_field_simplify; try lra; f_equal; simpl; auto)
+   | |- _ = _ => repeat (simpl; auto; try field_simplify; try nonzero; try lca; f_equal)
    | |- _ => simpl
    end).
 
@@ -19353,17 +19090,17 @@ Ltac WF_auto :=
 Lemma WF_TType_X : WF_TType 1 tX. Proof. WF_auto. Qed.
 Lemma WF_TType_Y : WF_TType 1 tY. Proof. WF_auto. Qed.
 Lemma WF_TType_Z : WF_TType 1 tZ. Proof. WF_auto. Qed.
-Lemma WF_TType_mX : WF_TType 1 (gScaleT (- C1)%C tX). Proof. WF_auto. Qed.
-Lemma WF_TType_mY : WF_TType 1 (gScaleT (- C1)%C tY). Proof. WF_auto. Qed.
-Lemma WF_TType_mZ : WF_TType 1 (gScaleT (- C1)%C tZ). Proof. WF_auto. Qed.
+Lemma WF_TType_mX : WF_TType 1 (mtX). Proof. WF_auto. Qed.
+Lemma WF_TType_mY : WF_TType 1 (mtY). Proof. WF_auto. Qed.
+Lemma WF_TType_mZ : WF_TType 1 (mtZ). Proof. WF_auto. Qed.
 Lemma WF_AType_X : WF_AType 1 aX. Proof. WF_auto. Qed.
 Lemma WF_AType_Y : WF_AType 1 aY. Proof. WF_auto. Qed.
 Lemma WF_AType_Z : WF_AType 1 aZ. Proof. WF_auto. Qed.
-Lemma WF_AType_mX : WF_AType 1 (gScaleA (- C1)%C aX). Proof. WF_auto. Qed.
-Lemma WF_AType_mY : WF_AType 1 (gScaleA (- C1)%C aY). Proof. WF_auto. Qed.
-Lemma WF_AType_mZ : WF_AType 1 (gScaleA (- C1)%C aZ). Proof. WF_auto. Qed.
+Lemma WF_AType_mX : WF_AType 1 (maX). Proof. simpl. WF_auto. Qed.
+Lemma WF_AType_mY : WF_AType 1 (maY). Proof. WF_auto. Qed.
+Lemma WF_AType_mZ : WF_AType 1 (maZ). Proof. WF_auto. Qed.
 
-#[export] Hint Resolve WF_TType_X WF_TType_Y WF_TType_Z WF_AType_X WF_AType_Y WF_AType_Z : wf_db.
+#[export] Hint Resolve WF_TType_X WF_TType_Y WF_TType_Z WF_TType_mX WF_TType_mY WF_TType_mZ WF_AType_X WF_AType_Y WF_AType_Z WF_AType_mX WF_AType_mY WF_AType_mZ : wf_db.
 
 
 (*** Core rules : use lma'
@@ -19558,10 +19295,10 @@ Proof. apply (triple_A_reorder_R aYmX2); WF_auto. Qed.
 Lemma YTmX2Y2 : {{ pY }} T 0 {{ pmX2Y2 }}.
 Proof. apply (triple_A_reorder_R aY2mX2); WF_auto. Qed.
 
-Lemma YHmY : {{ pY }} H 0 {{ - pY }}.
+Lemma YHmY : {{ pY }} H 0 {{ mpY }}.
 Proof. MUL_T_anticomm_auto tX tZ tZ tX. Qed.
 
-Lemma YSmX : {{ pY }} S 0 {{ - pX }}.
+Lemma YSmX : {{ pY }} S 0 {{ mpX }}.
 Proof. MUL_T_anticomm_auto tX tZ tY tZ. Qed.
 
 Lemma XXCNOTXI : {{ pXX }} CNOT 0 1 {{ pXI }}.
@@ -19578,13 +19315,31 @@ Proof. MUL_T_anticomm_auto tIX tIZ tIX tZZ. Qed.
 
 #[export] Hint Resolve IHI ISI ITI IICNOTII XTYX2 XTY2X2 YTmXY2 YTmX2Y2 YHmY YSmX XXCNOTXI ZZCNOTIZ YICNOTYX IYCNOTZY : ht_db.
 
-Lemma YYCNOTmXZ : {{ pYY }} CNOT 0 1 {{ - pXZ }}.
+Lemma YYCNOTmXZ : {{ pYY }} CNOT 0 1 {{ mpXZ }}.
 Proof. MUL_T_comm_auto tYI tIY tYX tZY. Qed.
 
-#[export] Hint Resolve YYCNOTmXZ : ht_db.
+Lemma XYCNOTYZ : {{ pXY }} CNOT 0 1 {{ pYZ }}.
+Proof. MUL_T_comm_auto tXI tIY tXX tZY. Qed.
+
+Lemma XZCNOTYY : {{ pXZ }} CNOT 0 1 {{ mpYY }}.
+Proof. MUL_T_comm_auto tXI tIZ tXX tZZ. Qed.
+
+Lemma YXCNOTYI : {{ pYX }} CNOT 0 1 {{ pYI }}.
+Proof. MUL_T_comm_auto tYI tIX tYX tIX. Qed.
+
+Lemma YZCNOTXY : {{ pYZ }} CNOT 0 1 {{ pXY }}.
+Proof. MUL_T_comm_auto tYI tIZ tYX tZZ. Qed.
+
+Lemma ZXCNOTZX : {{ pZX }} CNOT 0 1 {{ pZX }}.
+Proof. MUL_T_comm_auto tZI tIX tZI tIX. Qed.
+
+Lemma ZYCNOTIY : {{ pZY }} CNOT 0 1 {{ pIY }}.
+Proof. MUL_T_comm_auto tZI tIY tZI tZY. Qed.
+
+#[export] Hint Resolve YYCNOTmXZ XYCNOTYZ XZCNOTYY YXCNOTYI YZCNOTXY ZXCNOTZX ZYCNOTIY : ht_db.
 
 
-Tactic Notation "doSEQ" constr(p) := apply SEQ with (B := p); WF_auto.
+Tactic Notation "doSEQ" constr(p) := apply SEQ with (B := p); auto with ht_db.
 
 Ltac doSEQs list_p :=
   match list_p with
@@ -19592,261 +19347,326 @@ Ltac doSEQs list_p :=
   | ?p :: ?list_p' => doSEQ p; doSEQs list_p'
   end.
 
-Ltac doSCALE := apply SCALE; WF_auto.
-Ltac doSCALE' c a a' := apply (SCALE' c a a'); WF_auto.
+Ltac eSEQ := eapply SEQ; auto with ht_db.
+Ltac eSEQs := repeat eSEQ.
+
+Ltac eFLIP := eapply FLIP; do 2 WF_auto.
+Ltac eUNFLIP := eapply UNFLIP; do 2 WF_auto.
 
 
 Definition Z (n : nat) := S n ;; S n.
 
 Lemma ZZZ : {{ pZ }} Z 0 {{ pZ }}.
-Proof. doSEQ pZ. Qed.
+Proof. eSEQ. Qed.
 
-Lemma XZmX : {{ pX }} Z 0 {{ - pX }}.
-Proof. doSEQ pY. Qed.
+Lemma XZmX : {{ pX }} Z 0 {{ mpX }}.
+Proof. eSEQ. Qed.
 
-Lemma YZmY : {{ pY }} Z 0 {{ - pY }}.
-Proof. doSEQ (- pX). doSCALE. Qed.
+Lemma YZmY : {{ pY }} Z 0 {{ mpY }}.
+Proof. eSEQ. eFLIP. Qed.
 
 #[export] Hint Resolve ZZZ XZmX YZmY : ht_db.
 
 Definition X (n : nat) := H n ;; Z n ;; H n.
 
 Lemma XXX : {{ pX }} X 0 {{ pX }}.
-Proof. doSEQs [pZ; pZ]. Qed.
+Proof. eSEQs. Qed.
 
-Lemma ZXmZ : {{ pZ }} X 0 {{ - pZ }}.
-Proof. doSEQs [pX; - pX]. doSCALE. Qed.
+Lemma ZXmZ : {{ pZ }} X 0 {{ mpZ }}.
+Proof. eSEQs. eFLIP. Qed.
 
-Lemma YXmY : {{ pY }} X 0 {{ - pY }}.
-Proof. doSEQ (- pY). doSCALE. doSEQ (- pY).
-  setoid_rewrite <- neg_inv at 3. doSCALE.
-Qed.
+Lemma YXmY : {{ pY }} X 0 {{ mpY }}.
+Proof. eSEQs. eFLIP. Qed.
 
 #[export] Hint Resolve XXX ZXmZ YXmY : ht_db.
 
 Definition Y (n : nat) := S n ;; X n ;; Z n ;; S n.
 
-Lemma XYmX : {{ pX }} Y 0 {{ - pX }}.
-Proof. doSEQs [pY; - pY; pY].
-  setoid_rewrite <- neg_inv at 3. doSCALE.
-Qed.
+Lemma XYmX : {{ pX }} Y 0 {{ mpX }}.
+Proof. eSEQs. eFLIP. Qed.
 
-Lemma ZYmZ : {{ pZ }} Y 0 {{ - pZ }}.
-Proof. doSEQs [pZ; - pZ]. doSCALE. doSEQ pZ.
-Qed.
+Lemma ZYmZ : {{ pZ }} Y 0 {{ mpZ }}.
+Proof. doSEQs [pZ; mpZ]. eFLIP. eSEQ. Qed.
 
 Lemma YYY : {{ pY }} Y 0 {{ pY }}.
-Proof. doSEQs [- pX; -pX]; try doSCALE. doSEQ (pX).
-  setoid_rewrite <- neg_inv at 3; doSCALE.
-Qed.
+Proof. doSEQs [mpX; mpX]. eFLIP. eSEQ. eFLIP. Qed.
 
 #[export] Hint Resolve XYmX ZYmZ YYY : ht_db. 
 
 Definition Td (n : nat) := Z n ;; S n ;; T n.
 
 Lemma ZTdZ : {{ pZ }} Td 0 {{ pZ }}.
-Proof. doSEQs [pZ; pZ]. Qed.
+Proof. eSEQs. Qed.
 
 Lemma XTdXmY2 : {{ pX }} Td 0 {{ - pYmX2 }}.
-Proof. doSEQs [- pX; - pY]; doSCALE. Qed.
+Proof. doSEQs [mpX; mpY]. eFLIP. eUNFLIP. Qed.
 
 Lemma YTdmXmY2 : {{ pY }} Td 0 {{ pXY2 }}.
-Proof. doSEQ (- pY). doSEQ (pX).
-  setoid_rewrite <- neg_inv at 3. doSCALE.
-Qed.
+Proof. eSEQs. eFLIP. Qed.
 
 #[export] Hint Resolve ZTdZ XTdXmY2 YTdmXmY2 : ht_db. 
+
+
+
+(** ** Definitions and tactics for automation. ** **)
+
+Definition extractC {n : nat} (a : AType n) : list Coef := map fst a.
+Definition extractA {n : nat} (a : AType n) : list (AType n) := map (fun t => [(C1, snd t)]) a.
+Fixpoint computeHT (g : prog) {n : nat} (a : AType n) : list (AType n) :=
+  match a with
+  | [] => []
+  | t :: a' => match t with
+             | (_, l) => match g with
+                        | CNOT ctrl targ => match nth ctrl l gI with
+                                           | gI => match nth targ l gI with
+                                                  | gI => [(C1, l)] :: (computeHT g a')
+                                                  | gX => [(C1, l)] :: (computeHT g a')
+                                                  | gZ => [(C1, switch (switch l gZ ctrl) gZ targ)] :: (computeHT g a')
+                                                  | gY => [(C1, switch (switch l gZ ctrl) gY targ)] :: (computeHT g a')
+                                                  end
+                                           | gX => match nth targ l gI with
+                                                  | gI => [(C1, switch (switch l gX ctrl) gX targ)] :: (computeHT g a')
+                                                  | gX => [(C1, switch (switch l gX ctrl) gI targ)] :: (computeHT g a')
+                                                  | gZ => [((- C1)%C, switch (switch l gY ctrl) gY targ)] :: (computeHT g a')
+                                                  | gY => [(C1, switch (switch l gY ctrl) gZ targ)] :: (computeHT g a')
+                                                  end
+                                           | gZ => match nth targ l gI with
+                                                  | gI => [(C1, l)] :: (computeHT g a')
+                                                  | gX => [(C1, l)] :: (computeHT g a')
+                                                  | gZ => [(C1, switch (switch l gI ctrl) gZ targ)] :: (computeHT g a')
+                                                  | gY => [(C1, switch (switch l gI ctrl) gY targ)] :: (computeHT g a')
+                                                  end
+                                           | gY => match nth targ l gI with
+                                                  | gI => [(C1, switch (switch l gY ctrl) gX targ)] :: (computeHT g a')
+                                                  | gX => [(C1, switch (switch l gY ctrl) gI targ)] :: (computeHT g a')
+                                                  | gZ => [(C1, switch (switch l gX ctrl) gY targ)] :: (computeHT g a')
+                                                  | gY => [((- C1)%C, switch (switch l gX ctrl) gZ targ)] :: (computeHT g a')
+                                                  end
+                                           end
+                        | H n => match nth n l gI with
+                                | gI => [(C1, l)] :: (computeHT g a')
+                                | gX => [(C1, switch l gZ n)] :: (computeHT g a')
+                                | gZ => [(C1, switch l gX n)] :: (computeHT g a')
+                                | gY => [((- C1)%C, l)] :: (computeHT g a')
+                                end
+                        | S n => match nth n l gI with
+                                | gI => [(C1, l)] :: (computeHT g a')
+                                | gX => [(C1, switch l gY n)] :: (computeHT g a')
+                                | gZ => [(C1, l)] :: (computeHT g a')
+                                | gY => [((- C1)%C, switch l gX n)] :: (computeHT g a')
+                                end
+                        | T n => match nth n l gI with
+                                | gI => [(C1, l)] :: (computeHT g a')
+                                | gX => [((C1/√2)%C, l); ((C1/√2)%C, switch l gY n)] :: (computeHT g a')
+                                | gZ => [(C1, l)] :: (computeHT g a')
+                                | gY => [((C1/√2)%C, l); (((C1/√2) * (- C1))%C, switch l gX n)] :: (computeHT g a')
+                                end
+                        | _ ;; _ => []
+                        end
+             end
+  end.
+
+Definition computeFinalStep (g : prog) (n : nat) (a : AType n) :=
+  lincombCA (@extractC n a) (@computeHT g n a).
+
+Ltac  BASE_auto_loop n p l g :=
+  match n with
+  | 0%nat =>  
+      match p with
+      | gI => eapply TEN_ID'
+      | gX => match g with
+             | H => eapply (TEN1' C1 p gZ)
+             | S => eapply (TEN1' C1 p gY)
+             | T => eapply (TEN3' C1 p gX gY)
+             end
+      | gY => match g with
+             | H => eapply (TEN1' (- C1)%C p gY)
+             | S => eapply (TEN1' (- C1)%C p gX)
+             | T => eapply (TEN3' (- C1)%C p gY gX)
+             end
+      | gZ => match g with
+             | H => eapply (TEN1' C1 p gX)
+             | _ => eapply (TEN1' C1 p gZ)
+             end
+      end
+  | s ?m => 
+      match l with
+      | ?h :: ?t => BASE_auto_loop m h t g
+      | nil => idtac
+      end
+  end.
+
+Ltac CNOT_auto_loop ctrl p1 l1 targ p2 l2 :=
+  match ctrl with
+  | 0%nat => 
+      match targ with
+      | 0%nat => 
+          match p1 with
+          | gI => match p2 with
+                 | gI => eapply TEN_ID2'
+                 | gX => eapply (TEN2' C1 p1 p2 gI gX)
+                 | gY => eapply (TEN2' C1 p1 p2 gZ gY)
+                 | gZ => eapply (TEN2' C1 p1 p2 gZ gZ)
+                 end
+          | gX => match p2 with
+                 | gI => eapply (TEN2' C1 p1 p2 gX gX)
+                 | gX => eapply (TEN2' C1 p1 p2 gX gI)
+                 | gY => eapply (TEN2' C1 p1 p2 gY gZ)
+                 | gZ => eapply (TEN2' (- C1)%C p1 p2 gY gY)
+                 end
+          | gY => match p2 with
+                 | gI => eapply (TEN2' C1 p1 p2 gY gX)
+                 | gX => eapply (TEN2' C1 p1 p2 gY gI)
+                 | gY => eapply (TEN2' (- C1)%C p1 p2 gX gZ)
+                 | gZ => eapply (TEN2' C1 p1 p2 gX gY)
+                 end
+          | gZ => match p2 with
+                 | gI => eapply (TEN2' C1 p1 p2 gZ gI)
+                 | gX => eapply (TEN2' C1 p1 p2 gZ gX)
+                 | gY => eapply (TEN2' C1 p1 p2 gI gY)
+                 | gZ => eapply (TEN2' C1 p1 p2 gI gZ)
+                 end
+          end
+      | s ?t => match l2 with
+               | ?h2 :: ?t2 => CNOT_auto_loop ctrl p1 l1 t h2 t2 
+               | nil => idtac
+               end
+      end
+  | s ?c => match l1 with
+           | ?h1 :: ?t1 => CNOT_auto_loop c h1 t1 targ p2 l2
+           | nil => idtac
+           end
+  end.
+
+Ltac simplify_kth_Coef n k final :=
+  let coef := fresh "coef" in
+  pose (fst (nth k final (defaultT n))) as coef; simpl in coef;
+  let Htemp'' := fresh "Htemp''" in
+  assert (Htemp'' : (C0, coef) = (C0, coef)) by reflexivity;
+  unfold coef in Htemp'';
+  match goal with
+  | _ : (C0, ?cf) = (C0, ?cf) |- _ => field_simplify cf in final
+  end;
+  clear coef; clear Htemp''.
+
+Ltac simplifyCoef_loop n k final :=
+  match k with
+  | 0%nat => idtac
+  | s ?k' =>  try simplify_kth_Coef n k' final; simplifyCoef_loop n k' final
+  end.
+
+Ltac simplifyCoef n final :=
+  let len := fresh "len" in
+  pose (length final) as len; simpl in len;
+  let Htemp' := fresh "Htemp'" in
+  assert (Htemp' : (0%nat, len) = (0%nat, len)) by reflexivity;
+  unfold len in Htemp';
+  match goal with
+  | _ : (0%nat, ?k) = (0%nat, ?k) |- _ => simplifyCoef_loop n k final
+  end;
+  clear len; clear Htemp'.
+
+Ltac validateU :=
+  simpl;
+  match goal with
+  | |- {{ G [(?c, ?l)] }} CNOT ?ctrl ?targ {{ _ }} => 
+      match l with
+      | ?h :: ?t => CNOT_auto_loop ctrl h t targ h t; WF_auto;
+                  let final := fresh "final" in
+                  pose (computeFinalStep (CNOT ctrl targ) (length l) [(c, l)]) as final;
+                  unfold computeFinalStep, lincombCA in final; simpl in final;
+                  simplifyCoef (length l) final
+      | nil => idtac
+      end
+  | |- {{ G [(?c, ?l)] }} ?g ?n {{ _ }} => 
+      match l with
+      | ?h :: ?t => BASE_auto_loop n h t g; WF_auto;
+                  let final := fresh "final" in
+                  pose (computeFinalStep (g n) (length l) [(c, l)]) as final;
+                  unfold computeFinalStep, lincombCA in final; simpl in final;
+                  simplifyCoef (length l) final
+      | nil => idtac
+      end
+  end.
+
+Ltac loopHT n Lc Lpre Lpost prg listApre listApost listHT :=
+  match listApre with
+  | ?hpr :: ?tpr =>
+      match listApost with
+      | ?hpo :: ?tpo =>
+          let pfHT := fresh "pfHT" in
+          assert (pfHT : {{ @G n hpr }} prg {{ @G n hpo }});
+          [auto with ht_db; try validateU | loopHT n Lc Lpre Lpost prg tpr tpo ((packHT hpr prg hpo pfHT) :: listHT)]
+      | [] => let Lht := fresh "Lht" in (pose (rev listHT) as Lht); simpl in Lht;
+                                      eapply (LINCOMB' Lc Lpre Lpost Lht)
+      end
+  | [] => let Lht := fresh "Lht" in (pose (rev listHT) as Lht); simpl in Lht;
+                                  eapply (LINCOMB' Lc Lpre Lpost Lht)
+  end.
+
+Ltac validateLC :=
+  unfold lincombCA; simpl;
+  match goal with
+  | |- {{ @G ?n ?a }} ?g {{ ?B }} => 
+      let listC := fresh "listC" in
+      pose (@extractC n a) as listC; simpl in listC;
+      let listApre := fresh "listApre" in
+      pose (@extractA n a) as listApre; simpl in listApre;
+      let listApost := fresh "listApost" in
+      pose (@computeHT g n a) as listApost; simpl in listApost;
+      let Htemp := fresh "Htemp" in
+      assert (Htemp : (listApre, listApost, listC) = (listApre, listApost, listC)) by reflexivity;
+      unfold listApre, listApost, listC in Htemp;
+      match goal with
+      | _ : (?Lpre, ?Lpost, ?Lc) = (?Lpre, ?Lpost, ?Lc) |- {{ @G n a }} g {{ B }} => 
+          clear listC; clear listApre; clear listApost; clear Htemp;
+          loopHT n Lc Lpre Lpost g Lpre Lpost (@nil (HoareTriple n));
+          WF_auto;
+          let final := fresh "final" in
+          pose (computeFinalStep g n a) as final;
+          unfold computeFinalStep, lincombCA in final; simpl in final;
+          simplifyCoef n final
+      end
+  end.
+
+Ltac validate := eSEQs; repeat validateU; repeat validateLC.
+
+
+(** ** Toffoli ** **)
 
 Definition TOFFOLI (a b c : nat) :=
   H c ;; CNOT b c ;; Td c ;; CNOT a c ;; T c ;; CNOT b c ;; Td c ;; CNOT a c ;; T b ;; T c ;; H c ;; CNOT a b ;; T a ;; Td b ;; CNOT a b.
 
 Lemma ZIITOFFOLI :
   {{ @G 3 [(C1, [gZ; gI; gI])] }} TOFFOLI 0 1 2 {{ @G 3 [(C1, [gZ; gI; gI])] }}.
-Proof. pose (@G 3 [(C1, [gZ; gI; gI])]) as ZII.
-  doSEQ ZII. apply TEN_ID'; WF_auto.
-  doSEQ ZII. apply TEN_ID2'; WF_auto.
-  doSEQ ZII. doSEQ ZII. doSEQ ZII.
-  apply TEN_ID'; WF_auto.
-  apply TEN_ID'; WF_auto.
-  doSEQ ZII.
-  apply TEN_ID'; WF_auto.
-  apply TEN_ID'; WF_auto.
-  doSEQ ZII. apply (TEN2' gZ gI gZ gI); WF_auto.
-  doSEQ ZII. apply TEN_ID'; WF_auto.
-  doSEQ ZII. apply TEN_ID2'; WF_auto.
-  doSEQ ZII. doSEQ ZII. doSEQ ZII.
-  apply TEN_ID'; WF_auto. apply TEN_ID'; WF_auto.
-  doSEQ ZII. apply TEN_ID'; WF_auto. apply TEN_ID'; WF_auto.
-  doSEQ ZII. apply (TEN2' gZ gI gZ gI); WF_auto.
-  doSEQ ZII. apply TEN_ID'; WF_auto.
-  doSEQ ZII. apply TEN_ID'; WF_auto.
-  doSEQ ZII. apply TEN_ID'; WF_auto.
-  doSEQ ZII. apply (TEN2' gZ gI gZ gI); WF_auto.
-  doSEQ ZII. apply (TEN1' C1 gZ gZ); WF_auto.
-  doSEQ ZII. doSEQ ZII. doSEQ ZII.
-  apply TEN_ID'; WF_auto.
-  apply TEN_ID'; WF_auto.
-  doSEQ ZII.
-  apply TEN_ID'; WF_auto.
-  apply TEN_ID'; WF_auto.
-  apply (TEN2' gZ gI gZ gI); WF_auto.
-Qed.
+Proof. validate. Qed.
 
 Lemma IZITOFFOLI :
   {{ @G 3 [(C1, [gI; gZ; gI])] }} TOFFOLI 0 1 2 {{ @G 3 [(C1, [gI; gZ; gI])] }}.
-Proof. pose (@G 3 [(C1, [gI; gZ; gI])]) as IZI.
-  pose (@G 3 [(C1, [gZ; gZ; gI])]) as ZZI.
-  doSEQ IZI. apply TEN_ID'; WF_auto.
-  doSEQ IZI. apply (TEN2' gZ gI gZ gI); WF_auto.
-  doSEQ IZI. doSEQ IZI. doSEQ IZI.
-  apply TEN_ID'; WF_auto.
-  apply TEN_ID'; WF_auto.
-  doSEQ IZI.
-  apply TEN_ID'; WF_auto.
-  apply TEN_ID'; WF_auto.
-  doSEQ IZI. apply TEN_ID2'; WF_auto.
-  doSEQ IZI. apply TEN_ID'; WF_auto.
-  doSEQ IZI. apply (TEN2' gZ gI gZ gI); WF_auto.
-  doSEQ IZI. doSEQ IZI. doSEQ IZI.
-  apply TEN_ID'; WF_auto. apply TEN_ID'; WF_auto.
-  doSEQ IZI. apply TEN_ID'; WF_auto. apply TEN_ID'; WF_auto.
-  doSEQ IZI. apply TEN_ID2'; WF_auto.
-  doSEQ IZI. apply (TEN1' C1 gZ gZ); WF_auto.
-  doSEQ IZI. apply TEN_ID'; WF_auto.
-  doSEQ IZI. apply TEN_ID'; WF_auto.
-  doSEQ ZZI. apply (TEN2' gI gZ gZ gZ); WF_auto.
-  doSEQ ZZI. apply (TEN1' C1 gZ gZ); WF_auto.
-  doSEQ ZZI. doSEQ ZZI. doSEQ ZZI.
-  apply (TEN1' C1 gZ gZ); WF_auto.
-  apply (TEN1' C1 gZ gZ); WF_auto.
-  doSEQ ZZI. 
-  apply (TEN1' C1 gZ gZ); WF_auto. 
-  apply (TEN1' C1 gZ gZ); WF_auto.
-  apply (TEN2' gZ gZ gI gZ); WF_auto.
-Qed.
-
-Ltac loopHT n listApre prg listApost :=
-  match listApre with
-  | ?hpr :: ?tpr =>
-      match listApost with
-      | ?hpo :: ?tpo =>
-          assert ({{ @G n hpr }} prg {{ @G n hpo }}); 
-          [auto with ht_db | loopHT n tpr prg tpo]
-      | [] => idtac
-      end
-  | [] => idtac
-  end.
+Proof. validate. Qed.
 
 Lemma IIZTOFFOLI : 
-  {{ @G 3 [(C1, [gI; gI; gZ])] }} TOFFOLI 0 1 2 {{ defaultP 3 }}.
-Proof.
-  doSEQ (@G 3 [(C1, [gI; gI; gX])]). apply (TEN1' C1 gZ gX); WF_auto.
-  doSEQ (@G 3 [(C1, [gI; gI; gX])]). apply (TEN2' gI gX gI gX); WF_auto.
-  doSEQ (@G 3 [((C1 / √2)%C, [gI; gI; gX]); (((C1 / √2) * (- C1))%C, [gI; gI; gY])]).
-  doSEQ (@G 3 [(((- C1) * C1)%C, [gI; gI; gX])]).
-  doSEQ (@G 3 [(C1, [gI; gI; gY])]).
-  apply (TEN1' C1 gX gY); WF_auto.
-  apply (TEN1' ((- C1) * C1)%C gY gX); WF_auto.
-  doSEQ (@G 3 [(((- C1) * C1)%C, [gI; gI; gY])]).
-  doSCALE' (- C1)%C [(C1, [gI; gI; gX])] [(C1, [gI; gI; gY])]; WF_auto.
-  replace [gI; gI; gX] with ([gI; gI] ++ [gX]) by auto.
-  apply trace_zero_syntax_R. apply trace_zero_syntax_X.
-  replace [gI; gI; gY] with ([gI; gI] ++ [gY]) by auto.
-  apply trace_zero_syntax_R. apply trace_zero_syntax_Y.
-  apply (TEN1' C1 gX gY); WF_auto.
-  setoid_rewrite <- neg_inv at 2. simpl.
-  apply (SCALE' (- C1)%C [(C1, [gI; gI; gY])]
-    [(((C1 / √ 2)  * (- C1))%C, [gI; gI; gX]); ((C1 / √ 2 * C1)%C, [gI; gI; gY])]); WF_auto.
-  replace [gI; gI; gY] with ([gI; gI] ++ [gY]) by auto.
-  apply trace_zero_syntax_R. apply trace_zero_syntax_Y.
-  replace [gI; gI; gX] with ([gI; gI] ++ [gX]) by auto.
-  apply trace_zero_syntax_R. apply trace_zero_syntax_X.
-  replace [gI; gI; gY] with ([gI; gI] ++ [gY]) by auto.
-  apply trace_zero_syntax_R. apply trace_zero_syntax_Y.
-  apply (triple_A_reorder_R
-           [((C1 / √ 2 * C1)%C, [gI; gI; gY]); ((C1 / √ 2 * - C1)%C, [gI; gI; gX])]); WF_auto.
-  replace [gI; gI; gY] with ([gI; gI] ++ [gY]) by auto.
-  apply trace_zero_syntax_R. apply trace_zero_syntax_Y.
-  replace [gI; gI; gX] with ([gI; gI] ++ [gX]) by auto.
-  apply trace_zero_syntax_R. apply trace_zero_syntax_X.
-  replace [gI; gI; gY] with ([gI; gI] ++ [gY]) by auto.
-  apply trace_zero_syntax_R. apply trace_zero_syntax_Y.
-  replace [gI; gI; gY] with ([gI; gI] ++ [gY]) by auto.
-  apply trace_zero_syntax_R. apply trace_zero_syntax_Y.
-  replace [gI; gI; gX] with ([gI; gI] ++ [gX]) by auto.
-  apply trace_zero_syntax_R. apply trace_zero_syntax_X.
-  apply (TEN3' (- C1)%C gY gY gX); WF_auto.
-  doSEQ (@G 3 [(((C1 / √ 2) * C1)%C, [gI; gI; gX]); ((C1 / √ 2 * - C1)%C, [gZ; gI; gY])]).
-  loopHT 3 [
-      [(C1, [gI; gI; gX])];
-      [(C1, [gI; gI; gY])]
-    ] (CNOT 0 2) [
-      [(C1, [gI; gI; gX])];
-      [(C1, [gZ; gI; gY])]
-    ].
-  apply (TEN2' gI gX gI gX); WF_auto.
-  apply (TEN2' gI gY gZ gY); WF_auto.
-  apply (LINCOMB' 
-           [(C1 / √ 2)%C; (C1 / √ 2 * - C1)%C]
-           [packHT [(C1, [gI; gI; gX])] (CNOT 0 2) [(C1, [gI; gI; gX])] H0;
-            packHT [(C1, [gI; gI; gY])] (CNOT 0 2) [(C1, [gZ; gI; gY])] H1]);
-    WF_auto.
-  replace [gI; gI; gX] with ([gI; gI] ++ [gX]) by auto.
-  apply trace_zero_syntax_R. apply trace_zero_syntax_X.
-  replace [gI; gI; gY] with ([gI; gI] ++ [gY]) by auto.
-  apply trace_zero_syntax_R. apply trace_zero_syntax_Y.
-  replace [gI; gI; gX] with ([gI; gI] ++ [gX]) by auto.
-  apply trace_zero_syntax_R. apply trace_zero_syntax_X.
-  replace [gZ; gI; gY] with ([gZ; gI] ++ [gY]) by auto.
-  apply trace_zero_syntax_R. apply trace_zero_syntax_Y.
-  doSEQ (@G 3 
-           [(((C1 / √ 2) * ((C1 / √ 2) * C1))%C, [gI; gI; gX]); 
-            (((C1 / √ 2) * ((C1 / √ 2) * C1))%C, [gI; gI; gY]); 
-            (((C1 / √ 2) * ((C1 / √ 2) * (- C1)))%C, [gZ; gI; gY]);
-            (((C1 / √ 2) * ((C1 / √ 2 )* C1))%C, [gZ; gI; gX])]).
-  loopHT 3 [
-      [(C1, [gI; gI; gX])];
-      [(C1, [gZ; gI; gY])]
-    ] (T 2) [
-      [(((C1 / √ 2) * C1)%C, [gI; gI; gX]);
-       (((C1 / √ 2) * C1)%C, [gI; gI; gY])];
-      [(((C1 / √ 2) * C1)%C, [gZ; gI; gY]);
-       (((C1 / √ 2) * (- C1))%C, [gZ; gI; gX])]
-    ].
-  apply (TEN3' C1 gX gX gY); WF_auto. 
-  apply (triple_A_eq aX [((C1 / √ 2)%C, [gX]); ((C1 / √ 2)%C, [gY])]); WF_auto.
-  apply (TEN3' (- C1)%C gY gY gX); WF_auto.
-  apply (LINCOMB'
-           [(C1 / √ 2)%C; ((C1 / √ 2) * (- C1))%C]
-           [packHT [(C1, [gI; gI; gX])] (T 2) [((C1 / √ 2 * C1)%C, [gI; gI; gX]); ((C1 / √ 2 * C1)%C, [gI; gI; gY])] H0;
-            packHT [(C1, [gZ; gI; gY])] (T 2) [((C1 / √ 2 * C1)%C, [gZ; gI; gY]); ((C1 / √ 2 * - C1)%C, [gZ; gI; gX])] H1]); WF_auto.
-  replace [gI; gI; gX] with ([gI; gI] ++ [gX]) by auto.
-  apply trace_zero_syntax_R. apply trace_zero_syntax_X.
-  replace [gZ; gI; gY] with ([gZ; gI] ++ [gY]) by auto.
-  apply trace_zero_syntax_R. apply trace_zero_syntax_Y.
-  replace [gI; gI; gX] with ([gI; gI] ++ [gX]) by auto.
-  apply trace_zero_syntax_R. apply trace_zero_syntax_X.
-  replace [gI; gI; gY] with ([gI; gI] ++ [gY]) by auto.
-  apply trace_zero_syntax_R. apply trace_zero_syntax_Y.
-  replace [gZ; gI; gY] with ([gZ; gI] ++ [gY]) by auto.
-  apply trace_zero_syntax_R. apply trace_zero_syntax_Y.
-  replace [gZ; gI; gX] with ([gZ; gI] ++ [gX]) by auto.
-  apply trace_zero_syntax_R. apply trace_zero_syntax_X.
+{{ @G 3 [(C1, [gI; gI; gZ])] }} TOFFOLI 0 1 2 {{ @G 3 
+           [((- C1 / (√ 2 * √ 2 * √ 2 * √ 2))%C, [gZ; gZ; gZ]);
+            ((C1 / (√ 2 * √ 2 * √ 2 * √ 2))%C, [gZ; gZ; gY]);
+            ((C1 / (√ 2 * √ 2 * √ 2 * √ 2))%C, [gI; gZ; gY]);
+            ((C1 / (√ 2 * √ 2 * √ 2 * √ 2))%C, [gI; gZ; gZ]);
+            ((C1 / (√ 2 * √ 2 * √ 2 * √ 2))%C, [gI; gI; gY]);
+            ((C1 / (√ 2 * √ 2 * √ 2 * √ 2))%C, [gI; gI; gZ]);
+            ((C1 / (√ 2 * √ 2 * √ 2 * √ 2))%C, [gZ; gI; gZ]);
+            ((- C1 / (√ 2 * √ 2 * √ 2 * √ 2))%C, [gZ; gI; gY]);
+            ((C1 / (√ 2 * √ 2 * √ 2 * √ 2))%C, [gZ; gI; gY]);
+            ((C1 / (√ 2 * √ 2 * √ 2 * √ 2))%C, [gZ; gI; gZ]);
+            ((C1 / (√ 2 * √ 2 * √ 2 * √ 2))%C, [gI; gI; gZ]);
+            ((- C1 / (√ 2 * √ 2 * √ 2 * √ 2))%C, [gI; gI; gY]);
+            ((C1 / (√ 2 * √ 2 * √ 2 * √ 2))%C, [gI; gZ; gZ]);
+            ((- C1 / (√ 2 * √ 2 * √ 2 * √ 2))%C, [gI; gZ; gY]);
+            ((- C1 / (√ 2 * √ 2 * √ 2 * √ 2))%C, [gZ; gZ; gY]);
+            ((- C1 / (√ 2 * √ 2 * √ 2 * √ 2))%C, [gZ; gZ; gZ])]
+ }}.
+Proof. validate. Qed.
 
-
-
-
-
-(** 
-Definition Td (n : nat) := Z n ;; S n ;; T n.
-ZTZ XTXY2 YTYmX2
-XSY ZSZ YSmX
-ZZZ XZmX YZmY
-ZTdZ XTdXmY2 YTdmXmY2 
-**)
-
-Admitted.
-
+(** ** Steane code on 7 qubits ** **)
 (* 
 g1 = IIIXXXX
 g2 = IXXIIXX
@@ -19866,26 +19686,128 @@ St7 := g1 ∩ ... ∩ g6
 ZL = St7 ∩ Zb
 XL = St7 ∩ Xb
 YL = St7 ∩ Yb
-
-
 *)
 
-(*** YL = i XL ZL ?? (p.20) ***)
-
-Definition Steane7 q0 q1 q2 q3 q4 q5 q6:= 
+Definition Steane7 q0 q1 q2 q3 q4 q5 q6 := 
 H q4 ;; H q5 ;; H q6 ;; 
 CNOT q0 q1 ;; CNOT q0 q2 ;; 
 CNOT q6 q0 ;; CNOT q6 q1 ;; CNOT q6 q3 ;; 
 CNOT q5 q0 ;; CNOT q5 q2 ;; CNOT q5 q3 ;; 
 CNOT q4 q1 ;; CNOT q4 q2 ;; CNOT q4 q3. 
 
+Lemma Steane7_X1 : 
+    {{ @G 7 [(C1, [gX; gI; gI; gI; gI; gI; gI])] }} 
+    Steane7 0 1 2 3 4 5 6
+    {{ @G 7 [(C1, [gX; gX; gX; gI; gI; gI; gI])] }}.
+Proof. validate. Qed.
+
+Lemma Steane7_Z1 : 
+    {{ @G 7 [(C1, [gZ; gI; gI; gI; gI; gI; gI])] }} 
+    Steane7 0 1 2 3 4 5 6
+    {{ @G 7 [(C1, [gZ; gI; gI; gI; gI; gZ; gZ])] }}.
+Proof. validate. Qed.
+
+Lemma Steane7_Z2 : 
+    {{ @G 7 [(C1, [gI; gZ; gI; gI; gI; gI; gI])] }} 
+    Steane7 0 1 2 3 4 5 6
+    {{ @G 7 [(C1, [gZ; gZ; gI; gI; gZ; gZ; gI])] }}.
+Proof. validate. Qed. 
+
+Lemma Steane7_Z3 : 
+    {{ @G 7 [(C1, [gI; gI; gZ; gI; gI; gI; gI])] }} 
+    Steane7 0 1 2 3 4 5 6
+    {{ @G 7 [(C1, [gZ; gI; gZ; gI; gZ; gI; gZ])] }}.
+Proof. validate. Qed.
+
+Lemma Steane7_Z4 : 
+    {{ @G 7 [(C1, [gI; gI; gI; gZ; gI; gI; gI])] }} 
+    Steane7 0 1 2 3 4 5 6
+    {{ @G 7 [(C1, [gI; gI; gI; gZ; gZ; gZ; gZ])] }}.
+Proof. validate. Qed.
+
+Lemma Steane7_Z5 : 
+    {{ @G 7 [(C1, [gI; gI; gI; gI; gZ; gI; gI])] }} 
+    Steane7 0 1 2 3 4 5 6
+    {{ @G 7 [(C1, [gI; gX; gX; gX; gX; gI; gI])] }}.
+Proof. validate. Qed.
+
+Lemma Steane7_Z6 : 
+    {{ @G 7 [(C1, [gI; gI; gI; gI; gI; gZ; gI])] }} 
+    Steane7 0 1 2 3 4 5 6
+    {{ @G 7 [(C1, [gX; gI; gX; gX; gI; gX; gI])] }}.
+Proof. validate. Qed.
+
+Lemma Steane7_Z7 : 
+    {{ @G 7 [(C1, [gI; gI; gI; gI; gI; gI; gZ])] }} 
+    Steane7 0 1 2 3 4 5 6
+    {{ @G 7 [(C1, [gX; gX; gI; gX; gI; gI; gX])] }}.
+Proof. validate. Qed.
+
+
+(** 
+1Z*2*3*4=Z ???
+1X*5*6*7=X ???
+4=g4
+3=g6
+2*3=g5
+5*6*7=g1 ???
+6*7=g2
+5*7=g3
+**)
+
+Lemma Steane7_g5 :
+  {{ @G 7 [(C1, [gI; gZ; gI; gI; gI; gI; gI])] ∩ @G 7 [(C1, [gI; gI; gZ; gI; gI; gI; gI])] }}
+  Steane7 0 1 2 3 4 5 6
+  {{ @G 7 [(C1, [gI; gZ; gZ; gI; gI; gZ; gZ])] ∩@G 7 [(C1, [gZ; gI; gZ; gI; gZ; gI; gZ])] }}.
+Proof. eapply CONS. eapply ID_implies. eapply CapComm.
+  eapply CONS. eapply ID_implies. eapply PauliMult2. all : WF_auto.
+  eapply CONS. eapply ID_implies. eapply CapComm.
+  apply CAP. apply Steane7_Z2. apply Steane7_Z3.
+Qed.
+
+Lemma Steane7_g2 :
+  {{ @G 7 [(C1, [gI; gI; gI; gI; gI; gZ; gI])] ∩
+       @G 7 [(C1, [gI; gI; gI; gI; gI; gI; gZ])] }}
+    Steane7 0 1 2 3 4 5 6
+    {{ @G 7 [(C1, [gX; gI; gX; gX; gI; gX; gI])] ∩
+          @G 7 [(C1, [gI; gX; gX; gI; gI; gX; gX])] }}.
+Proof. eapply CONS. eapply ID_implies. eapply PauliMult2. all : WF_auto.
+  apply CAP. apply Steane7_Z6. apply Steane7_Z7.
+Qed.
+
+Lemma Steane7_g3 :
+  {{ @G 7 [(C1, [gI; gI; gI; gI; gZ; gI; gI])] ∩
+       @G 7 [(C1, [gI; gI; gI; gI; gI; gI; gZ])] }}
+    Steane7 0 1 2 3 4 5 6
+    {{ @G 7 [(C1, [gX; gI; gX; gI; gX; gI; gX])] ∩
+         @G 7 [(C1, [gX; gX; gI; gX; gI; gI; gX])] }}.
+Proof. eapply CONS. eapply ID_implies. eapply CapComm.
+  eapply CONS. eapply ID_implies. eapply PauliMult2. all : WF_auto.
+  eapply CONS. eapply ID_implies. eapply CapComm.
+  apply CAP. apply Steane7_Z5. apply Steane7_Z7.
+Qed.
+
+Lemma Steane7_Z : 
+  {{ @G 7 [(C1, [gZ; gI; gI; gI; gI; gI; gI])] ∩
+        @G 7 [(C1, [gI; gZ; gI; gI; gI; gI; gI])] ∩
+        @G 7 [(C1, [gI; gI; gZ; gI; gI; gI; gI])] ∩
+        @G 7 [(C1, [gI; gI; gI; gZ; gI; gI; gI])] }}
+    Steane7 0 1 2 3 4 5 6
+    {{ @G 7 [(C1, [gZ; gI; gI; gI; gI; gZ; gZ])] ∩
+         @G 7 [(C1, [gZ; gZ; gI; gI; gZ; gZ; gI])] ∩
+         @G 7 [(C1, [gZ; gI; gZ; gI; gZ; gI; gZ])] ∩
+         @G 7 [(C1, [gI; gI; gI; gZ; gZ; gZ; gZ])] }} .
+Proof. eapply CONS. eapply ID_implies. Fail eapply PauliMult2. Admitted.
+
+
+Lemma 
 
 
 
 
 
 
-????????????????????????????????????????????????????
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
 
