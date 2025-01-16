@@ -1201,7 +1201,7 @@ Lemma Minvert_r {n : nat} (A B C : Square n) :
   WF_Matrix A -> WF_Matrix C ->
   invertible B -> A × B = C × B ->  A = C.
 Proof. intros WFA WFC H H0.
-       destruct H as [B' H']. inversion H'.
+       destruct H as [B' [WFB' invB']]. inversion invB'.
        assert ( A × B × B' = C × B × B' ).
        { rewrite H0. easy. }
        rewrite ! Mmult_assoc in H2.
@@ -1727,28 +1727,28 @@ Qed.
 
 (* Types.v line 5522 *)
 Lemma matrix_equality_implies_element_equality :
-  forall {m n} (A B : Matrix m n) (o p : nat),
+  forall {m n} {A B : Matrix m n} (o p : nat),
     A = B -> A o p = B o p.
 Proof. intros m n A B o p H. rewrite H. easy. Qed. 
 
 (* Types.v line 5546 *)
-Ltac mydo1 tac A B x y H :=
+Ltac mydo1 tac x y H :=
   match x with
   | O => idtac
-  | S ?n => (tac A B n y H) ; (mydo1 tac A B n y H)
+  | S ?n => (tac n y H) ; (mydo1 tac n y H)
   end.
 
 (* Types.v line 5551 *)
-Ltac mydo2 tac A B x y H :=
+Ltac mydo2 tac x y H :=
   match y with
   | O => idtac
-  | S ?n => (mydo1 tac A B x n H) ; (mydo2 tac A B x n H)
+  | S ?n => (mydo1 tac x n H) ; (mydo2 tac x n H)
   end.
 
 (* Types.v line 5556 *)
-Ltac specialize_destruct_matrix_equality A B m n H :=
+Ltac specialize_destruct_matrix_equality m n H :=
   let ceq := fresh "ceq" in
-  specialize (matrix_equality_implies_element_equality A B m n H) as ceq;
+  specialize (matrix_equality_implies_element_equality m n H) as ceq;
   inversion ceq.
 
 (* Types.v line 5560 *)
@@ -1756,7 +1756,7 @@ Ltac extract_linear_system H :=
   match type of H with
   | ?A = ?B =>
       match type of A with
-      | Matrix ?m ?n => mydo2 specialize_destruct_matrix_equality A B m n H;
+      | Matrix ?m ?n => mydo2 specialize_destruct_matrix_equality m n H;
                         autorewrite with R_db in *;
                         subst
       end
