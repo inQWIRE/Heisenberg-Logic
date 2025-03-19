@@ -1098,7 +1098,7 @@ Lemma Mscale_inj : forall {m n} (A B : Matrix m n) (c : C), A = B -> (c .* A = c
 Proof. intros m n A B c H. rewrite H. easy. Qed. 
 
 (* Types.v line 1256 *)
-Lemma Mscale_inv : forall {m n} (A B : Matrix m n) (c : C), c <> C0 -> (c .* A = c .* B)%M ->  A = B.
+Lemma Mscale_cancel : forall {m n} (A B : Matrix m n) (c : C), c <> C0 -> (c .* A = c .* B)%M ->  A = B.
 Proof. intros m n A B c H H0. apply Mscale_inj with (c:= /c) in H0.
   rewrite ! Mscale_assoc in H0. rewrite Cinv_l in H0; try easy.
   rewrite ! Mscale_1_l in H0. easy.
@@ -1442,10 +1442,7 @@ Proof.
       { rewrite Cmult_comm.
         reflexivity. }
       rewrite H7.
-      assumption.
-      assumption.
-      assumption.
-      assumption.
+      all: assumption.
 Qed.
 
 
