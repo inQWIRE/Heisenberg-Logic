@@ -1,5 +1,5 @@
 -docroot .
--R . HeisenbergFoundations
+-Q . HeisenbergFoundations
 
 -R QuantumLib-fork QuantumLib
 QuantumLib-fork

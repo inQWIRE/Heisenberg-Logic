@@ -25093,7 +25093,7 @@ Proof. intros n m Lt H0 H1 H2 H3 H4 H5 H6 v.
           apply WF_translate. rewrite Forall_nth in H3. apply H3; auto.
           rewrite nth_overflow; auto. rewrite translate_defaultT_I. auto with wf_db. }
      
-     2: { rewrite Forall_forall. intros x H15. apply WF_kron; auto with wf_db.}
+     2: { rewrite Forall_forall. intros x H15. apply WF_kron; auto with wf_db. }
 
      assert (forall k : nat, (k < length Lt)%nat -> @Mmult (2 ^ n * 2 ^ m)%nat (2 ^ n * 2 ^ m)%nat 1%nat
          (fun r c : nat =>
@@ -29526,8 +29526,8 @@ Proof. intros bit pm c l A U i_lessthan_n simpl_prog_U notgInth notgIA pm_1 H0.
 
   1,3-4 : try (rewrite Mscale_adj; f_equal);
   destruct (nth bit l gI); destruct A; simpl;
-  try apply id_sa; try apply σx_sa;
-  try apply σy_sa; try apply σz_sa;
+  try apply I_hermitian; try apply σx_hermitian;
+  try apply σy_hermitian; try apply σz_hermitian;
   try lca.
 
   1 : unfold not_gI in notgInth;
