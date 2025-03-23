@@ -18,3 +18,6 @@ HoareHeisenbergLogic : Main file that contains the core logic of Hoare-Heisenber
 Automation : Definitions and tactics for automation.
 
 Examples : Some examples.
+
+
+This repository is coded and tested for Coq 8.19.2
