@@ -4,5 +4,12 @@
 -R QuantumLib-fork QuantumLib
 QuantumLib-fork
 
-new_Helper.v
-new_Types.v
+Preamble.v
+LinAlg.v
+Predicates.v
+Normalization.v
+F2Math.v
+Separability.v
+HoareHeisenbergLogic.v
+Automation.v
+Examples.v
