@@ -60,6 +60,3 @@ docs
 *.v~
 \#*\#
 .\#*
-
-QuantumLib*
-old_files
