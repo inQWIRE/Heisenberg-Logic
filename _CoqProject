@@ -1,14 +1,15 @@
--R . Top
+-docroot .
+-Q . HeisenbergFoundations
 
-Complex.v
-Eigenvectors.v
-Heisenberg.v
-Matrix.v
-Monad.v
-Monoid.v
-Polynomial.v
-Prelim.v
-Quantum.v
-RealAux.v
-Types.v
+-R QuantumLib-fork QuantumLib
+QuantumLib-fork
 
+Preamble.v
+LinAlg.v
+Predicates.v
+Normalization.v
+F2Math.v
+Separability.v
+HoareHeisenbergLogic.v
+Automation.v
+Examples.v

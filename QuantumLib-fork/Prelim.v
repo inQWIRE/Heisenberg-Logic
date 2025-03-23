@@ -1,20 +1,38 @@
+ 
+ 
+(** This file contains basic utility, definitions, and proofs. *)
+
 Require Export Bool.
 Require Export Arith.
 Require Export Reals.
 Require Export Psatz.
-Require Export Program.
+Require Export Program. 
 Require Export List.
 
 Export ListNotations.
 
 
-(* Boolean notations, lemmas *)
+(* a lemma that was removed from Coq in 8.16 that I found quite helpful *)
+Lemma le_plus_minus' : forall m n, m <= n -> n = m + (n - m).
+Proof. intros. rewrite Nat.add_comm. rewrite Nat.sub_add; easy. Qed.
 
-Notation "¬ b" := (negb b) (at level 10).
+Lemma le_plus_minus_r': forall n m : nat, n <= m -> n + (m - n) = m.
+Proof. intros. rewrite Nat.add_comm. rewrite Nat.sub_add; easy. Qed.
+
+
+
+(***)
+
+
+(** Boolean notation, lemmas *)
+
+Notation "¬ b" := (negb b) (at level 75, right associativity). (* Level/associativity defined such that it does not clash with the standard library *)
 Infix  "⊕" := xorb (at level 20).
 
-Lemma xorb_nb_b : forall b, ¬ b ⊕ b = true. Proof. destruct b; easy. Qed.
-Lemma xorb_b_nb : forall b, b ⊕ ¬ b = true. Proof. destruct b; easy. Qed.
+
+Lemma xorb_nb_b : forall b, (¬ b) ⊕ b = true. Proof. destruct b; easy. Qed.
+Lemma xorb_b_nb : forall b, b ⊕ (¬ b) = true. Proof. destruct b; easy. Qed.
+
 
 Lemma xorb_involutive_l : forall b b', b ⊕ (b ⊕ b') = b'. Proof. destruct b, b'; easy. Qed.
 Lemma xorb_involutive_r : forall b b', b ⊕ b' ⊕ b' = b. Proof. destruct b, b'; easy. Qed.
@@ -22,12 +40,16 @@ Lemma xorb_involutive_r : forall b b', b ⊕ b' ⊕ b' = b. Proof. destruct b, b
 Lemma andb_xorb_dist : forall b b1 b2, b && (b1 ⊕ b2) = (b && b1) ⊕ (b && b2).
 Proof. destruct b, b1, b2; easy. Qed.
 
-(* A bit of useful reflection from Software Foundations Vol 3 *)
+(** Nat lemmas *)
+
+Lemma Sn_minus_1 : forall (n : nat), S n - 1 = n. Proof. lia. Qed.
+
+(** Useful reflections from Software Foundations Vol 3 *)
 
 Lemma beq_reflect : forall x y, reflect (x = y) (x =? y).
 Proof.
   intros x y.
-  apply iff_reflect. symmetry.  apply beq_nat_true_iff.
+  apply iff_reflect. symmetry.  apply Nat.eqb_eq.
 Qed.
 
 Lemma blt_reflect : forall x y, reflect (x < y) (x <? y).
@@ -42,7 +64,7 @@ Proof.
   apply iff_reflect. symmetry. apply Nat.leb_le.
 Qed.
 
-Hint Resolve blt_reflect ble_reflect beq_reflect : bdestruct.
+#[export] Hint Resolve blt_reflect ble_reflect beq_reflect : bdestruct.
 
 Ltac bdestruct X :=
   let H := fresh in let e := fresh "e" in
@@ -54,16 +76,20 @@ Ltac bdestruct X :=
 
 Ltac bdestructΩ X := bdestruct X; simpl; try lia.
 
+Ltac bdestruct_all :=
+  repeat match goal with
+  | |- context[?a <? ?b] => bdestruct (a <? b)
+  | |- context[?a <=? ?b] => bdestruct (a <=? b)                                       
+  | |- context[?a =? ?b] => bdestruct (a =? b)
+  end; try (exfalso; lia).
 
-(* Distribute functions over lists *)
+(** Distribute functions over conditional *)
 
-Lemma if_dist : forall (A B : Type) (b : bool) (f : A -> B) (x y : A), f (if b then x else y) = if b then f x else f y.
+Lemma if_dist : forall (A B : Type) (b : bool) (f : A -> B) (x y : A), 
+  f (if b then x else y) = if b then f x else f y.
 Proof. destruct b; reflexivity. Qed.
 
-Lemma if_dist2 : forall (A B C : Type) (b : bool) (f : A -> B -> C) (x y : A) (z : B), f (if b then x else y) z = if b then f x z else f y z.
-Proof. destruct b; reflexivity. Qed.
-
-(* Generalizing f_equals *)
+(** Generalizations of f_equals *)
 
 Lemma f_equal_inv : forall {A B} (x : A) (f g : A -> B), f = g -> f x = g x.
 Proof. intros. rewrite H. easy. Qed.
@@ -74,30 +100,31 @@ Proof. intros. rewrite H. easy. Qed.
 Lemma f_equal_gen : forall {A B} (f g : A -> B) a b, f = g -> a = b -> f a = g b.
 Proof. intros. subst. reflexivity. Qed.
 
-(* Currying *)
+(** Lists *)
 
-Definition curry {A B C : Type} (f : A * B -> C) : (A -> B -> C) :=
-  fun x y => f (x,y).
-Definition uncurry {A B C : Type} (f : A -> B -> C) : (A * B -> C) :=
-  fun p => f (fst p) (snd p).
+Lemma map_nth_eq [A B] (dnew : A) (f : A -> B) (l : list A) (d : B) i : 
+  f dnew = d ->
+  nth i (map f l) d = f (nth i l dnew).
+Proof.
+  intros <-.
+  apply map_nth.
+Qed.
 
-(* Lists *)
+Lemma map_map_nth {A B} (f : A -> B) (l : list (list A)) i : 
+  nth i (map (map f) l) [] = map f (nth i l []).
+Proof.
+  now apply map_nth_eq.
+Qed.
 
-(* Precondition: x must appear in li *)
-Fixpoint lookup (x : nat) (li : list nat) : nat :=
-  match li with
-  | nil => 0
-  | y :: ys => if x =? y then 0 else S (lookup x ys)
-  end.
+Lemma map_nth_small [A B] (dnew : A) (f : A -> B) (l : list A) (d : B) i : 
+  i < length l ->
+  nth i (map f l) d = f (nth i l dnew).
+Proof.
+  intros Hi.
+  rewrite (nth_indep _ d (f dnew)) by (now rewrite map_length).
+  apply map_nth.
+Qed.
 
-(*
-Fixpoint index {A} (i : nat) (li : list A) : option A :=
-  match i, li with
-  | _, nil => None
-  | 0, x :: _ => Some x
-  | S i', _ :: li' => index i' li'
-  end.
-*)
 Notation "l !! i" := (nth_error l i) (at level 20).
 
 Fixpoint remove_at {A} (i : nat) (ls : list A) :=
@@ -125,24 +152,11 @@ Proof.
   rewrite IHl; easy.
 Qed.
 
-Fixpoint Injective {A} (ls : list A) :=
-  match ls with
-  | [] => True
-  | x :: ls' => ~ In x ls' /\ Injective ls'
-  end.
-  
-Lemma nth_nil : forall {A} x, ([] : list A) !! x = None.
-Proof.
-  destruct x; auto.
-Qed.
-
 Lemma repeat_combine : forall A n1 n2 (a : A), 
   List.repeat a n1 ++ List.repeat a n2 = List.repeat a (n1 + n2).
-Proof.
-  induction n1; trivial. 
-  intros. simpl. 
-  rewrite IHn1.
-  reflexivity.
+Proof.  
+  intros.
+  now rewrite repeat_app.
 Qed.
 
 Lemma rev_repeat : forall A (a : A) n, rev (repeat a n) = repeat a n.
@@ -152,9 +166,10 @@ Proof.
   rewrite (repeat_combine A n 1).
   rewrite Nat.add_1_r.
   reflexivity.
-Qed.
+Qed. 
 
-Lemma firstn_repeat_le : forall A (a : A) m n, (m <= n)%nat -> firstn m (repeat a n) = repeat a m.  
+Lemma firstn_repeat_le : forall A (a : A) m n, (m <= n)%nat -> 
+  firstn m (repeat a n) = repeat a m.  
 Proof.
   induction m; trivial.
   intros n L.
@@ -164,7 +179,8 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma firstn_repeat_ge : forall A (a : A) m n, (m >= n)%nat -> firstn m (repeat a n) = repeat a n.  
+Lemma firstn_repeat_ge : forall A (a : A) m n, (m >= n)%nat -> 
+  firstn m (repeat a n) = repeat a n.  
 Proof.
   intros A a m n H.
   generalize dependent m.
@@ -176,15 +192,17 @@ Proof.
     reflexivity.
 Qed.
 
-Lemma firstn_repeat : forall A (a : A) m n, firstn m (repeat a n) = repeat a (min m n).  
+Lemma firstn_repeat : forall A (a : A) m n, 
+  firstn m (repeat a n) = repeat a (min m n).  
 Proof.
   intros.
   bdestruct (m <=? n).
-  - rewrite firstn_repeat_le, Min.min_l; easy.
-  - rewrite firstn_repeat_ge, Min.min_r; trivial; lia.
+  - rewrite firstn_repeat_le, Nat.min_l; easy.
+  - rewrite firstn_repeat_ge, Nat.min_r; trivial; lia.
 Qed.
 
-Lemma skipn_repeat : forall A (a : A) m n, skipn m (repeat a n) = repeat a (n-m).
+Lemma skipn_repeat : forall A (a : A) m n, 
+  skipn m (repeat a n) = repeat a (n-m).
 Proof.  
   induction m; intros n; simpl.
   - rewrite Nat.sub_0_r. reflexivity.
@@ -193,22 +211,40 @@ Proof.
     apply IHm.
 Qed.
 
-Lemma skipn_length : forall {A} (l : list A) n, length (skipn n l) = (length l - n)%nat. 
+Lemma nth_firstn : forall {A} i n (l : list A) d,
+  (i < n)%nat -> nth i (firstn n l) d = nth i l d.
 Proof.
-  Transparent skipn.
-  intros A l.
-  induction l.
-  intros [|n]; easy.
-  intros [|n].
-  easy.
+  intros A i n l d Hi.
+  generalize dependent n.
+  generalize dependent i.
+  induction l; intros i n Hi.
+  rewrite firstn_nil.
+  reflexivity.
+  destruct n. lia.
+  rewrite firstn_cons.
   simpl.
-  rewrite IHl.
-  easy.
-  Opaque skipn.
+  destruct i.
+  reflexivity.
+  apply IHl.
+  lia.
 Qed.
 
+Lemma nth_skipn {T : Type} {n0 n : nat} {k : list T} {d : T} : 
+  nth n (skipn n0 k) d = nth (n0 + n) k d.
+Proof.
+  bdestruct (n0 <? length k).
+  - replace (nth _ k d) with 
+      (nth (n0+n) (firstn n0 k ++ skipn n0 k) d) 
+      by (rewrite (firstn_skipn n0 k); easy).
+    replace (n0 + n) with (length (firstn n0 k) + n).
+    + rewrite app_nth2_plus.
+      easy. 
+    + rewrite firstn_length_le; lia.
+  - rewrite skipn_all2; [|easy].
+    rewrite 2!nth_overflow; cbn; try easy; try lia.
+Qed.
 
-(* option type *)
+(** Option type *)
 
 Definition maybe {A} (o : option A) (default : A) : A :=
   match o with
@@ -216,11 +252,7 @@ Definition maybe {A} (o : option A) (default : A) : A :=
   | None => default
   end.
 
-
-
-(************************************)
-(* Helpful, general purpose tactics *)
-(************************************)
+(** General purpose tactics *)
 
 Ltac simpl_rewrite lem :=
   let H := fresh "H" in 
@@ -255,8 +287,10 @@ Ltac apply_with_obligations H :=
     [replace g with g'; [apply H|]|]|]|]|]|]|]; trivial end 
   end.
 
+Ltac gen a :=
+  generalize dependent a.
 
-(* From SF - up to five arguments *)
+(** From SF - up to five arguments *)
 Tactic Notation "gen" ident(X1) :=
   generalize dependent X1.
 Tactic Notation "gen" ident(X1) ident(X2) :=
@@ -268,49 +302,40 @@ Tactic Notation "gen" ident(X1) ident(X2) ident(X3) ident(X4) :=
 Tactic Notation "gen" ident(X1) ident(X2) ident(X3) ident(X4) ident(X5) :=
   gen X5; gen X4; gen X3; gen X2; gen X1.
 
-
-(***************)
-(* Powers of 2 *)
-(***************)
+(** Powers of 2 *)
 
 Lemma double_mult : forall (n : nat), (n + n = 2 * n)%nat. Proof. intros. lia. Qed.
 Lemma pow_two_succ_l : forall x, (2^x * 2 = 2 ^ (x + 1))%nat.
-Proof. intros. rewrite mult_comm. rewrite <- Nat.pow_succ_r'. intuition. Qed.
+Proof. intros. rewrite Nat.mul_comm. rewrite <- Nat.pow_succ_r'. auto with *. Qed.
 Lemma pow_two_succ_r : forall x, (2 * 2^x = 2 ^ (x + 1))%nat.
-Proof. intros. rewrite <- Nat.pow_succ_r'. intuition. Qed.
+Proof. intros. rewrite <- Nat.pow_succ_r'. auto with *. Qed.
 Lemma double_pow : forall (n : nat), (2^n + 2^n = 2^(n+1))%nat. 
 Proof. intros. rewrite double_mult. rewrite pow_two_succ_r. reflexivity. Qed.
 Lemma pow_components : forall (a b m n : nat), a = b -> m = n -> (a^m = b^n)%nat.
-Proof. intuition. Qed.
+Proof. auto with *. Qed.
 Lemma pow_positive : forall a b, a <> 0 -> 0 < a ^ b.
-Proof. intros. induction b; simpl; try lia; 
-  (* for Coq < 8.12 *)
-  try (apply Nat.lt_0_mul'; split; lia). 
-Qed.  
-
+Proof. intros. induction b; simpl; lia. Qed.  
 
 Ltac unify_pows_two :=
   repeat match goal with
   (* NB: this first thing is potentially a bad idea, do not do with 2^1 *)
   | [ |- context[ 4%nat ]]                  => replace 4%nat with (2^2)%nat by reflexivity
-  | [ |- context[ (0 + ?a)%nat]]            => rewrite plus_0_l 
-  | [ |- context[ (?a + 0)%nat]]            => rewrite plus_0_r 
+  | [ |- context[ (0 + ?a)%nat]]            => rewrite Nat.add_0_l 
+  | [ |- context[ (?a + 0)%nat]]            => rewrite Nat.add_0_r 
   | [ |- context[ (1 * ?a)%nat]]            => rewrite Nat.mul_1_l 
   | [ |- context[ (?a * 1)%nat]]            => rewrite Nat.mul_1_r 
   | [ |- context[ (2 * 2^?x)%nat]]          => rewrite <- Nat.pow_succ_r'
   | [ |- context[ (2^?x * 2)%nat]]          => rewrite pow_two_succ_l
   | [ |- context[ (2^?x + 2^?x)%nat]]       => rewrite double_pow 
   | [ |- context[ (2^?x * 2^?y)%nat]]       => rewrite <- Nat.pow_add_r 
-  | [ |- context[ (?a + (?b + ?c))%nat ]]   => rewrite plus_assoc 
+  | [ |- context[ (?a + (?b + ?c))%nat ]]   => rewrite Nat.add_assoc
   | [ |- (2^?x = 2^?y)%nat ]                => apply pow_components; try lia 
   end.
 
+(** Subsets *)
 
-
-(* general subset to be used in Heisenberg.v *)
 Definition subset_gen {X : Type} (l1 l2 : list X) :=
   forall (x : X), In x l1 -> In x l2.
-
 
 (* an alternate version of subset *)
 Fixpoint subset_gen' {X : Type} (l1 l2 : list X) :=
@@ -318,7 +343,6 @@ Fixpoint subset_gen' {X : Type} (l1 l2 : list X) :=
   | [] => True
   | (l :: l1') => In l l2 /\ subset_gen' l1' l2
   end.
-
 
 Lemma subset_is_subset' : forall (X : Type) (l1 l2 : list X),
     subset_gen' l1 l2 <-> subset_gen l1 l2.
@@ -340,10 +364,7 @@ Proof. intros X l1 l2. split.
              right. apply H'.
 Qed.           
 
-           
-  
-Infix "⊆" := subset_gen (at level 30, no associativity).
-
+Infix "⊆" := subset_gen (at level 70, no associativity).
 
 Lemma subset_cons : forall (X : Type) (l1 l2 : list X) (x : X),
   l1 ⊆ l2 -> l1 ⊆ (x :: l2).
@@ -354,7 +375,6 @@ Proof. intros X l1 l2 x.
        apply H; apply H0.
 Qed.
 
-
 Lemma subset_concat_l : forall (X : Type) (l1 l2 : list X),
   l1 ⊆ (l1 ++ l2).
 Proof. intros X l1 l2.
@@ -362,7 +382,6 @@ Proof. intros X l1 l2.
        apply in_or_app.
        left; apply H.
 Qed.
-
 
 Lemma subset_concat_r : forall (X : Type) (l1 l2 : list X),
   l1 ⊆ (l2 ++ l1).
@@ -372,13 +391,11 @@ Proof. intros X l1 l2.
        right; apply H.
 Qed.
 
-
 Corollary subset_self : forall (X : Type) (l1 : list X),
   l1 ⊆ l1. 
 Proof. intros X l1. assert (H: l1 ⊆ (l1 ++ [])). { apply subset_concat_l. }
-       rewrite <- app_nil_end in H. apply H. 
+       rewrite app_nil_r in H. apply H. 
 Qed.
-
 
 Lemma subsets_add : forall (X : Type) (l1 l2 l3 : list X),
   l1 ⊆ l3 -> l2 ⊆ l3 -> (l1 ++ l2) ⊆ l3.
@@ -390,7 +407,6 @@ Proof. intros X l1 l2 l3.
        - apply H2; apply Hl2.
 Qed.
 
-
 Lemma subset_trans : forall (X : Type) (l1 l2 l3 : list X),
     l1 ⊆ l2 -> l2 ⊆ l3 -> l1 ⊆ l3.
 Proof. intros X l1 l2 l3.
@@ -400,6 +416,31 @@ Proof. intros X l1 l2 l3.
        apply H.
 Qed.
 
+#[export] Hint Resolve subset_concat_l subset_concat_r subset_self 
+                       subsets_add subset_trans : sub_db.
 
+Lemma firstn_subset : forall {X : Type} (n : nat) (ls : list X),
+    firstn n ls ⊆ ls.
+Proof. induction n as [| n']. 
+       - easy.
+       - intros. destruct ls. 
+         easy. simpl. 
+         unfold subset_gen in *.
+         intros. 
+         destruct H as [H | H].
+         left; easy. 
+         right; apply IHn'; apply H.
+Qed.
 
-Hint Resolve subset_concat_l subset_concat_r subset_self subsets_add subset_trans : sub_db.
+Lemma skipn_subset : forall {X : Type} (n : nat) (ls : list X),
+    skipn n ls ⊆ ls.
+Proof. induction n as [| n']. 
+       - easy.
+       - intros. destruct ls. 
+         easy. simpl. 
+         unfold subset_gen in *.
+         intros. 
+         right; apply IHn'; apply H.
+Qed.
+
+#[export] Hint Resolve firstn_subset skipn_subset : sub_db.
