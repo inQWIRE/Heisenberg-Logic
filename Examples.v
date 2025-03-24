@@ -53,7 +53,38 @@ Proof. time validate. Qed.
 Tactic call ran for 47.226 secs (44.475u,1.429s) (success) *)
 
 
+Example XIITOFFOLI_solve : 
+exists Placeholder,
+{{ @AtoPred 3 [(C1, [gX; gI; gI])] }} TOFFOLI 0 1 2 {{ Placeholder }}.
+Proof. time solvePlaceholder.
+(* time solvePlaceholder.
+Tactic call ran for 32.674 secs (32.509u,0.09s) (success) *)
+assumption.
+Qed.
 
+
+Example XIITOFFOLI : 
+{{ @AtoPred 3 [(C1, [gX; gI; gI])] }} TOFFOLI 0 1 2 {{ @AtoPred 3  
+        [(- C1 / (√ 2 * √ 2 * √ 2 * √ 2), [gX; gZ; gX]);
+         (- C1 / (√ 2 * √ 2 * √ 2 * √ 2), [gY; gI; gX]);
+         (- C1 / (√ 2 * √ 2 * √ 2 * √ 2), [gY; gZ; gX]);
+         (C1 / (√ 2 * √ 2 * √ 2 * √ 2), [gX; gI; gX]);
+         (- C1 / (√ 2 * √ 2 * √ 2 * √ 2), [gY; gZ; gI]);
+         (C1 / (√ 2 * √ 2 * √ 2 * √ 2), [gX; gI; gI]);
+         (C1 / (√ 2 * √ 2 * √ 2 * √ 2), [gX; gZ; gI]);
+         (C1 / (√ 2 * √ 2 * √ 2 * √ 2), [gY; gI; gI]);
+         (- C1 / (√ 2 * √ 2 * √ 2 * √ 2), [gY; gI; gI]);
+         (C1 / (√ 2 * √ 2 * √ 2 * √ 2), [gX; gZ; gI]);
+         (C1 / (√ 2 * √ 2 * √ 2 * √ 2), [gX; gI; gI]);
+         (C1 / (√ 2 * √ 2 * √ 2 * √ 2), [gY; gZ; gI]);
+         (C1 / (√ 2 * √ 2 * √ 2 * √ 2), [gX; gI; gX]);
+         (C1 / (√ 2 * √ 2 * √ 2 * √ 2), [gY; gZ; gX]);
+         (C1 / (√ 2 * √ 2 * √ 2 * √ 2), [gY; gI; gX]);
+         (- C1 / (√ 2 * √ 2 * √ 2 * √ 2), [gX; gZ; gX])]
+ }}.
+Proof. time validate. Qed.
+(* time validate
+Tactic call ran for 17.345 secs (17.035u,0.054s) (success) *)
 
 
 
