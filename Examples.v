@@ -1,4 +1,3 @@
-
 Require Import HeisenbergFoundations.Automation.
 
 
@@ -91,7 +90,7 @@ Tactic call ran for 17.345 secs (17.035u,0.054s) (success) *)
 (***************************************************)
 (** ** Normalization example on 7 qubit Steane code ** **)
 (***************************************************)
-(* 
+(*
 g1 = IIIXXXX
 g2 = IXXIIXX
 g3 = XIXIXIX
@@ -101,7 +100,8 @@ g6 = ZIZIZIZ
 Xb = XXXXXXX
 Zb = ZZZZZZZ
 ZL := g1 ∩ ... ∩ g6 ∩ Zb
-XL := g1 ∩ ... ∩ g6 ∩ Xb *)
+XL := g1 ∩ ... ∩ g6 ∩ Xb 
+*)
 Definition g1 : TType 7 := (C1, [gI; gI; gI; gX; gX; gX; gX]).
 Definition g2 : TType 7 := (C1, [gI; gX; gX; gI; gI; gX; gX]).
 Definition g3 : TType 7 := (C1, [gX; gI; gX; gI; gX; gI; gX]).
@@ -258,7 +258,7 @@ g5 = IZZIIZZ
 g6 = ZIZIZIZ
 Xb = XXXXXXX
 Zb = ZZZZZZZ
-Yb = YYYYYYY
+Yb = -YYYYYYY
 
 ZL := g1 ∩ ... ∩ g6 ∩ Zb
 XL := g1 ∩ ... ∩ g6 ∩ Xb
@@ -269,14 +269,17 @@ ZL = St7 ∩ Zb
 XL = St7 ∩ Xb
 YL = St7 ∩ Yb
 
-Definition g1 := @G 7 (F [(C1, [gI; gI; gI; gX; gX; gX; gX])]).
-Definition g2 := @G 7 (F [(C1, [gI; gX; gX; gI; gI; gX; gX])]).
-Definition g3 := @G 7 (F [(C1, [gX; gI; gX; gI; gX; gI; gX])]).
-Definition g4 := @G 7 (F [(C1, [gI; gI; gI; gZ; gZ; gZ; gZ])]).
-Definition g5 := @G 7 (F [(C1, [gI; gZ; gZ; gI; gI; gZ; gZ])]).
-Definition g6 := @G 7 (F [(C1, [gZ; gI; gZ; gI; gZ; gI; gZ])]).
-Definition Xbar := @G 7 (F [(C1, [gX; gX; gX; gX; gX; gX; gX])]).
-Definition Zbar := @G 7 (F [(C1, [gZ; gZ; gZ; gZ; gZ; gZ; gZ])]).
+
+Definition g1 : TType 7 := (C1, [gI; gI; gI; gX; gX; gX; gX]).
+Definition g2 : TType 7 := (C1, [gI; gX; gX; gI; gI; gX; gX]).
+Definition g3 : TType 7 := (C1, [gX; gI; gX; gI; gX; gI; gX]).
+Definition g4 : TType 7 := (C1, [gI; gI; gI; gZ; gZ; gZ; gZ]).
+Definition g5 : TType 7 := (C1, [gI; gZ; gZ; gI; gI; gZ; gZ]).
+Definition g6 : TType 7 := (C1, [gZ; gI; gZ; gI; gZ; gI; gZ]).
+Definition Xbar : TType 7 := (C1, [gX; gX; gX; gX; gX; gX; gX]).
+Definition Zbar : TType 7 := (C1, [gZ; gZ; gZ; gZ; gZ; gZ; gZ]).
+Definition ZL : list (TType 7) := [g1; g2; g3; g4; g5; g6; Zbar].
+Definition XL : list (TType 7) := [g1; g2; g3; g4; g5; g6; Xbar].
 *)
 
 Definition Steane7 q0 q1 q2 q3 q4 q5 q6 := 
@@ -285,38 +288,6 @@ CNOT q0 q1 ;; CNOT q0 q2 ;;
 CNOT q6 q0 ;; CNOT q6 q1 ;; CNOT q6 q3 ;; 
 CNOT q5 q0 ;; CNOT q5 q2 ;; CNOT q5 q3 ;; 
 CNOT q4 q1 ;; CNOT q4 q2 ;; CNOT q4 q3. 
-
-Example Steane7Z : 
-@triple 7 (Cap ([
-[(C1, [gZ; gI; gI; gI; gI; gI; gI])];
-[(C1, [gI; gZ; gI; gI; gI; gI; gI])];
-[(C1, [gI; gI; gZ; gI; gI; gI; gI])];
-[(C1, [gI; gI; gI; gZ; gI; gI; gI])];
-[(C1, [gI; gI; gI; gI; gZ; gI; gI])];
-[(C1, [gI; gI; gI; gI; gI; gZ; gI])];
-[(C1, [gI; gI; gI; gI; gI; gI; gZ])]
-])) (Steane7 0 1 2 3 4 5 6) (Cap ([
-
-[(C1, [gZ; gI; gI; gI; gI; gZ; gZ])];
-[(C1, [gZ; gZ; gI; gI; gZ; gZ; gI])];
-[(C1, [gZ; gI; gZ; gI; gZ; gI; gZ])];
-[(C1, [gI; gI; gI; gZ; gZ; gZ; gZ])];
-[(C1, [gI; gX; gX; gX; gX; gI; gI])];
-[(C1, [gX; gI; gX; gX; gI; gX; gI])];
-[(C1, [gX; gX; gI; gX; gI; gI; gX])]
-
-
-(* [(C1, [gZ; gI; gI; gI; gI; gZ; gZ])];
-[(C1, [gZ; gZ; gI; gI; gZ; gZ; gI])];
-[(C1, [gZ; gI; gZ; gI; gZ; gI; gZ])];
-[(C1, [gI; gI; gI; gZ; gZ; gZ; gZ])];
-[(C1, [gI; gX; gX; gX; gX; gI; gI])];
-[(C1, [gX; gI; gX; gX; gI; gX; gI])];
-[(C1, [gX; gX; gI; gX; gI; gI; gX])] *)
-])).
-Proof. time validate. Qed.
-(* time validate
-Tactic call ran for 18.646 secs (17.973u,0.353s) (success) *)
 
 
 Example Steane7Z_solve : 
@@ -332,13 +303,237 @@ exists Placeholder,
 ])) (Steane7 0 1 2 3 4 5 6) (Placeholder).
 Proof. time solvePlaceholder.
 (* time solvePlaceholder.
-Tactic call ran for 17.471 secs (16.808u,0.27s) (success) *)
+Tactic call ran for 6.267 secs (6.226u,0.021s) (success) *)
 assumption.
 Qed.
 
 
+Example Steane7Z : 
+@triple 7 (Cap ([
+[(C1, [gZ; gI; gI; gI; gI; gI; gI])];
+[(C1, [gI; gZ; gI; gI; gI; gI; gI])];
+[(C1, [gI; gI; gZ; gI; gI; gI; gI])];
+[(C1, [gI; gI; gI; gZ; gI; gI; gI])];
+[(C1, [gI; gI; gI; gI; gZ; gI; gI])];
+[(C1, [gI; gI; gI; gI; gI; gZ; gI])];
+[(C1, [gI; gI; gI; gI; gI; gI; gZ])]
+])) (Steane7 0 1 2 3 4 5 6) (Cap ([
+[(C1, [gZ; gI; gI; gI; gI; gZ; gZ])];
+[(C1, [gZ; gZ; gI; gI; gZ; gZ; gI])];
+[(C1, [gZ; gI; gZ; gI; gZ; gI; gZ])];
+[(C1, [gI; gI; gI; gZ; gZ; gZ; gZ])];
+[(C1, [gI; gX; gX; gX; gX; gI; gI])];
+[(C1, [gX; gI; gX; gX; gI; gX; gI])];
+[(C1, [gX; gX; gI; gX; gI; gI; gX])]
+])).
+Proof. time validate. Qed.
+(* time validate
+Tactic call ran for 6.786 secs (6.681u,0.043s) (success) *)
 
 
+Example Steane7X_solve : 
+exists Placeholder,
+@triple 7 (Cap ([
+[(C1, [gX; gI; gI; gI; gI; gI; gI])];
+[(C1, [gI; gZ; gI; gI; gI; gI; gI])];
+[(C1, [gI; gI; gZ; gI; gI; gI; gI])];
+[(C1, [gI; gI; gI; gZ; gI; gI; gI])];
+[(C1, [gI; gI; gI; gI; gZ; gI; gI])];
+[(C1, [gI; gI; gI; gI; gI; gZ; gI])];
+[(C1, [gI; gI; gI; gI; gI; gI; gZ])]
+])) (Steane7 0 1 2 3 4 5 6) (Placeholder).
+Proof. time solvePlaceholder.
+(* time solvePlaceholder.
+Tactic call ran for 6.441 secs (6.391u,0.024s) (success) *)
+assumption.
+Qed.
+
+
+Example Steane7X : 
+@triple 7 (Cap ([
+[(C1, [gX; gI; gI; gI; gI; gI; gI])];
+[(C1, [gI; gZ; gI; gI; gI; gI; gI])];
+[(C1, [gI; gI; gZ; gI; gI; gI; gI])];
+[(C1, [gI; gI; gI; gZ; gI; gI; gI])];
+[(C1, [gI; gI; gI; gI; gZ; gI; gI])];
+[(C1, [gI; gI; gI; gI; gI; gZ; gI])];
+[(C1, [gI; gI; gI; gI; gI; gI; gZ])]
+])) (Steane7 0 1 2 3 4 5 6) (Cap ([
+[(C1, [gX; gX; gX; gI; gI; gI; gI])];
+[(C1, [gZ; gZ; gI; gI; gZ; gZ; gI])];
+[(C1, [gZ; gI; gZ; gI; gZ; gI; gZ])];
+[(C1, [gI; gI; gI; gZ; gZ; gZ; gZ])];
+[(C1, [gI; gX; gX; gX; gX; gI; gI])];
+[(C1, [gX; gI; gX; gX; gI; gX; gI])];
+[(C1, [gX; gX; gI; gX; gI; gI; gX])]
+])).
+Proof. time validate. Qed.
+(* time validate
+Tactic call ran for 6.386 secs (6.345u,0.02s) (success) *)
+
+
+
+
+(***************************************************)
+(************* Shor code on 9 qubits *************)
+(***************************************************)
+
+(* 
+g1' ZZIIIIIII
+g2' IZZIIIIII 
+g3' IIIZZIIII 
+g4' IIIIZZIII
+g5' IIIIIIZZI
+g6' IIIIIIIZZ
+g7' XXXXXXIII
+g8' IIIXXXXXX
+Zbar' XXXXXXXXX
+Xbar' ZZZZZZZZZ
+
+ZL' := g1 ∩ ... ∩ g8 ∩ Zbar'
+XL' := g1 ∩ ... ∩ g8 ∩ Xbar'
+Sh9 := g1 ∩ ... ∩ g8
+
+ZL' = Sh9 ∩ Zbar'
+XL' = Sh9 ∩ Xbar'
+*)
+
+Definition g1' : TType 9 := (C1, [gZ; gZ; gI; gI; gI; gI; gI; gI; gI]).
+Definition g2' : TType 9 := (C1, [gI; gZ; gZ; gI; gI; gI; gI; gI; gI]).
+Definition g3' : TType 9 := (C1, [gI; gI; gI; gZ; gZ; gI; gI; gI; gI]).
+Definition g4' : TType 9 := (C1, [gI; gI; gI; gI; gZ; gZ; gI; gI; gI]).
+Definition g5' : TType 9 := (C1, [gI; gI; gI; gI; gI; gI; gZ; gZ; gI]).
+Definition g6' : TType 9 := (C1, [gI; gI; gI; gI; gI; gI; gI; gZ; gZ]).
+Definition g7' : TType 9 := (C1, [gX; gX; gX; gX; gX; gX; gI; gI; gI]).
+Definition g8' : TType 9 := (C1, [gI; gI; gI; gX; gX; gX; gX; gX; gX]).
+Definition Xbar' : TType 9 := (C1, [gZ; gZ; gZ; gZ; gZ; gZ; gZ; gZ; gZ]).
+Definition Zbar' : TType 9 := (C1, [gX; gX; gX; gX; gX; gX; gX; gX; gX]).
+Definition ZL' : list (TType 9) := [g1'; g2'; g3'; g4'; g5'; g6'; g7'; g8'; Zbar'].
+Definition XL' : list (TType 9) := [g1'; g2'; g3'; g4'; g5'; g6'; g7'; g8'; Xbar'].
+
+
+Definition Shor9 q0 q1 q2 q3 q4 q5 q6 q7 q8 := 
+CNOT q0 q3 ;; CNOT q0 q6 ;;
+H q0 ;; H q3 ;; H q6 ;;
+CNOT q0 q1 ;; CNOT q0 q2 ;;
+CNOT q3 q4 ;; CNOT q3 q5 ;;
+CNOT q6 q7 ;; CNOT q6 q8.
+
+
+Example Shor9Z_solve : 
+exists Placeholder,
+@triple 9 (Cap ([
+[(C1, [gZ; gI; gI; gI; gI; gI; gI; gI; gI])];
+[(C1, [gI; gZ; gI; gI; gI; gI; gI; gI; gI])];
+[(C1, [gI; gI; gZ; gI; gI; gI; gI; gI; gI])];
+[(C1, [gI; gI; gI; gZ; gI; gI; gI; gI; gI])];
+[(C1, [gI; gI; gI; gI; gZ; gI; gI; gI; gI])];
+[(C1, [gI; gI; gI; gI; gI; gZ; gI; gI; gI])];
+[(C1, [gI; gI; gI; gI; gI; gI; gZ; gI; gI])];
+[(C1, [gI; gI; gI; gI; gI; gI; gI; gZ; gI])];
+[(C1, [gI; gI; gI; gI; gI; gI; gI; gI; gZ])]
+])) (Shor9 0 1 2 3 4 5 6 7 8) (Placeholder).
+Proof. time solvePlaceholder.
+(* time solvePlaceholder.
+Tactic call ran for 7.665 secs (7.376u,0.052s) (success) *)
+assumption.
+Qed.
+
+
+Example Shor9Z : 
+@triple 9 (Cap ([
+[(C1, [gZ; gI; gI; gI; gI; gI; gI; gI; gI])];
+[(C1, [gI; gZ; gI; gI; gI; gI; gI; gI; gI])];
+[(C1, [gI; gI; gZ; gI; gI; gI; gI; gI; gI])];
+[(C1, [gI; gI; gI; gZ; gI; gI; gI; gI; gI])];
+[(C1, [gI; gI; gI; gI; gZ; gI; gI; gI; gI])];
+[(C1, [gI; gI; gI; gI; gI; gZ; gI; gI; gI])];
+[(C1, [gI; gI; gI; gI; gI; gI; gZ; gI; gI])];
+[(C1, [gI; gI; gI; gI; gI; gI; gI; gZ; gI])];
+[(C1, [gI; gI; gI; gI; gI; gI; gI; gI; gZ])]
+])) (Shor9 0 1 2 3 4 5 6 7 8) (Cap ([
+[(C1, [gX; gX; gX; gI; gI; gI; gI; gI; gI])];
+[(C1, [gZ; gZ; gI; gI; gI; gI; gI; gI; gI])];
+[(C1, [gZ; gI; gZ; gI; gI; gI; gI; gI; gI])];
+[(C1, [gX; gX; gX; gX; gX; gX; gI; gI; gI])];
+[(C1, [gI; gI; gI; gZ; gZ; gI; gI; gI; gI])];
+[(C1, [gI; gI; gI; gZ; gI; gZ; gI; gI; gI])];
+[(C1, [gX; gX; gX; gI; gI; gI; gX; gX; gX])];
+[(C1, [gI; gI; gI; gI; gI; gI; gZ; gZ; gI])];
+[(C1, [gI; gI; gI; gI; gI; gI; gZ; gI; gZ])]
+])).
+Proof. time validate. Qed.
+(* time validate
+Tactic call ran for 7.362 secs (7.292u,0.033s) (success) *)
+
+
+
+Example Shor9X_solve : 
+exists Placeholder,
+@triple 9 (Cap ([
+[(C1, [gX; gI; gI; gI; gI; gI; gI; gI; gI])];
+[(C1, [gI; gZ; gI; gI; gI; gI; gI; gI; gI])];
+[(C1, [gI; gI; gZ; gI; gI; gI; gI; gI; gI])];
+[(C1, [gI; gI; gI; gZ; gI; gI; gI; gI; gI])];
+[(C1, [gI; gI; gI; gI; gZ; gI; gI; gI; gI])];
+[(C1, [gI; gI; gI; gI; gI; gZ; gI; gI; gI])];
+[(C1, [gI; gI; gI; gI; gI; gI; gZ; gI; gI])];
+[(C1, [gI; gI; gI; gI; gI; gI; gI; gZ; gI])];
+[(C1, [gI; gI; gI; gI; gI; gI; gI; gI; gZ])]
+])) (Shor9 0 1 2 3 4 5 6 7 8) (Placeholder).
+Proof. time solvePlaceholder.
+(* time solvePlaceholder.
+Tactic call ran for 6.993 secs (6.964u,0.017s) (success) *)
+assumption.
+Qed.
+
+
+Example Shor9X : 
+@triple 9 (Cap ([
+[(C1, [gX; gI; gI; gI; gI; gI; gI; gI; gI])];
+[(C1, [gI; gZ; gI; gI; gI; gI; gI; gI; gI])];
+[(C1, [gI; gI; gZ; gI; gI; gI; gI; gI; gI])];
+[(C1, [gI; gI; gI; gZ; gI; gI; gI; gI; gI])];
+[(C1, [gI; gI; gI; gI; gZ; gI; gI; gI; gI])];
+[(C1, [gI; gI; gI; gI; gI; gZ; gI; gI; gI])];
+[(C1, [gI; gI; gI; gI; gI; gI; gZ; gI; gI])];
+[(C1, [gI; gI; gI; gI; gI; gI; gI; gZ; gI])];
+[(C1, [gI; gI; gI; gI; gI; gI; gI; gI; gZ])]
+])) (Shor9 0 1 2 3 4 5 6 7 8) (Cap ([
+[(C1, [gZ; gI; gI; gZ; gI; gI; gZ; gI; gI])];
+[(C1, [gZ; gZ; gI; gI; gI; gI; gI; gI; gI])];
+[(C1, [gZ; gI; gZ; gI; gI; gI; gI; gI; gI])];
+[(C1, [gX; gX; gX; gX; gX; gX; gI; gI; gI])];
+[(C1, [gI; gI; gI; gZ; gZ; gI; gI; gI; gI])];
+[(C1, [gI; gI; gI; gZ; gI; gZ; gI; gI; gI])];
+[(C1, [gX; gX; gX; gI; gI; gI; gX; gX; gX])];
+[(C1, [gI; gI; gI; gI; gI; gI; gZ; gZ; gI])];
+[(C1, [gI; gI; gI; gI; gI; gI; gZ; gI; gZ])]
+])).
+Proof. time validate. Qed.
+(* time validate
+Tactic call ran for 7.768 secs (7.454u,0.043s) (success) *)
+
+
+
+(* Code is commented out because it takes really long to compute
+
+(** We can check if the normalization are equal. **)
+Example equal_normalization_Shor9X :
+(@normalize 9
+(map AtoT [
+[(C1, [gZ; gI; gI; gZ; gI; gI; gZ; gI; gI])];
+[(C1, [gZ; gZ; gI; gI; gI; gI; gI; gI; gI])];
+[(C1, [gZ; gI; gZ; gI; gI; gI; gI; gI; gI])];
+[(C1, [gX; gX; gX; gX; gX; gX; gI; gI; gI])];
+[(C1, [gI; gI; gI; gZ; gZ; gI; gI; gI; gI])];
+[(C1, [gI; gI; gI; gZ; gI; gZ; gI; gI; gI])];
+[(C1, [gX; gX; gX; gI; gI; gI; gX; gX; gX])];
+[(C1, [gI; gI; gI; gI; gI; gI; gZ; gZ; gI])];
+[(C1, [gI; gI; gI; gI; gI; gI; gZ; gI; gZ])]
+]) = normalize XL').
+Proof. compute. Rsimpl. reflexivity. Qed.
+*)
 
 
 
