@@ -17,6 +17,11 @@ Example IZITOFFOLI :
   {{ @AtoPred 3 [(C1, [gI; gZ; gI])] }} TOFFOLI 0 1 2 {{ @AtoPred 3 [(C1, [gI; gZ; gI])] }}.
 Proof. time validate. Qed.
 
+Example IIXTOFFOLI :
+  {{ @AtoPred 3 [(C1, [gI; gI; gX])] }} TOFFOLI 0 1 2 {{ @AtoPred 3 [(C1, [gI; gI; gX])] }}.
+Proof. time validate. Qed.
+
+
 
 Example IIZTOFFOLI_solve : 
 exists Placeholder,
@@ -84,6 +89,39 @@ Example XIITOFFOLI :
 Proof. time validate. Qed.
 (* time validate
 Tactic call ran for 17.345 secs (17.035u,0.054s) (success) *)
+
+
+Example IXITOFFOLI_solve : 
+exists Placeholder,
+{{ @AtoPred 3 [(C1, [gI; gX; gI])] }} TOFFOLI 0 1 2 {{ Placeholder }}.
+Proof. time solvePlaceholder.
+(* time solvePlaceholder.
+Tactic call ran for 37.36 secs (35.813u,0.256s) (success) *)
+assumption.
+Qed.
+
+Example IXITOFFOLI :
+{{ @AtoPred 3 [(C1, [gI; gX; gI])] }} TOFFOLI 0 1 2 {{ @AtoPred 3  
+      [(- C1 / (√ 2 * √ 2 * √ 2 * √ 2), [gZ; gX; gX]);
+         (- C1 / (√ 2 * √ 2 * √ 2 * √ 2), [gI; gY; gX]);
+         (- C1 / (√ 2 * √ 2 * √ 2 * √ 2), [gZ; gY; gX]);
+         (C1 / (√ 2 * √ 2 * √ 2 * √ 2), [gI; gX; gX]);
+         (- C1 / (√ 2 * √ 2 * √ 2 * √ 2), [gI; gY; gI]);
+         (C1 / (√ 2 * √ 2 * √ 2 * √ 2), [gZ; gX; gI]);
+         (C1 / (√ 2 * √ 2 * √ 2 * √ 2), [gI; gX; gI]);
+         (C1 / (√ 2 * √ 2 * √ 2 * √ 2), [gZ; gY; gI]);
+         (- C1 / (√ 2 * √ 2 * √ 2 * √ 2), [gZ; gY; gI]);
+         (C1 / (√ 2 * √ 2 * √ 2 * √ 2), [gI; gX; gI]);
+         (C1 / (√ 2 * √ 2 * √ 2 * √ 2), [gZ; gX; gI]);
+         (C1 / (√ 2 * √ 2 * √ 2 * √ 2), [gI; gY; gI]);
+         (C1 / (√ 2 * √ 2 * √ 2 * √ 2), [gI; gX; gX]);
+         (C1 / (√ 2 * √ 2 * √ 2 * √ 2), [gZ; gY; gX]);
+         (C1 / (√ 2 * √ 2 * √ 2 * √ 2), [gI; gY; gX]);
+         (- C1 / (√ 2 * √ 2 * √ 2 * √ 2), [gZ; gX; gX])]
+}}.
+Proof. time validate. Qed.
+(* time validate
+Tactic call ran for 22.679 secs (21.822u,0.437s) (success) *)
 
 
 
