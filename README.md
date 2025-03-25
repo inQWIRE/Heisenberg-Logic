@@ -1,23 +1,29 @@
 # Heisenberg-Foundations
 The basics of the Heisenberg representation of quantum computing
 
-Preamble : Auxiliary definitions and lemmas.
+### Mathematical Foundations
 
-LinAlg : Result about linear algebra.
+- Preamble : Mathematical definitions and lemmas.
 
-Predicates : Definition and properties of predicates.
+- LinAlg : Result about linear algebra.
 
-Normalization : Functions and lemmas for normalization.
+- F2Math : Math on the finite field of characteristic 2.
 
-F2Math : Math on the finite field of characteristic 2.
+### Mathematical Foundations
 
-Separability : Base definition and lemmas for separability.
+- Predicates : Definition and properties of stabilizer predicates.
 
-HoareHeisenbergLogic : Main file that contains the core logic of Hoare-Heisenberg Logic.
+- Normalization : Functions and lemmas for normalization.
 
-Automation : Definitions and tactics for automation.
+- HoareHeisenbergLogic : Main file that contains the core logic of Hoare-Heisenberg Logic.
 
-Examples : Some examples.
+- Separability : Definition and lemmas about separability.
 
+- Automation : Definitions and tactics for automation.
 
-This repository is coded and tested for Coq 8.19.2
+- Examples : A collection of verified programs.
+
+This project is based on [Hoare meets Heisenberg: A Lightweight Logic for Quantum Programs](https://arxiv.org/abs/2101.08939v4) by Aarthi Sundaram, Robert Rand, Kartik Singhal, and Brad Lackey.
+
+This repository was developed and tested for Coq 8.19.2.
+
