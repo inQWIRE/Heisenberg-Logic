@@ -3552,6 +3552,14 @@ Proof.
 Qed.
 
 
+(** ** generalized implication rule ** **)
+
+Lemma generalized_implies : forall (n : nat) (a a' b b' : Predicate n) (g : prog),
+    {{ a }} g {{ b }} ->
+    (forall v, vecSatisfiesP v a' -> vecSatisfiesP v a) ->
+    (forall v, vecSatisfiesP v b -> vecSatisfiesP v b') ->
+    {{ a' }} g {{ b' }}.
+Proof. intros. intro. auto. Qed.
 
 
 
