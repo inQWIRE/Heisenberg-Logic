@@ -6384,70 +6384,94 @@ Proof. MUL_T_comm_auto tZI tIY tZI tZY. Qed.
 #[export] Hint Resolve YYCNOTmXZ XYCNOTYZ XZCNOTYY YXCNOTYI YZCNOTXY ZXCNOTZX ZYCNOTIY : ht_db.
 
 
-Tactic Notation "doSEQ" constr(p) := apply SEQ with (B := p); auto with ht_db.
-
-Ltac doSEQs list_p :=
-  match list_p with
-  | nil => idtac
-  | ?p :: ?list_p' => doSEQ p; doSEQs list_p'
-  end.
-
-Ltac eSEQ := eapply SEQ; auto with ht_db.
-Ltac eSEQs := repeat eSEQ.
-
-Ltac eFLIP := eapply FLIP; auto with ht_db; do 2 WF_auto.
-Ltac eUNFLIP := eapply UNFLIP; auto with ht_db; do 2 WF_auto.
-
-
 Definition Z (n : nat) := S n ;; S n.
 
 Lemma ZZZ : {{ pZ }} Z 0 {{ pZ }}.
-Proof. eSEQ. Qed.
+Proof. 
+  eapply SEQ; auto with ht_db. 
+Qed.
 
 Lemma XZmX : {{ pX }} Z 0 {{ mpX }}.
-Proof. eSEQ. Qed.
+Proof. 
+  eapply SEQ; auto with ht_db. 
+Qed.
 
 Lemma YZmY : {{ pY }} Z 0 {{ mpY }}.
-Proof. eSEQ. eFLIP. Qed.
+Proof. 
+  eapply SEQ; auto with ht_db. 
+  eapply FLIP; auto with ht_db; do 2 WF_auto. 
+Qed.
 
 #[export] Hint Resolve ZZZ XZmX YZmY : ht_db.
 
 Definition X (n : nat) := H n ;; Z n ;; H n.
 
 Lemma XXX : {{ pX }} X 0 {{ pX }}.
-Proof. eSEQs. Qed.
+Proof. 
+  repeat (eapply SEQ; auto with ht_db). 
+Qed.
 
 Lemma ZXmZ : {{ pZ }} X 0 {{ mpZ }}.
-Proof. eSEQs. eFLIP. Qed.
+Proof. 
+  repeat (eapply SEQ; auto with ht_db). 
+  eapply FLIP; auto with ht_db; do 2 WF_auto. 
+Qed.
 
 Lemma YXmY : {{ pY }} X 0 {{ mpY }}.
-Proof. eSEQs. eFLIP. Qed.
+Proof. 
+  repeat (eapply SEQ; auto with ht_db). 
+  eapply FLIP; auto with ht_db; do 2 WF_auto. 
+Qed.
 
 #[export] Hint Resolve XXX ZXmZ YXmY : ht_db.
 
 Definition Y (n : nat) := S n ;; X n ;; Z n ;; S n.
 
 Lemma XYmX : {{ pX }} Y 0 {{ mpX }}.
-Proof. eSEQs. eFLIP. Qed.
+Proof. 
+  repeat (eapply SEQ; auto with ht_db). 
+  eapply FLIP; auto with ht_db; do 2 WF_auto. 
+Qed.
 
 Lemma ZYmZ : {{ pZ }} Y 0 {{ mpZ }}.
-Proof. doSEQs [pZ; mpZ]. eFLIP. eSEQ. Qed.
+Proof. 
+  apply SEQ with (B := pZ); auto with ht_db;
+    apply SEQ with (B := mpZ); auto with ht_db.
+  eapply FLIP; auto with ht_db; do 2 WF_auto. 
+  eapply SEQ; auto with ht_db. 
+Qed.
 
 Lemma YYY : {{ pY }} Y 0 {{ pY }}.
-Proof. doSEQs [mpX; mpX]. eFLIP. eSEQ. eFLIP. Qed.
+Proof. 
+  apply SEQ with (B := mpX); auto with ht_db;
+    apply SEQ with (B := mpX); auto with ht_db.
+  eapply FLIP; auto with ht_db; do 2 WF_auto. 
+  eapply SEQ; auto with ht_db. 
+  eapply FLIP; auto with ht_db; do 2 WF_auto. 
+Qed.
 
 #[export] Hint Resolve XYmX ZYmZ YYY : ht_db. 
 
 Definition Td (n : nat) := Z n ;; S n ;; T n.
 
 Lemma ZTdZ : {{ pZ }} Td 0 {{ pZ }}.
-Proof. eSEQs. Qed.
+Proof. 
+  repeat (eapply SEQ; auto with ht_db). 
+Qed.
 
 Lemma XTdXmY2 : {{ pX }} Td 0 {{ - pYmX2 }}.
-Proof. doSEQs [mpX; mpY]. eFLIP. eUNFLIP. Qed.
+Proof. 
+  apply SEQ with (B := mpX); auto with ht_db;
+    apply SEQ with (B := mpY); auto with ht_db. 
+  eapply FLIP; auto with ht_db; do 2 WF_auto. 
+  eapply UNFLIP; auto with ht_db; do 2 WF_auto. 
+Qed.
 
-Lemma YTdmXmY2 : {{ pY }} Td 0 {{ pXY2 }}.
-Proof. eSEQs. eFLIP. Qed.
+Lemma YTdXY2 : {{ pY }} Td 0 {{ pXY2 }}.
+Proof. 
+  repeat (eapply SEQ; auto with ht_db).
+  eapply FLIP; auto with ht_db; do 2 WF_auto. 
+Qed.
 
-#[export] Hint Resolve ZTdZ XTdXmY2 YTdmXmY2 : ht_db. 
+#[export] Hint Resolve ZTdZ XTdXmY2 YTdXY2 : ht_db. 
 

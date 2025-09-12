@@ -323,7 +323,7 @@ Ltac validate_single :=
           WF_auto).
 
 Ltac validate :=
-  repeat (tryif eSEQ then [> eSEQs; validate_single | idtac] else validate_single).
+  repeat (tryif eapply SEQ then [> (*repeat eapply SEQ*)validate; validate_single | idtac] else validate_single).
 
 Ltac solvePlaceholder :=
   intros;
