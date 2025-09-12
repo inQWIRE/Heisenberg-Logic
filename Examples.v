@@ -5,6 +5,10 @@ Require Import HeisenbergFoundations.Automation.
 (********************* Toffoli *********************)
 (***************************************************)
 
+(** Here for reference:
+Definition Td (n : nat) := Z n ;; S n ;; T n. **)
+
+
 Definition TOFFOLI (a b c : nat) :=
   H c ;; CNOT b c ;; Td c ;; CNOT a c ;; T c ;; CNOT b c ;; Td c ;; CNOT a c ;; T b ;; T c ;; H c ;; CNOT a b ;; T a ;; Td b ;; CNOT a b.
 
@@ -670,12 +674,65 @@ Qed.
 
 
 
+
 (***************************************************)
 (******************* Graph States *******************)
 (***************************************************)
 
-
 Definition CZ q0 q1 := H q1 ;; CNOT q0 q1 ;; H q1.
+
+Lemma IICZII : {{ pII }} CZ 0 1 {{ pII }}.
+Proof. validate. Qed.
+
+Lemma XICZXZ : {{ pXI }} CZ 0 1 {{ pXZ }}.
+Proof. validate. Qed.
+
+Lemma IXCZZX : {{ pIX }} CZ 0 1 {{ pZX }}.
+Proof. validate. Qed.
+
+Lemma XXCZYY : {{ pXX }} CZ 0 1 {{ pYY }}.
+Proof. validate. Qed.
+
+Lemma YICZYZ : {{ pYI }} CZ 0 1 {{ pYZ }}.
+Proof. validate. Qed.
+
+Lemma IYCZZY : {{ pIY }} CZ 0 1 {{ pZY }}.
+Proof. validate. Qed.
+
+Lemma YYCZXX : {{ pYY }} CZ 0 1 {{ pXX }}.
+Proof. validate. Qed.
+
+Lemma YXCZmXY : {{ pYX }} CZ 0 1 {{ mpXY }}.
+Proof. validate. Qed.
+
+Lemma XYCZmYX : {{ pXY }} CZ 0 1 {{ mpYX }}.
+Proof. validate. Qed.
+
+Lemma ZYCZIY : {{ pZY }} CZ 0 1 {{ pIY }}.
+Proof. validate. Qed.
+
+Lemma YZCZYI : {{ pYZ }} CZ 0 1 {{ pYI }}.
+Proof. validate. Qed.
+
+Lemma XZCZXI : {{ pXZ }} CZ 0 1 {{ pXI }}.
+Proof. validate. Qed.
+
+Lemma ZXCZIX : {{ pZX }} CZ 0 1 {{ pIX }}.
+Proof. validate. Qed.
+
+Lemma ZICZZI : {{ pZI }} CZ 0 1 {{ pZI }}.
+Proof. validate. Qed.
+
+Lemma IZCZIZ : {{ pIZ }} CZ 0 1 {{ pIZ }}.
+Proof. validate. Qed.
+
+Lemma ZZCZZZ : {{ pZZ }} CZ 0 1 {{ pZZ }}.
+Proof. validate. Qed.
+
+#[export] Hint Resolve IICZII XICZXZ IXCZZX XXCZYY YICZYZ IYCZZY YYCZXX YXCZmXY XYCZmYX ZYCZIY YZCZYI XZCZXI ZXCZIX ZICZZI IZCZIZ ZZCZZZ : ht_db. 
+
+
+
 
 (*
 n = 3
@@ -738,60 +795,166 @@ Proof. intros n g lt H0 H1 H2.
   constructor; auto.
   apply compute_postcond; auto.
 Qed.
-
-
 *)
 
 
-Lemma TestGraphState0 : 
+
+
+Lemma TestGraphState :
 exists Placeholder,
 {{ graph_init 3 }} 
 edges_to_CZ [ (0, 1); (1, 2) ]%nat
 {{ Placeholder }}.
 Proof. unfoldGraphState.
   time solvePlaceholder.
+  (* Tactic call ran for 1.657 secs (1.163u,0.407s) (success) *)
   assumption.
 Qed.
+
 
 Compute @normalize 3 [(C1, [gZ; gX; gZ]); (C1, [gI; gZ; gX]); (C1, [gX; gZ; gI])].
 
 
-Lemma TestGraphState1 : 
+Lemma TestGraphState' : 
 {{ graph_init 3 }} 
 edges_to_CZ [ (0, 1); (1, 2) ]%nat
 {{ graph_to_Predicate 3 [ (0, 1); (1, 2) ]%nat }}.
 Proof. unfoldGraphState.
   time validate.
+(* Tactic call ran for 1.17 secs (1.111u,0.028s) (success) *)
 Qed.
 
-Lemma TestGraphState2 : (* complete graph K3 in 10 qubits *)
+Lemma TestGraphState'' : (* complete graph K3 in 10 qubits *)
 {{ graph_init 10 }} 
 edges_to_CZ [ (0, 1); (0, 2); (1, 2)]%nat
 {{ graph_to_Predicate 10 [ (0, 1); (0, 2); (1, 2)]%nat }}.
 Proof. unfoldGraphState.
   time validate.
-(* Tactic call ran for 9.833 secs (7.683u,0.791s) (success) *)
+(* Tactic call ran for 8.015 secs (7.593u,0.145s) (success) *)
 Qed.
 
-Lemma TestGraphState3 :  (* complete graph K5 in 5 qubits *)
-{{ graph_init 5 }}
-edges_to_CZ [(0,1); (0,2); (0,3); (0,4); (1,2); (1,3); (1,4); (2,3); (2,4); (3,4)]%nat
-{{ graph_to_Predicate 5 [(0,1); (0,2); (0,3); (0,4); (1,2); (1,3); (1,4); (2,3); (2,4); (3,4)]%nat }}.
-Proof. unfoldGraphState.
-  time validate.
-(* Tactic call ran for 10.225 secs (9.296u,0.365s) (success) *)
-Qed.
 
-Lemma TestGraphState4 :  (* complete graph K5 in 10 qubits *)
+
+
+(** ** Simple benchmark by varying the number of qubits ** **)
+
+Lemma Benchmark_varyGates_K5_q10 :  
+(* complete graph K5 (= 3*10 = 30 Gates) in 10 qubits *)
 {{ graph_init 10 }}
-edges_to_CZ [(0,1); (0,2); (0,3); (0,4); (1,2); (1,3); (1,4); (2,3); (2,4); (3,4)]%nat
-{{ graph_to_Predicate 10 [(0,1); (0,2); (0,3); (0,4); (1,2); (1,3); (1,4); (2,3); (2,4); (3,4)]%nat }}.
+edges_to_CZ 
+[(0,1); (0,2); (0,3); (0,4);
+ (1,2); (1,3); (1,4);
+ (2,3); (2,4);
+ (3,4)]%nat
+{{ graph_to_Predicate 10 
+[(0,1); (0,2); (0,3); (0,4); 
+(1,2); (1,3); (1,4); 
+(2,3); (2,4); 
+(3,4)]%nat
+}}.
 Proof. unfoldGraphState.
   time validate.
-(* Tactic call ran for 26.271 secs (24.517u,0.744s) (success) *)
+(* Tactic call ran for 24.79 secs (24.264u,0.274s) (success) *)
 Qed.
 
-Lemma TestGraphState5 :  (* complete graph K10 in 10 qubits *)
+Lemma Benchmark_varyGates_K6_q10 :  
+(* complete graph K6 (= 3*15 = 45 Gates) in 10 qubits *)
+{{ graph_init 10 }}
+edges_to_CZ
+[(0,1); (0,2); (0,3); (0,4); (0,5);
+ (1,2); (1,3); (1,4); (1,5);
+ (2,3); (2,4); (2,5);
+ (3,4); (3,5);
+ (4,5)]%nat
+{{ graph_to_Predicate 10
+[(0,1); (0,2); (0,3); (0,4); (0,5);
+ (1,2); (1,3); (1,4); (1,5);
+ (2,3); (2,4); (2,5);
+ (3,4); (3,5);
+ (4,5)]%nat
+ }}.
+Proof. unfoldGraphState.
+  time validate.
+(* Tactic call ran for 37.369 secs (36.447u,0.579s) (success) *)
+Qed.
+
+Lemma Benchmark_varyGates_K7_q10 :  
+(* complete graph K7 (= 3*21 = 63 Gates) in 10 qubits *)
+{{ graph_init 10 }}
+edges_to_CZ
+[(0,1); (0,2); (0,3); (0,4); (0,5); (0,6);
+ (1,2); (1,3); (1,4); (1,5); (1,6);
+ (2,3); (2,4); (2,5); (2,6);
+ (3,4); (3,5); (3,6);
+ (4,5); (4,6);
+ (5,6)]%nat
+{{ graph_to_Predicate 10
+[(0,1); (0,2); (0,3); (0,4); (0,5); (0,6);
+ (1,2); (1,3); (1,4); (1,5); (1,6);
+ (2,3); (2,4); (2,5); (2,6);
+ (3,4); (3,5); (3,6);
+ (4,5); (4,6);
+ (5,6)]%nat
+ }}.
+Proof. unfoldGraphState.
+  time validate.
+(* Tactic call ran for 51.93 secs (51.364u,0.281s) (success) *)
+Qed.
+
+Lemma Benchmark_varyGates_K8_q10 :  
+(* complete graph K8 (= 3*28 = 84 Gates) in 10 qubits *)
+{{ graph_init 10 }}
+edges_to_CZ
+[(0,1); (0,2); (0,3); (0,4); (0,5); (0,6); (0,7);
+ (1,2); (1,3); (1,4); (1,5); (1,6); (1,7);
+ (2,3); (2,4); (2,5); (2,6); (2,7);
+ (3,4); (3,5); (3,6); (3,7);
+ (4,5); (4,6); (4,7);
+ (5,6); (5,7);
+ (6,7)]%nat
+{{ graph_to_Predicate 10
+[(0,1); (0,2); (0,3); (0,4); (0,5); (0,6); (0,7);
+ (1,2); (1,3); (1,4); (1,5); (1,6); (1,7);
+ (2,3); (2,4); (2,5); (2,6); (2,7);
+ (3,4); (3,5); (3,6); (3,7);
+ (4,5); (4,6); (4,7);
+ (5,6); (5,7);
+ (6,7)]%nat
+ }}.
+Proof. unfoldGraphState.
+  time validate.
+(* Tactic call ran for 70.124 secs (69.321u,0.382s) (success) *)
+Qed.
+
+Lemma Benchmark_varyGates_K9_q10 :  
+(* complete graph K9 (= 3*36 = 108 Gates) in 10 qubits *)
+{{ graph_init 10 }}
+edges_to_CZ
+[(0,1); (0,2); (0,3); (0,4); (0,5); (0,6); (0,7); (0,8);
+ (1,2); (1,3); (1,4); (1,5); (1,6); (1,7); (1,8);
+ (2,3); (2,4); (2,5); (2,6); (2,7); (2,8);
+ (3,4); (3,5); (3,6); (3,7); (3,8);
+ (4,5); (4,6); (4,7); (4,8);
+ (5,6); (5,7); (5,8);
+ (6,7); (6,8);
+ (7,8)]%nat
+{{ graph_to_Predicate 10
+[(0,1); (0,2); (0,3); (0,4); (0,5); (0,6); (0,7); (0,8);
+ (1,2); (1,3); (1,4); (1,5); (1,6); (1,7); (1,8);
+ (2,3); (2,4); (2,5); (2,6); (2,7); (2,8);
+ (3,4); (3,5); (3,6); (3,7); (3,8);
+ (4,5); (4,6); (4,7); (4,8);
+ (5,6); (5,7); (5,8);
+ (6,7); (6,8);
+ (7,8)]%nat
+ }}.
+Proof. unfoldGraphState.
+  time validate.
+(* Tactic call ran for 93.225 secs (91.966u,0.49s) (success) *)
+Qed.
+
+Lemma Benchmark_varyGates_K10_q10 :  
+(* complete graph K10 (= 3*45 = 135 Gates) in 10 qubits *)
 {{ graph_init 10 }}
 edges_to_CZ
 [(0,1); (0,2); (0,3); (0,4); (0,5); (0,6); (0,7); (0,8); (0,9);
@@ -816,50 +979,341 @@ edges_to_CZ
  }}.
 Proof. unfoldGraphState.
   time validate.
-(* Tactic call ran for 128.407 secs (118.935u,4.08s) (success) *)
+(* Tactic call ran for 112.954 secs (111.8u,0.357s) (success) *)
 Qed.
 
-Lemma TestGraphState6 :  (* complete graph K5 in 15 qubits *)
+
+
+
+(** ** Benchmark by Graph States ** **)
+
+Lemma Benchmark_varyQubits_K5_q5 :  (* complete graph K5 in 5 qubits *)
+{{ graph_init 5 }}
+edges_to_CZ 
+[(0,1); (0,2); (0,3); (0,4); 
+(1,2); (1,3); (1,4); 
+(2,3); (2,4); 
+(3,4)]%nat
+{{ graph_to_Predicate 5 
+[(0,1); (0,2); (0,3); (0,4); 
+(1,2); (1,3); (1,4); 
+(2,3); (2,4); 
+(3,4)]%nat 
+}}.
+Proof. unfoldGraphState.
+  time validate.
+(* Tactic call ran for 8.942 secs (8.74u,0.033s) (success) *)
+Qed.
+
+Lemma Benchmark_varyQubits_K5_q10 :  (* complete graph K5 in 10 qubits *)
+{{ graph_init 10 }}
+edges_to_CZ 
+[(0,1); (0,2); (0,3); (0,4); 
+(1,2); (1,3); (1,4); 
+(2,3); (2,4); 
+(3,4)]%nat
+{{ graph_to_Predicate 10
+[(0,1); (0,2); (0,3); (0,4); 
+(1,2); (1,3); (1,4); 
+(2,3); (2,4); 
+(3,4)]%nat 
+}}.
+Proof. unfoldGraphState.
+  time validate.
+(* Tactic call ran for 23.505 secs (23.316u,0.08s) (success) *)
+Qed.
+
+Lemma Benchmark_varyQubits_K5_q15 :  (* complete graph K5 in 15 qubits *)
 {{ graph_init 15 }}
-edges_to_CZ [(0,1); (0,2); (0,3); (0,4); (1,2); (1,3); (1,4); (2,3); (2,4); (3,4)]%nat
-{{ graph_to_Predicate 15 [(0,1); (0,2); (0,3); (0,4); (1,2); (1,3); (1,4); (2,3); (2,4); (3,4)]%nat }}.
+edges_to_CZ 
+[(0,1); (0,2); (0,3); (0,4); 
+(1,2); (1,3); (1,4); 
+(2,3); (2,4); 
+(3,4)]%nat
+{{ graph_to_Predicate 15
+[(0,1); (0,2); (0,3); (0,4); 
+(1,2); (1,3); (1,4); 
+(2,3); (2,4); 
+(3,4)]%nat 
+}}.
 Proof. unfoldGraphState.
   time validate.
-(* Tactic call ran for 60.459 secs (56.59u,1.244s) (success) *)
+(* Tactic call ran for 53.248 secs (52.705u,0.146s) (success) *)
 Qed.
 
-Lemma TestGraphState7 :  (* complete graph K5 in 20 qubits *)
+Lemma Benchmark_varyQubits_K5_q20 :  (* complete graph K5 in 20 qubits *)
 {{ graph_init 20 }}
-edges_to_CZ [(0,1); (0,2); (0,3); (0,4); (1,2); (1,3); (1,4); (2,3); (2,4); (3,4)]%nat
-{{ graph_to_Predicate 20 [(0,1); (0,2); (0,3); (0,4); (1,2); (1,3); (1,4); (2,3); (2,4); (3,4)]%nat }}.
+edges_to_CZ 
+[(0,1); (0,2); (0,3); (0,4); 
+(1,2); (1,3); (1,4); 
+(2,3); (2,4); 
+(3,4)]%nat
+{{ graph_to_Predicate 20
+[(0,1); (0,2); (0,3); (0,4); 
+(1,2); (1,3); (1,4); 
+(2,3); (2,4); 
+(3,4)]%nat 
+}}.
 Proof. unfoldGraphState.
   time validate.
-(* Tactic call ran for 118.262 secs (108.817u,3.359s) (success) *)
+(* Tactic call ran for 107.479 secs (106.487u,0.337s) (success) *)
 Qed.
 
-Lemma TestGraphState8 :  (* complete graph K5 in 25 qubits *)
+Lemma Benchmark_varyQubits_K5_q25 :  (* complete graph K5 in 25 qubits *)
 {{ graph_init 25 }}
-edges_to_CZ [(0,1); (0,2); (0,3); (0,4); (1,2); (1,3); (1,4); (2,3); (2,4); (3,4)]%nat
-{{ graph_to_Predicate 25 [(0,1); (0,2); (0,3); (0,4); (1,2); (1,3); (1,4); (2,3); (2,4); (3,4)]%nat }}.
+edges_to_CZ 
+[(0,1); (0,2); (0,3); (0,4); 
+(1,2); (1,3); (1,4); 
+(2,3); (2,4); 
+(3,4)]%nat
+{{ graph_to_Predicate 25
+[(0,1); (0,2); (0,3); (0,4); 
+(1,2); (1,3); (1,4); 
+(2,3); (2,4); 
+(3,4)]%nat 
+}}.
 Proof. unfoldGraphState.
   time validate.
-(* Tactic call ran for 194.406 secs (180.787u,5.28s) (success) *)
+(* Tactic call ran for 184.291 secs (182.705u,0.568s) (success) *)
 Qed.
 
-Lemma TestGraphState9 :  (* complete graph K5 in 30 qubits *)
+Lemma Benchmark_varyQubits_K5_q30 :  (* complete graph K5 in 30 qubits *)
 {{ graph_init 30 }}
-edges_to_CZ [(0,1); (0,2); (0,3); (0,4); (1,2); (1,3); (1,4); (2,3); (2,4); (3,4)]%nat
-{{ graph_to_Predicate 30 [(0,1); (0,2); (0,3); (0,4); (1,2); (1,3); (1,4); (2,3); (2,4); (3,4)]%nat }}.
+edges_to_CZ 
+[(0,1); (0,2); (0,3); (0,4); 
+(1,2); (1,3); (1,4); 
+(2,3); (2,4); 
+(3,4)]%nat
+{{ graph_to_Predicate 30
+[(0,1); (0,2); (0,3); (0,4); 
+(1,2); (1,3); (1,4); 
+(2,3); (2,4); 
+(3,4)]%nat 
+}}.
 Proof. unfoldGraphState.
   time validate.
-(* Tactic call ran for 337.781 secs (305.632u,10.749s) (success) *)
+(* Tactic call ran for 290.807 secs (287.714u,0.924s) (success) *)
 Qed.
 
 
 
 
 (** time complexity seems to be larger than the number of qubits squared (~ n^2 log n)
-time complexity seems to be linear in the number of edges **)
+time complexity seems to be linear in the number of gates **)
 
+
+
+
+(** ** Benchmark by n-qubit GHZ state ** **)
+
+Fixpoint CNOTchain (n i : nat) : prog :=
+  match i with
+  | 0 => CNOT (n-1)%nat n
+  | s i' => CNOT (n - i - 1)%nat (n - i)%nat ;; CNOTchain n i'
+  end.
+
+(** Works for n >= 2 **)
+Definition GHZ (n : nat) : prog := H 0 ;; CNOTchain (n - 1)%nat (n - 2)%nat.
+
+Compute GHZ 3.
+
+
+Definition nat_to_Z_i (size i : nat) := (C1, switch (repeat gI size) gZ i).
+
+Definition GHZ_init (size : nat) : Predicate size :=
+  @Cap size (map (fun i => TtoA (nat_to_Z_i size i)) (List.seq 0%nat size)).
+
+Ltac unfoldGHZ :=
+  unfold GHZ, GHZ_init, nat_to_Z_i,TtoA; simpl.
+
+
+Lemma Benchmark_GHZ5 :
+exists Placeholder,
+{{
+GHZ_init 5
+}}
+GHZ 5
+{{ Placeholder }} .
+Proof. unfoldGHZ.
+ time solvePlaceholder.
+(* Tactic call ran for 2.778 secs (1.798u,0.534s) (success) *)
+assumption.
+Qed.
+
+Lemma Benchmark_GHZ10 :
+exists Placeholder,
+{{
+GHZ_init 10
+}}
+GHZ 10
+{{ Placeholder }} .
+Proof. unfoldGHZ.
+ time solvePlaceholder.
+(* Tactic call ran for 10.08 secs (9.141u,0.25s) (success) *)
+assumption.
+Qed.
+
+Lemma Benchmark_GHZ15 :
+exists Placeholder,
+{{
+GHZ_init 15
+}}
+GHZ 15
+{{ Placeholder }} .
+Proof. unfoldGHZ.
+ time solvePlaceholder.
+(* Tactic call ran for 31.872 secs (29.814u,0.663s) (success) *)
+assumption.
+Qed.
+
+Lemma Benchmark_GHZ20 :
+exists Placeholder,
+{{
+GHZ_init 20
+}}
+GHZ 20
+{{ Placeholder }} .
+Proof. unfoldGHZ.
+ time solvePlaceholder.
+(* Tactic call ran for 87.723 secs (80.864u,1.411s) (success) *)
+assumption.
+Qed.
+
+Lemma Benchmark_GHZ25 :
+exists Placeholder,
+{{
+GHZ_init 25
+}}
+GHZ 25
+{{ Placeholder }} .
+Proof. unfoldGHZ.
+ time solvePlaceholder.
+(* Tactic call ran for 172.687 secs (165.89u,1.452s) (success) *)
+assumption.
+Qed.
+
+Lemma Benchmark_GHZ30 :
+exists Placeholder,
+{{
+GHZ_init 30
+}}
+GHZ 30
+{{ Placeholder }} .
+Proof. unfoldGHZ.
+ time solvePlaceholder.
+(* Tactic call ran for 326.225 secs (312.609u,2.966s) (success) *)
+assumption.
+Qed.
+
+
+
+
+(** ** Benchmark by T Gates ** **)
+
+Fixpoint Trepeat (n : nat) : prog :=
+  match n with
+  | 0 => T 0
+  | s n' => T 0 ;; Trepeat n'
+  end.
+
+Definition Ts (n : nat) : prog := Trepeat (n - 1)%nat.
+
+Compute Trepeat 3.
+Compute Ts 3.
+
+
+
+
+
+Lemma Benchmark_T1 :
+exists Placeholder,
+{{ @AtoPred 1 ([
+(C1, [gX])
+])}}
+Ts 1
+{{ Placeholder }} .
+Proof. unfold Ts; simpl.
+  time solvePlaceholder.
+(* Tactic call ran for 0.305 secs (0.268u,0.034s) (success) *)
+assumption.
+Qed.
+
+Lemma Benchmark_T2 :
+exists Placeholder,
+{{ @AtoPred 1 ([
+(C1, [gX])
+])}}
+Ts 2
+{{ Placeholder }} .
+Proof. unfold Ts; simpl.
+  time solvePlaceholder.
+(* Tactic call ran for 0.869 secs (0.848u,0.008s) (success) *)
+assumption.
+Qed.
+
+Lemma Benchmark_T3 :
+exists Placeholder,
+{{ @AtoPred 1 ([
+(C1, [gX])
+])}}
+Ts 3
+{{ Placeholder }} .
+Proof. unfold Ts; simpl.
+  time solvePlaceholder.
+(* Tactic call ran for 2.469 secs (2.444u,0.031s) (success) *)
+assumption.
+Qed.
+
+Lemma Benchmark_T4 :
+exists Placeholder,
+{{ @AtoPred 1 ([
+(C1, [gX])
+])}}
+Ts 4
+{{ Placeholder }} .
+Proof. unfold Ts; simpl.
+  time solvePlaceholder.
+(* Tactic call ran for 10.841 secs (10.198u,0.073s) (success) *)
+assumption.
+Qed.
+
+Lemma Benchmark_T5 :
+exists Placeholder,
+{{ @AtoPred 1 ([
+(C1, [gX])
+])}}
+Ts 5
+{{ Placeholder }} .
+Proof. unfold Ts; simpl.
+  time solvePlaceholder.
+(* Tactic call ran for 42.227 secs (41.509u,0.25s) (success) *)
+assumption.
+Qed.
+
+Lemma Benchmark_T6 :
+exists Placeholder,
+{{ @AtoPred 1 ([
+(C1, [gX])
+])}}
+Ts 6
+{{ Placeholder }} .
+Proof. unfold Ts; simpl.
+  time solvePlaceholder.
+(* Tactic call ran for 260.36 secs (250.444u,2.145s) (success) *)
+assumption.
+Qed.
+
+Lemma Benchmark_T7 :
+exists Placeholder,
+{{ @AtoPred 1 ([
+(C1, [gX])
+])}}
+Ts 7
+{{ Placeholder }} .
+Proof. unfold Ts; simpl.
+  time solvePlaceholder.
+(* Tactic call ran for 1204.312 secs (1178.374u,9.61s) (success) *)
+assumption.
+Qed.
 
 
