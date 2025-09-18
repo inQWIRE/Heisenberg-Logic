@@ -4578,28 +4578,16 @@ Qed.
 
 
 (*** Functions for Separability Computation ***)
-(** ith qubit has pivot **)
-Definition has_pivot (n i : nat) (LLp : list (list Pauli)) : bool :=
-  negb (forallb (fun p => POrd.eqb p gI) (map (fun Lp => nth i Lp gI) LLp)).
 
-(** i := n = # of qubits
-    m := length LLp = # of terms **)
-Fixpoint get_pivots_loop (n m i : nat) (LLp : list (list Pauli)) (term_qubit : list (nat * nat)) {struct i} : list (nat * nat) :=
-  match i with
-  | 0%nat => rev term_qubit
-  | Datatypes.S i' => if has_pivot n (n - i) LLp
-                     then match LLp with
-                          | [] => rev term_qubit
-                          | _ :: L => get_pivots_loop n m i' L (((m - (length LLp)), (n - i))%nat :: term_qubit)
-                          end
-                     else get_pivots_loop n m i' LLp term_qubit
-  end.
+Definition all_in_qubits (K : list nat) (term_qubit : list (nat * nat)) :=
+  forallb (fun k => (existsb (fun qubit => Nat.eqb qubit k) (map snd term_qubit))) K.
 
-Definition get_pivots (n : nat) (LLp : list (list Pauli)) := 
-  get_pivots_loop n (length LLp) n LLp [].
+Definition get_nonI_term_qubit_pairs (LLp : list (list Pauli)) (n k : nat) :=
+  filter (fun p => negb (POrd.eqb (nth k (nth (fst p) LLp (repeat gI n)) gI) gI))
+    (combine (List.seq 0%nat (length LLp)) (repeat k%nat (length LLp))).
 
-Definition all_pivots (K : list nat) (term_qubit : list (nat * nat)) :=
-  forallb (fun k => (existsb (fun pivot => Nat.eqb pivot k) (map snd term_qubit))) K.
+Definition all_nonI_term_qubit_pairs (LLp : list (list Pauli)) (n : nat) :=
+  flat_map (get_nonI_term_qubit_pairs LLp n) (List.seq 0%nat n).
 
 Definition commute (Lp1 Lp2 : list Pauli) :=
   Nat.even (length (filter (fun p =>
@@ -4625,8 +4613,8 @@ Definition check_complement (n : nat) (LLp : list (list Pauli)) (K : list nat) (
 
 Definition separable {n : nat} (L : list (TType n)) (K : list nat) :=
   let LLp := map snd L in
-  let term_qubit := get_pivots n LLp in
-  all_pivots K term_qubit && 
+  let term_qubit := all_nonI_term_qubit_pairs LLp n in
+all_in_qubits K term_qubit && 
     commutativity_condition n LLp K &&
     check_complement n LLp K term_qubit.
 
@@ -4634,23 +4622,25 @@ Definition separable_all {n : nat} (L : list (TType n)) (LK : list (list nat)) :
   forallb (separable L) LK.
 
 
-Fixpoint get_pivot_loop {n : nat} (L : list (TType n)) (k : nat) (term_qubit : list (nat * nat)) : nat :=
-  match term_qubit with
-  | [] => 0%nat
-  | (term, qubit) :: t => if Nat.eqb k qubit then term else get_pivot_loop L k t
-  end. 
+Definition get_terms_elem (LLp : list (list Pauli)) (n k : nat) :=
+  filter (fun i => negb (POrd.eqb (nth k (nth i LLp (repeat gI n)) gI) gI)) (List.seq 0%nat (length LLp)).
 
-Definition get_pivot {n : nat} (L : list (TType n)) (k : nat) : nat :=
-  let LLp := map snd L in
-  let term_qubit := get_pivots n LLp in
-  get_pivot_loop L k term_qubit.
+Fixpoint get_terms_list_acc (LLp : list (list Pauli)) (n : nat) (K acc : list nat) :=
+  match K with
+  | h :: t => let terms := get_terms_elem LLp n h in
+            get_terms_list_acc LLp n t 
+              (acc ++ (filter (fun i => negb (existsb (fun j => Nat.eqb i j) acc)) terms))
+  | [] => acc
+  end.
 
+Definition get_terms_list {n : nat} (lt : list (TType n)) (K : list nat) :=
+  get_terms_list_acc (map snd lt) n K [].
 
 Fixpoint separate_loop {n : nat} (lt : list (TType n)) (input : list (list nat)) (acc : (list nat) * (list (list TTypes)) * (list nat)) : (list nat) * (list (list TTypes)) * (list nat) :=
   match input with
   | h :: t => separate_loop lt t 
          ((length h) :: (fst (fst acc)), 
-           (map (fun k => ForgetT (unpad_Sep_TType (nth (get_pivot lt k) lt (defaultT_I n)) h)) h) :: (snd (fst acc)), 
+           (map (fun k => ForgetT (unpad_Sep_TType (nth k lt (defaultT_I n)) h)) (get_terms_list lt h)) :: (snd (fst acc)), 
            snd acc)
   | [] => (rev (fst (fst acc)), rev (snd (fst acc)), snd acc)
   end.
