@@ -1041,6 +1041,15 @@ Proof. intros n m a b A.  generalize dependent a. simpl. induction A.
     rewrite <- (Mplus_assoc _ _ _ a a0). reflexivity.
 Qed.
 
+Lemma fold_left_Mplus_Zero_Permutation {m n : nat} (lm lm' : list (Matrix m n)) :
+  Permutation lm lm' ->
+  fold_left Mplus lm Zero = fold_left Mplus lm' Zero.
+Proof. intros H.
+  induction H; auto.
+  - simpl. rewrite ! fold_left_Mplus. f_equal. auto.
+  - simpl. rewrite ! fold_left_Mplus. rewrite ! Mplus_assoc. f_equal. apply Mplus_comm.
+  - rewrite IHPermutation1. auto.
+Qed.
 
 Lemma C_inj_l : forall (c x y : C), x = y -> (c * x = c * y)%C.
 Proof. intros. rewrite H. easy. Qed.
@@ -2608,7 +2617,6 @@ Qed.
 Lemma Permutation_incl : forall (A : Type) (l l' : list A), Permutation l l' -> incl l l'.
 Proof. intros. unfold incl. intros. apply Permutation_in with (l := l); trivial. Qed.
 
-
 Lemma last_in_list : forall {A : Type} (d : A) (l : list A),
     l <> [] -> In (last l d) l.
 Proof. intros A d l H0.
@@ -2623,6 +2631,19 @@ Proof. intros A d l H0.
   lia.
 Qed.
 
+Definition cycle_list {A : Type} (L : list A):=
+  match L with
+  | [] => []
+  | h :: t => t ++ [h]
+  end.
+
+Lemma Permutation_cycle_list {A : Type} (L : list A) :
+  Permutation L (cycle_list L).
+Proof. induction L as [ | a L]; simpl.
+  constructor.
+  replace (a :: L) with ([a] ++ L) by auto.
+  apply Permutation_app_comm.
+Qed.
 
 
  Lemma get_vec_reduce_col_back : forall {n m : nat} (i col : nat) (A : Matrix n (s m)),
