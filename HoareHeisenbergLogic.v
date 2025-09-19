@@ -3568,6 +3568,7 @@ Proof. intros. intro. auto. Qed.
 Reserved Infix "⇒" (at level 65, no associativity).
 
 Inductive implies {n} : Predicate n -> Predicate n -> Prop :=
+| ImpliesComp : forall (A B C : Predicate n), A ⇒ B -> B ⇒ C -> A ⇒ C
 | ID_implies : forall (A : Predicate n), A ⇒ A
 | CapElim : forall (La La' : list (AType n)), incl La La' -> Cap La' ⇒ Cap La
 | CupIntro : forall (A B : Predicate n), (A) ⇒ (Cup A B)
@@ -3595,6 +3596,15 @@ Inductive implies {n} : Predicate n -> Predicate n -> Prop :=
 | AddAssoc1 : forall (A B C : Predicate n), ((A +' B) +' C) ⇒ (A +' (B +' C))
 | AddAssoc2 : forall (A B C : Predicate n), (A +' (B +' C)) ⇒ ((A +' B) +' C)
 | AddZeroElim : forall (A B C : Predicate n), (A +' ((C0 ·' C) *' B)) ⇒ (A) 
+| AddListPermutation : forall (a b : AType n), Permutation a b -> AtoPred a ⇒ AtoPred b
+| AddListDistributeScale : forall (a : AType n) (c c' : C) (lp : list Pauli), 
+    AtoPred ((c + c', lp) :: a) ⇒ AtoPred ((c, lp) :: (c', lp) :: a)
+| AddListDistributeScaleInv : forall (a : AType n) (c c' : C) (lp : list Pauli), 
+    AtoPred ((c, lp) :: (c', lp) :: a) ⇒ AtoPred ((c + c', lp) :: a)
+| AddDropZeroScale : forall (a : AType n) (c : C) (lp : list Pauli),
+    c = C0 -> AtoPred ((c, lp) :: a) ⇒ AtoPred a
+| AddDropZeroScaleInv : forall (a : AType n) (c : C) (lp : list Pauli),
+    c = C0 -> AtoPred a ⇒ AtoPred ((c, lp) :: a)
 | SeptoCap : forall (la : list (AType n)) (Ln_LLT_Perm : (list nat) * (list (list TTypes)) * (list nat)),
     n = (fold_right Nat.add 0%nat (fst (fst Ln_LLT_Perm))) ->
     Forall proper_length_TType (DiagonalQubits (fst (fst Ln_LLT_Perm)) (snd (fst Ln_LLT_Perm))) ->
@@ -3686,6 +3696,7 @@ Lemma interpret_implies {n} (A B : Predicate n) :
 Proof.
   intros H0 v H1.
   induction H0.
+  - auto.
   - auto.
   - inversion H1. constructor; auto.
     apply (incl_Forall H0); auto.
@@ -3800,6 +3811,96 @@ Proof.
     rewrite H0 in H1.
     rewrite Mplus_0_r in H1.
     assumption.
+  - inversion H0; subst; auto.
+    + unfold vecSatisfiesP in *.
+      unfold vecSatisfies in *.
+      destruct H1. split; auto.
+      unfold Eigenpair in *.
+      simpl in *.
+      unfold translateA in *.
+      assert (Permutation (map translate (x :: l)) (map translate (x :: l'))).
+      { apply Permutation_map; auto. }
+      rewrite fold_left_Mplus_Zero_Permutation with (lm' := map translate (x :: l)); auto.
+      apply Permutation_sym; auto.
+    + unfold vecSatisfiesP in *.
+      unfold vecSatisfies in *.
+      destruct H1. split; auto.
+      unfold Eigenpair in *.
+      simpl in *.
+      unfold translateA in *.
+      assert (Permutation (map translate (y :: x :: l)) (map translate (x :: y :: l))).
+      { apply Permutation_map; auto. }
+      rewrite fold_left_Mplus_Zero_Permutation with (lm' := map translate (y :: x :: l)); auto.
+      apply Permutation_sym; auto.
+    + unfold vecSatisfiesP in *.
+      unfold vecSatisfies in *.
+      destruct H1. split; auto.
+      unfold Eigenpair in *.
+      simpl in *.
+      unfold translateA in *.
+      assert (Permutation (map translate a) (map translate l')).
+      { apply Permutation_map; auto. }
+      assert (Permutation (map translate l') (map translate b)).
+      { apply Permutation_map; auto. }
+      rewrite fold_left_Mplus_Zero_Permutation with (lm' := map translate l').
+      rewrite fold_left_Mplus_Zero_Permutation with (lm' := map translate a); auto.
+      all : apply Permutation_sym; auto.
+  - unfold vecSatisfiesP in *.
+    unfold vecSatisfies in *.
+    destruct H1. split; auto.
+    unfold Eigenpair in *.
+    simpl in *.
+    unfold translateA in *.
+    unfold translate in *.
+    simpl in *.
+    rewrite ! fold_left_Mplus in *.
+    rewrite Mscale_plus_distr_l in H1.
+    rewrite ! Mplus_assoc in *.
+    auto.
+  - unfold vecSatisfiesP in *.
+    unfold vecSatisfies in *.
+    destruct H1. split; auto.
+    unfold Eigenpair in *.
+    simpl in *.
+    unfold translateA in *.
+    unfold translate in *.
+    simpl in *.
+    rewrite ! fold_left_Mplus in *.
+    rewrite Mscale_plus_distr_l.
+    rewrite ! Mplus_assoc in *.
+    auto.
+  - subst.
+    unfold vecSatisfiesP in *.
+    unfold vecSatisfies in *.
+    destruct H1. split; auto.
+    unfold Eigenpair in *.
+    simpl in *.
+    unfold translateA in *.
+    unfold translate in *.
+    simpl in *.
+    rewrite ! fold_left_Mplus in *.
+    rewrite Mscale_0_l in *.
+    rewrite map_length in *.
+    rewrite <- H1.
+    f_equal.
+    rewrite <- Mplus_0_r at 1.
+    f_equal.
+  - subst.
+    unfold vecSatisfiesP in *.
+    unfold vecSatisfies in *.
+    destruct H1. split; auto.
+    unfold Eigenpair in *.
+    simpl in *.
+    unfold translateA in *.
+    unfold translate in *.
+    simpl in *.
+    rewrite ! fold_left_Mplus in *.
+    rewrite Mscale_0_l in *.
+    rewrite map_length in *.
+    rewrite <- H1.
+    f_equal.
+    setoid_rewrite <- Mplus_0_r at 7.
+    f_equal.
   - subst.
     destruct Ln_LLT_Perm as [[Ln LLT] Perm].
     simpl in *. destruct H1; split; auto.
