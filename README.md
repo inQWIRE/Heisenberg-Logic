@@ -9,7 +9,7 @@ The basics of the Heisenberg representation of quantum computing
 
 - F2Math : Math on the finite field of characteristic 2.
 
-### Mathematical Foundations
+### Hoare-Heisenberg Logic
 
 - Predicates : Definition and properties of stabilizer predicates.
 
