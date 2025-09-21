@@ -264,14 +264,34 @@ Ltac simplifyCoefLC_loop a :=
   end.
 
 Ltac simplifyCoefLC :=
-  match goal with
+  (* repeat *) match goal with
   | |- {{ _ }} _ {{ AtoPred ?a }} => 
       match a with
       | (?c, ?l) :: ?a' => simplifyCoefLC_C c; repeat simplifyCoefLC_loop a'
       | [] => idtac 
       end
+(*    | |- AtoPred ?a ⇒ _ => 
+        match a with
+      | (?c, ?l) :: ?a' => simplifyCoefLC_C c; repeat simplifyCoefLC_loop a'
+      | [] => idtac 
+      end *)
   | |- _ => idtac
-  end.
+  end(*; This is to match the leading coefficient to C1
+  try rewrite <- ! Cmult_assoc;
+  try match goal with
+    | |- context [(Cdiv (RtoC (IZR (Zpos xH)))  (*  this is (C1 / √2)%C  *)
+                    (RtoC (sqrt (IZR (Zpos (xO xH)))))) * ?a] =>
+        replace ((Cdiv (RtoC (IZR (Zpos xH)))  (*  this is (C1 / √2)%C  *)
+                    (RtoC (sqrt (IZR (Zpos (xO xH)))))) * a) with 
+        ((C1 * (Cdiv (RtoC (IZR (Zpos xH)))  (*  this is (C1 / √2)%C  *)
+                  (RtoC (sqrt (IZR (Zpos (xO xH))))))) * a) 
+        by (rewrite <- Cmult_assoc; rewrite Cmult_1_l; auto)
+    end;
+  try rewrite ! Cmult_assoc;
+  try match goal with
+    | |- context [?a * C1] => 
+        replace (a * C1) with a by (rewrite Cmult_1_r; auto)
+    end*).
 
 Ltac simplifyCoefLC_C_loop_context H base init final :=
   match final with
@@ -304,14 +324,114 @@ Ltac simplifyCoefLC_loop_context H a :=
   end.
 
 Ltac simplifyCoefLC_context :=
-  match goal with
+  (* repeat *) match goal with
   | [H : {{ _ }} _ {{ AtoPred ?a }} |- _ ] => 
       match a with
       | (?c, ?l) :: ?a' => simplifyCoefLC_C_context H c; repeat simplifyCoefLC_loop_context H a'
       | [] => idtac 
       end
   |  _ => idtac
+  end(*; This is to match the leading coefficient to C1
+  try match goal with
+    | [H : _ |- _ ] => try rewrite <- ! Cmult_assoc in H
+    end;
+  try match goal with
+    | [H : context [(Cdiv (RtoC (IZR (Zpos xH)))  (*  this is (C1 / √2)%C  *)
+                    (RtoC (sqrt (IZR (Zpos (xO xH)))))) * ?a] |- _ ] =>
+        replace ((Cdiv (RtoC (IZR (Zpos xH)))  (*  this is (C1 / √2)%C  *)
+                    (RtoC (sqrt (IZR (Zpos (xO xH)))))) * a) with 
+        ((C1 * (Cdiv (RtoC (IZR (Zpos xH)))  (*  this is (C1 / √2)%C  *)
+                  (RtoC (sqrt (IZR (Zpos (xO xH))))))) * a) in H 
+          by (rewrite <- Cmult_assoc; rewrite Cmult_1_l; auto)
+    end;
+  try match goal with
+    | [H : _ |- _ ] => try rewrite ! Cmult_assoc in H
+    end;
+  try match goal with
+    | [H : context [?a * C1] |- _ ] =>
+        replace (a * C1) with a in H by (rewrite Cmult_1_r; auto)
+  end*).
+
+(* Not used
+Ltac sort_postcond_backward_reasoning  :=
+  eapply CONS; 
+  [compute; Rsimpl; apply ID_implies 
+  | apply AddListPermutation; apply Permutation_sym; apply TOrd.Permuted_sort
+  | unfold TOrd.sort; simpl].
+
+Ltac postcond_reduction_backward_reasoning_loop fuel :=
+  match fuel with
+  | 0%nat => idtac
+  | s ?fuel' => 
+      eapply CONS; 
+      [compute; Rsimpl; apply ID_implies 
+      | first [apply AddListDistributeScale 
+              | match goal with
+                | |- context [(?a,_)] => 
+                    ring_simplify a; 
+                    simpl; Rsimpl; 
+                    apply AddDropZeroScaleInv; 
+                    [lca; idtac]
+                end
+              | apply AddListPermutation; apply Permutation_sym; apply Permutation_cycle_list]
+      | simpl; repeat setoid_rewrite <- Cmult_plus_distr_r;
+        postcond_reduction_backward_reasoning_loop fuel']
   end.
+
+Ltac postcond_reduction_backward_reasoning :=
+  simplifyCoefLC; sort_postcond_backward_reasoning;
+  match goal with
+  | |- {{ _ }} _ {{ AtoPred ?a }} => 
+      let length_temp := fresh "length_temp" in
+      assert (length_temp : length a = length a) by reflexivity;
+      simpl in length_temp;
+      match goal with 
+      | _ : ?b = ?b |- _ => 
+          clear length_temp;
+          postcond_reduction_backward_reasoning_loop b
+      end                        
+  end;
+  sort_postcond_backward_reasoning.
+
+
+Ltac sort_implication_forward_reasoning  :=
+  eapply ImpliesComp; 
+  [apply AddListPermutation; apply TOrd.Permuted_sort
+  | unfold TOrd.sort; simpl].
+
+Ltac implication_reduction_forward_reasoning_loop fuel :=
+  match fuel with
+  | 0%nat => idtac
+  | s ?fuel' => 
+      eapply ImpliesComp; 
+      [first [apply AddListDistributeScaleInv
+             | match goal with
+               | |- context [(?a,_)] => 
+                   ring_simplify a; 
+                   simpl; Rsimpl; 
+                   apply AddDropZeroScale; 
+                   [lca; idtac]
+               end
+             | apply AddListPermutation; apply Permutation_cycle_list]
+      | simpl; (* repeat setoid_rewrite <- Cmult_plus_distr_r; *)
+        implication_reduction_forward_reasoning_loop fuel']
+  end.
+
+Ltac impication_reduction_forward_reasoning :=
+  simplifyCoefLC; sort_implication_forward_reasoning;
+  match goal with
+  | |- AtoPred ?a ⇒ _ => 
+      let length_temp := fresh "length_temp" in
+      assert (length_temp : length a = length a) by reflexivity;
+      simpl in length_temp;
+      match goal with 
+      | _ : ?b = ?b |- _ => 
+          clear length_temp;
+          implication_reduction_forward_reasoning_loop b
+      end                        
+  end;
+  sort_implication_forward_reasoning.
+*)
 
 Ltac validate_single := 
   repeat (try eapply CAP'; try eapply split_Forall2;
@@ -321,29 +441,28 @@ Ltac validate_single :=
              repeat rewrite Copp_involutive); 
           try validateU; try validateLC;
           WF_auto).
+(* Not used
+Ltac validate_single_reduction :=
+  unshelve (eapply CONS; 
+            [ simpl; Rsimpl; apply ID_implies
+            | shelve
+            | validate_single]);
+  impication_reduction_forward_reasoning;
+  apply ID_implies.
 
-Ltac validate :=
-  repeat (tryif eapply SEQ then [> (*repeat eapply SEQ*)validate; validate_single | idtac] else validate_single).
-
-Ltac solvePlaceholder :=
-  intros;
-  eexists ?[Ph];
-  match goal with
-  | |- ?g => let G := fresh "G" in assert (G : g);
-                                [> validate | idtac ];
-                                simpl in *; Csimpl; Csimpl_context G;
-                                repeat simplifyCoefLC; repeat simplifyCoefLC_context
-  end.
-
+Ltac validate_reduction_sequence :=
+  repeat tryif eapply SEQ then [> (*repeat eapply SEQ*) validate_reduction_sequence; validate_single_reduction | idtac] else validate_single_reduction.
+*)
+Ltac validate_sequence :=
+  repeat tryif eapply SEQ then [> (*repeat eapply SEQ*) validate_sequence; validate_single | idtac] else validate_single.
 
 
 Ltac validateCapImpliesSep :=
-  repeat 
-    match goal with 
-    | |- _ ⇒ Sep _ => compute; Rsimpl; eapply CaptoSep; compute; Rsimpl; auto;
-                    repeat (constructor; try split; intros; try lia; auto)
-    | |- Permutation _ _ => try (apply Permutation_sym; apply sort_seq_Permutation; compute;  easy); try (apply sort_seq_Permutation; compute;  easy)
-    end.
+  eapply CaptoSep; simpl; 
+  [ easy
+  | repeat (constructor; try split; intros; try lia; auto)
+  | apply Permutation_sym; apply sort_seq_Permutation; compute; easy
+  | easy].
 
 Ltac validateCapImpliesCap :=
   apply CapElim;
@@ -351,20 +470,38 @@ Ltac validateCapImpliesCap :=
   let a := fresh "a" in 
   let H' := fresh "H'" in 
   intros a H';
-  repeat (first [destruct H' as [H' | H']; subst; [> try (left; easy); repeat (right; try easy; try (left; easy)) | idtac] | inversion H']).
+  repeat (first [apply H' | destruct H' as [H' | H']; subst; [> try (left; easy); repeat (right; try easy; try (left; easy)) | idtac] | inversion H']).
 
-Ltac validateCaptoSep :=
-  match goal with 
-  | |- {{ Cap _  }} _ {{ Sep _ }} => eapply CONS; [> compute; Rsimpl; apply ID_implies | 
-                                                            validateCapImpliesSep | 
-                                                            eapply CONS; [> apply ID_implies | idtac | validate] ];
-                                   validateCapImpliesCap
+Ltac validate :=
+  match goal with
+  | |- {{ Cap _  }} _ {{ Sep _ }} => 
+      eapply CONS;
+      [ simpl; apply ID_implies
+      | validateCapImpliesSep
+      | unfold compose, to_fun, collect_fun; simpl; Csimpl;
+        eapply CONS; [ apply ID_implies | idtac  | validate_sequence ] ];
+      validateCapImpliesCap
+  | |- {{ Cap _ }} _ {{ _ }} => 
+      eapply CONS; 
+      [ simpl; apply ID_implies 
+      | idtac 
+      | validate_sequence];
+      validateCapImpliesCap
+  | |- _ => validate_sequence
+  end.
+
+Ltac solvePlaceholder :=
+  intros;
+  eexists ?[Ph];
+  match goal with
+  | |- ?g => let G := fresh "G" in assert (G : g);
+                                [> validate | idtac ];
+                                simplifyCoefLC; simplifyCoefLC_context
   end.
 
 
 
-
-
+(*** Unused from here ***)
 (* Computation for "non-additive" gate application function since T gates don't preserve well-formedness *)
 (** ** Calculate Postcondition Function ** **)
 
