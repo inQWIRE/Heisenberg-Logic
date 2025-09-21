@@ -1,6 +1,7 @@
 Require Import HeisenbergFoundations.Automation.
 
 
+
 (***************************************************)
 (********************* Toffoli *********************)
 (***************************************************)
@@ -25,12 +26,51 @@ Example IIXTOFFOLI :
   {{ @AtoPred 3 [(C1, [gI; gI; gX])] }} TOFFOLI 0 1 2 {{ @AtoPred 3 [(C1, [gI; gI; gX])] }}.
 Proof. time validate. Qed.
 
+(* Here for reference
+Example IIZTOFFOLI : 
+{{ @AtoPred 3 [(C1, [gI; gI; gZ])] }} TOFFOLI 0 1 2 {{ @AtoPred 3
+    [(- C1 * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2), [gZ; gZ; gZ]);
+     (C1 / √ 2 * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2), [gZ; gZ; gY]);
+     (C1 / √ 2 * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2), [gI; gZ; gY]);
+     (C1 / √ 2 * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2), [gI; gZ; gZ]);
+     (C1 / √ 2 * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2), [gI; gI; gY]);
+     (C1 / √ 2 * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2), [gI; gI; gZ]);
+     (C1 / √ 2 * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2), [gZ; gI; gZ]);
+     (- C1 * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2), [gZ; gI; gY]);
+     (C1 / √ 2 * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2), [gZ; gI; gY]);
+     (C1 / √ 2 * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2), [gZ; gI; gZ]);
+     (C1 / √ 2 * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2), [gI; gI; gZ]);
+     (- C1 * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2), [gI; gI; gY]);
+     (C1 / √ 2 * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2), [gI; gZ; gZ]);
+     (- C1 * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2), [gI; gZ; gY]);
+     (- C1 * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2), [gZ; gZ; gY]);
+     (- C1 * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2), [gZ; gZ; gZ])] 
+}}.
+Proof. validate. Qed.
+*)
 
 
 Example IIZTOFFOLI_solve : 
 exists Placeholder,
 {{ @AtoPred 3 [(C1, [gI; gI; gZ])] }} TOFFOLI 0 1 2 {{ Placeholder }}.
 Proof. time solvePlaceholder.
+(*[(- C1 * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2), [gZ; gZ; gZ]);
+     (C1 / √ 2 * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2), [gZ; gZ; gY]);
+     (C1 / √ 2 * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2), [gI; gZ; gY]);
+     (C1 / √ 2 * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2), [gI; gZ; gZ]);
+     (C1 / √ 2 * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2), [gI; gI; gY]);
+     (C1 / √ 2 * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2), [gI; gI; gZ]);
+     (C1 / √ 2 * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2), [gZ; gI; gZ]);
+     (- C1 * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2), [gZ; gI; gY]);
+     (C1 / √ 2 * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2), [gZ; gI; gY]);
+     (C1 / √ 2 * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2), [gZ; gI; gZ]);
+     (C1 / √ 2 * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2), [gI; gI; gZ]);
+     (- C1 * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2), [gI; gI; gY]);
+     (C1 / √ 2 * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2), [gI; gZ; gZ]);
+     (- C1 * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2), [gI; gZ; gY]);
+     (- C1 * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2), [gZ; gZ; gY]);
+     (- C1 * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2) * (C1 / √ 2), [gZ; gZ; gZ])]*)
+
 (* time solvePlaceholder.
 Tactic call ran for 60.051 secs (56.539u,1.708s) (success) *)
 assumption.
@@ -130,8 +170,11 @@ Tactic call ran for 22.679 secs (21.822u,0.437s) (success) *)
 
 
 (***************************************************)
-(** ** Normalization example on 7 qubit Steane code ** **)
+(** ** Normalization Examples ** **)
 (***************************************************)
+
+(** Normalization example on 7 qubit Steane code ** **)
+
 (*
 g1 = IIIXXXX
 g2 = IXXIIXX
@@ -166,9 +209,6 @@ Definition Z7' : TType 7 := (C1, [gX; gX; gI; gX; gI; gI; gX]).
 Definition LZ : list (TType 7) := [Z1'; Z2'; Z3'; Z4'; Z5'; Z6'; Z7'].
 Definition LX : list (TType 7) := [X1'; Z2'; Z3'; Z4'; Z5'; Z6'; Z7'].
 
-
-
-(** Some normalization tests **)
 
 Compute map snd (normalize ZL). (*
 [[gX; gI; gX; gI; gX; gI; gX];
@@ -224,6 +264,10 @@ Compute map snd (normalize (removelast XL)). (*
 
 
 
+
+(** Some other normalization tests **)
+
+
 Definition t1' : TType 7 := (C1, [gI; gI; gI; gI; gI; gY; gZ]).
 Definition t2' : TType 7 := (C1, [gI; gI; gI; gI; gI; gZ; gX]).
 Definition t3' : TType 7 := (C1, [gI; gI; gZ; gX; gZ; gI; gI]).
@@ -233,7 +277,7 @@ Definition t6' : TType 7 := (C1, [gX; gY; gI; gI; gI; gI; gI]).
 Definition t7' : TType 7 := (C1, [gZ; gX; gI; gI; gI; gI; gI]).
 Definition Test' : list (TType 7) := [t1'; t2'; t3'; t4'; t5'; t6'; t7'].
 
-(* Test
+(* Test'
 [[gI; gI; gI; gI; gI; gY; gZ];
  [gI; gI; gI; gI; gI; gZ; gX];
  [gI; gI; gZ; gX; gZ; gI; gI];
@@ -255,7 +299,7 @@ Definition t2'' : TType 3 := (C1, [gI; gY; gZ]).
 Definition t3'' : TType 3 := (C1, [gZ; gI; gI]).
 Definition Test'' : list (TType 3) := [t1''; t2''; t3''].
 
-(* Test'
+(* Test''
 [[gI; gZ; gX];
  [gI; gY; gZ];
  [gZ; gI; gI]] *)
@@ -270,8 +314,8 @@ Definition t3''' : TType 4 := (C1, [gY; gZ; gI; gI]).
 Definition t4''' : TType 4 := (C1, [gZ; gX; gI; gI]).
 Definition Test''' : list (TType 4) := [t1'''; t2'''; t3'''; t4'''].
 
-(* Test''
-[[gI; gZ; gX; gX];
+(* Test'''
+[[gI; gI; gX; gX];
  [gI; gI; gZ; gY];
  [gY; gZ; gI; gZ];
  [gZ; gX; gI; gI]] *)
@@ -280,10 +324,6 @@ Compute map snd (normalize Test'''). (*
  [gZ; gX; gI; gI];
  [gI; gI; gY; gZ];
  [gI; gI; gZ; gY]] *)
-
-
-
-
 
 
 
@@ -413,6 +453,37 @@ Proof. time validate. Qed.
 (* time validate
 Tactic call ran for 6.386 secs (6.345u,0.02s) (success) *)
 
+
+(** We can check if the normalization are equal. **)
+Example equal_normalization_Steane7X :
+(@normalize 7
+(map AtoT [
+[(C1, [gX; gX; gX; gI; gI; gI; gI])];
+[(C1, [gZ; gZ; gI; gI; gZ; gZ; gI])];
+[(C1, [gZ; gI; gZ; gI; gZ; gI; gZ])];
+[(C1, [gI; gI; gI; gZ; gZ; gZ; gZ])];
+[(C1, [gI; gX; gX; gX; gX; gI; gI])];
+[(C1, [gX; gI; gX; gX; gI; gX; gI])];
+[(C1, [gX; gX; gI; gX; gI; gI; gX])]
+]) = normalize XL).
+Proof. compute. Rsimpl. reflexivity. Qed.
+
+Example Steane7X_normalization : 
+@triple 7 (Cap ([
+[(C1, [gX; gI; gI; gI; gI; gI; gI])];
+[(C1, [gI; gZ; gI; gI; gI; gI; gI])];
+[(C1, [gI; gI; gZ; gI; gI; gI; gI])];
+[(C1, [gI; gI; gI; gZ; gI; gI; gI])];
+[(C1, [gI; gI; gI; gI; gZ; gI; gI])];
+[(C1, [gI; gI; gI; gI; gI; gZ; gI])];
+[(C1, [gI; gI; gI; gI; gI; gI; gZ])]
+])) (Steane7 0 1 2 3 4 5 6) (Cap (
+map TtoA (normalize XL)
+)).
+Proof. rewrite <- equal_normalization_Steane7X.
+  apply normalization_admissible;
+    [repeat constructor; WF_auto | validate].
+Qed.
 
 
 
@@ -558,7 +629,8 @@ Tactic call ran for 7.768 secs (7.454u,0.043s) (success) *)
 
 
 
-(* Code is commented out because it takes really long to compute
+
+(* commented out because equal_normalization_Shor9X is too slow
 
 (** We can check if the normalization are equal. **)
 Example equal_normalization_Shor9X :
@@ -574,9 +646,36 @@ Example equal_normalization_Shor9X :
 [(C1, [gI; gI; gI; gI; gI; gI; gZ; gZ; gI])];
 [(C1, [gI; gI; gI; gI; gI; gI; gZ; gI; gZ])]
 ]) = normalize XL').
-Proof. compute. Rsimpl. reflexivity. Qed.
-*)
+Proof. 
+time compute. 
+(* time compute
+Tactic call ran for 7.03 secs (6.389u,0.584s) (success) *)
+time Rsimpl. 
+(* time Rsimpl
+Tactic call ran for 3160.159 secs (1344.501u,926.864s) (success) *)
+reflexivity. Qed.
 
+
+Example Shor9X_normalization : 
+@triple 9 (Cap ([
+[(C1, [gX; gI; gI; gI; gI; gI; gI; gI; gI])];
+[(C1, [gI; gZ; gI; gI; gI; gI; gI; gI; gI])];
+[(C1, [gI; gI; gZ; gI; gI; gI; gI; gI; gI])];
+[(C1, [gI; gI; gI; gZ; gI; gI; gI; gI; gI])];
+[(C1, [gI; gI; gI; gI; gZ; gI; gI; gI; gI])];
+[(C1, [gI; gI; gI; gI; gI; gZ; gI; gI; gI])];
+[(C1, [gI; gI; gI; gI; gI; gI; gZ; gI; gI])];
+[(C1, [gI; gI; gI; gI; gI; gI; gI; gZ; gI])];
+[(C1, [gI; gI; gI; gI; gI; gI; gI; gI; gZ])]
+])) (Shor9 0 1 2 3 4 5 6 7 8) (Cap (
+map TtoA (normalize XL')
+)).
+Proof. rewrite <- equal_normalization_Shor9X.
+  apply normalization_admissible;
+    [repeat constructor; WF_auto | validate].
+Qed.
+
+*)
 
 
 (***************************************************)
@@ -584,39 +683,34 @@ Proof. compute. Rsimpl. reflexivity. Qed.
 (***************************************************)
 
 
-(** To specify a valid eigenspace, we need independent commuting terms **)
-(** Since we are mapping valid terms to valid terms, the checks need not be necessary **)
-(* normalize Test'
-[[gY; gZ; gI; gI; gI; gI; gI];
- [gZ; gX; gI; gI; gI; gI; gI];
- [gI; gI; gX; gZ; gZ; gI; gI];
+(* Test'
+[[gI; gI; gI; gI; gI; gY; gZ];
+ [gI; gI; gI; gI; gI; gZ; gX];
  [gI; gI; gZ; gX; gZ; gI; gI];
  [gI; gI; gZ; gZ; gY; gI; gI];
- [gI; gI; gI; gI; gI; gY; gZ];
- [gI; gI; gI; gI; gI; gZ; gX]] *)
-Compute separable (normalize Test') [0; 1; 3]%nat. (* false *)
+ [gI; gI; gX; gX; gY; gI; gI];
+ [gX; gY; gI; gI; gI; gI; gI];
+ [gZ; gX; gI; gI; gI; gI; gI] *)
+Compute separable Test' [0; 1; 3]%nat. (* false *)
+Compute separable Test' [0; 1]%nat. (* true *)
 
-(* normalize Test''
-[[gZ; gI; gI];
+(* Test''
+[[gI; gZ; gX];
  [gI; gY; gZ];
- [gI; gZ; gX]] *)
-Compute separable (normalize Test'') [1; 2]%nat. (* true *)
-Compute separable (normalize Test'') [0; 2]%nat. (* false *)
+ [gZ; gI; gI]] *)
+Compute separable Test'' [1; 2]%nat. (* true *)
+Compute separable Test'' [0; 2]%nat. (* false *)
 
-(* normalize Test'''
-[[gY; gZ; gI; gI];
- [gZ; gX; gI; gI];
- [gI; gI; gY; gZ];
- [gI; gI; gZ; gY]] *)
-Compute separable (normalize Test''') [0; 1]%nat. (* true *)
-Compute separable (normalize Test''') [0; 2]%nat. (* false *)
-Compute separable (normalize Test''') [1; 2]%nat. (* false *)
-Compute separable (normalize Test''') [0; 3]%nat. (* false *)
-Compute separable (normalize Test''') [0; 2; 3]%nat. (* false *)
-
-
-
-
+(* Test'''
+[[gI; gI; gX; gX];
+ [gI; gI; gZ; gY];
+ [gY; gZ; gI; gZ];
+ [gZ; gX; gI; gI]] *)
+Compute separable Test''' [0; 1]%nat. (* true *)
+Compute separable Test''' [0; 2]%nat. (* false *)
+Compute separable Test''' [1; 2]%nat. (* false *)
+Compute separable Test''' [0; 3]%nat. (* false *)
+Compute separable Test''' [0; 2; 3]%nat. (* false *)
 
 
 
@@ -624,54 +718,143 @@ Compute separable (normalize Test''') [0; 2; 3]%nat. (* false *)
 (************** Separability Examples **************)
 (***************************************************)
 
-Example separation_test :
-{{ @Cap 4 (map TtoA ( normalize
-[(C1, [gY; gI; gZ; gI]); 
-(C1, [gI; gY; gI; gZ]);
-(C1, [gZ; gI; gX; gI]);
-(C1, [gI; gZ; gI; gY])] )) }}
-H 0 ;; H 0
-{{ @Sep 4 (@separate 4 ( normalize
-[(C1, [gY; gI; gZ; gI]); 
-(C1, [gI; gY; gI; gZ]);
-(C1, [gZ; gI; gX; gI]);
-(C1, [gI; gZ; gI; gY])]
-) [[0; 2]; [1; 3]]%nat) }}.
-Proof. time validateCaptoSep. 
-(* time validateCaptoSep
-Tactic call ran for 0.522 secs (0.497u,0.013s) (success) *)
+(** Test 1 **)
+
+Example separation_solve :
+exists Placeholder,
+{{ @Cap 4 
+[[(C1, [gY; gI; gZ; gI])];
+ [(C1, [gI; gY; gI; gZ])];
+ [(C1, [gZ; gI; gX; gI])];
+ [(C1, [gI; gZ; gI; gY])]]
+}}
+H 0 ;; S 0 ;; H 0
+{{ Placeholder }}.
+Proof. time solvePlaceholder.
+(* time solvePlaceholder
+Tactic call ran for 0.572 secs (0.566u,0.002s) (success) *)
+assumption.
+Qed.
+
+Example separation_validate :
+{{ @Cap 4
+[[(C1, [gY; gI; gZ; gI])];
+ [(C1, [gI; gY; gI; gZ])];
+ [(C1, [gZ; gI; gX; gI])];
+ [(C1, [gI; gZ; gI; gY])]]
+}}
+H 0 ;; S 0 ;; H 0
+{{ @Cap 4
+[[(C1, [gZ; gI; gZ; gI])]; 
+ [(C1, [gI; gY; gI; gZ])];
+ [((- C1)%C, [gY; gI; gX; gI])]; 
+ [(C1, [gI; gZ; gI; gY])]]
+}}.
+Proof. time validate.
+(* time validate
+Tactic call ran for 0.602 secs (0.59u,0.006s) (success) *)
 Qed.
 
 
-(* map snd (normalize Test')
-[[gY; gZ; gI; gI; gI; gI; gI]; 
- [gZ; gX; gI; gI; gI; gI; gI];
- [gI; gI; gX; gZ; gZ; gI; gI]; 
+Compute 
+@separable_all 4 
+[(C1, [gZ; gI; gZ; gI]);
+ (C1, [gI; gY; gI; gZ]);
+ ((- C1)%C, [gY; gI; gX; gI]); 
+ (C1, [gI; gZ; gI; gY])]
+  [[0; 2]; [1; 3]]%nat. (* true *)
+
+Compute 
+@separate 4 
+[(C1, [gZ; gI; gZ; gI]);
+ (C1, [gI; gY; gI; gZ]);
+ ((- C1)%C, [gY; gI; gX; gI]); 
+ (C1, [gI; gZ; gI; gY])]
+  [[0; 2]; [1; 3]]%nat. (* 
+([2%nat; 2%nat],
+ [[(R1, R0, [gZ; gZ]); 
+   ((- R1)%R, (- R0)%R, [gY; gX])];
+  [(R1, R0, [gY; gZ]); 
+   (R1, R0, [gZ; gY])]], 
+[0%nat; 2%nat; 1%nat; 3%nat]) *)
+
+
+Example separation_test :
+{{ @Cap 4 
+[[(C1, [gY; gI; gZ; gI])]; 
+ [(C1, [gI; gY; gI; gZ])];
+ [(C1, [gZ; gI; gX; gI])];
+ [(C1, [gI; gZ; gI; gY])]] 
+}}
+H 0 ;; S 0 ;; H 0
+{{ @Sep 4 (@separate 4
+  [(C1, [gZ; gI; gZ; gI]); 
+   (C1, [gI; gY; gI; gZ]);
+   ((- C1)%C, [gY; gI; gX; gI]); 
+   (C1, [gI; gZ; gI; gY])]
+  [[0; 2]; [1; 3]]%nat) }}.
+Proof. time validate.
+(* time validate
+Tactic call ran for 0.643 secs (0.638u,0.002s) (success) *)
+Qed.
+
+
+(** Test 2 **)
+
+(* Test'
+[[gI; gI; gI; gI; gI; gY; gZ];
+ [gI; gI; gI; gI; gI; gZ; gX];
  [gI; gI; gZ; gX; gZ; gI; gI];
- [gI; gI; gZ; gZ; gY; gI; gI]; 
- [gI; gI; gI; gI; gI; gY; gZ];
- [gI; gI; gI; gI; gI; gZ; gX]] *)
-Compute map snd (normalize Test').
-Compute separable (normalize Test') [2; 3; 4]%nat.
-Compute separable (normalize Test') [0; 1]%nat.
-Compute separable (normalize Test') [5; 6]%nat.
-Compute separable_all (normalize Test') [[2; 3; 4]; [0;1]; [5;6]]%nat.
+ [gI; gI; gZ; gZ; gY; gI; gI];
+ [gI; gI; gX; gX; gY; gI; gI];
+ [gX; gY; gI; gI; gI; gI; gI];
+ [gZ; gX; gI; gI; gI; gI; gI] *)
+Compute map snd Test'.
+Compute separable Test' [0; 1]%nat. (* true *)
+Compute separable Test' [2; 3; 4]%nat. (* true *)
+Compute separable Test' [5; 6]%nat. (* true *)
+Compute separable_all Test' [[0;1]; [2; 3; 4]; [5;6]]%nat. (* true *)
 
 
 
+Example separation_solve2 :
+exists Placeholder,
+{{ Cap (map TtoA Test') }}
+H 0 ;; S 0 ;; H 0
+{{ Placeholder }}.
+Proof. time solvePlaceholder.
+(* time solvePlaceholder
+Tactic call ran for 1.975 secs (1.931u,0.015s) (success) *)
+assumption.
+Qed.
+
+Compute @separable_all 7
+[(C1, [gI; gI; gI; gI; gI; gY; gZ]);
+ (C1, [gI; gI; gI; gI; gI; gZ; gX]);
+ (C1, [gI; gI; gZ; gX; gZ; gI; gI]);
+ (C1, [gI; gI; gZ; gZ; gY; gI; gI]);
+ (C1, [gI; gI; gX; gX; gY; gI; gI]);
+ (C1, [gX; gY; gI; gI; gI; gI; gI]);
+ ((- C1)%C, [gY; gX; gI; gI; gI; gI; gI])]
+[[0;1]; [2; 3; 4]; [5;6]]%nat. (* true *)
 
 
 Example separation_test2 :
-{{ Cap (map TtoA (normalize Test')) }}
-H 0 ;; H 0
-{{ Sep (separate (normalize Test') [[2; 3; 4]; [0;1]; [5;6]]%nat) }}.
-Proof. time validateCaptoSep.
-(* time validateCaptoSep.
-Tactic call ran for 7.411 secs (6.551u,0.452s) (success) *)
+{{ Cap (map TtoA Test') }}
+H 0 ;; S 0 ;; H 0
+{{ Sep (@separate 7
+[(C1, [gI; gI; gI; gI; gI; gY; gZ]);
+ (C1, [gI; gI; gI; gI; gI; gZ; gX]);
+ (C1, [gI; gI; gZ; gX; gZ; gI; gI]);
+ (C1, [gI; gI; gZ; gZ; gY; gI; gI]);
+ (C1, [gI; gI; gX; gX; gY; gI; gI]);
+ (C1, [gX; gY; gI; gI; gI; gI; gI]);
+ ((- C1)%C, [gY; gX; gI; gI; gI; gI; gI])]
+[[0;1]; [2; 3; 4]; [5;6]]%nat) }}.
+Proof. time validate.
+(* time validate
+Tactic call ran for 2.175 secs (2.139u,0.018s) (success) *)
 Qed.
-
-
-
 
 
 
@@ -856,7 +1039,7 @@ Proof. unfoldGraphState.
   time validate.
 (* Tactic call ran for 24.79 secs (24.264u,0.274s) (success) *)
 Qed.
-
+(*
 Lemma Benchmark_varyGates_K6_q10 :  
 (* complete graph K6 (= 3*15 = 45 Gates) in 10 qubits *)
 {{ graph_init 10 }}
@@ -1101,7 +1284,7 @@ Qed.
 (** time complexity seems to be larger than the number of qubits squared (~ n^2 log n)
 time complexity seems to be linear in the number of gates **)
 
-
+*)
 
 
 (** ** Benchmark by n-qubit GHZ state ** **)
@@ -1152,7 +1335,7 @@ Proof. unfoldGHZ.
 (* Tactic call ran for 10.08 secs (9.141u,0.25s) (success) *)
 assumption.
 Qed.
-
+(*
 Lemma Benchmark_GHZ15 :
 exists Placeholder,
 {{
@@ -1205,7 +1388,7 @@ Proof. unfoldGHZ.
 assumption.
 Qed.
 
-
+*)
 
 
 (** ** Benchmark by T Gates ** **)
@@ -1276,7 +1459,7 @@ Proof. unfold Ts; simpl.
 (* Tactic call ran for 10.841 secs (10.198u,0.073s) (success) *)
 assumption.
 Qed.
-
+(*
 Lemma Benchmark_T5 :
 exists Placeholder,
 {{ @AtoPred 1 ([
@@ -1316,4 +1499,4 @@ Proof. unfold Ts; simpl.
 assumption.
 Qed.
 
-
+*)
