@@ -496,7 +496,8 @@ Ltac solvePlaceholder :=
   match goal with
   | |- ?g => let G := fresh "G" in assert (G : g);
                                 [> validate | idtac ];
-                                simplifyCoefLC; simplifyCoefLC_context
+                                simpl in *; Csimpl; Csimpl_context G;
+                                repeat simplifyCoefLC; repeat simplifyCoefLC_context
   end.
 
 
