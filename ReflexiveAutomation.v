@@ -5806,10 +5806,137 @@ Ltac split_pred_eq :=
   | |- ?G => fail 1 "Unrecognized / unsolvable condition in split_pred_eq! Goal: " G
   end.
 
+
+Fixpoint is_WF_AdditivePredicate {n} (P : QPredicate n) : bool :=
+  match P with 
+  | QAtoPred a => is_WF_QAType (length a) a
+  | QCap a_s => forallb (is_WF_QAType (list_max (map (@length _) a_s))) a_s
+  | QSep _ => false
+  | QCup P Q => is_WF_AdditivePredicate P && is_WF_AdditivePredicate Q
+  | QErr => true
+  end.
+
+Lemma is_WF_AdditivePredicate_correct {n} (QP : QPredicate n) : 
+  is_WF_AdditivePredicate QP = true -> 
+  WF_AdditivePredicate (translateQP QP).
+Proof.
+  induction QP; cbn.
+  - now intros ?%is_WF_QAType_correct%WF_AType_WF_AType'.
+  - rewrite forallb_forall, Forall_map, Forall_forall.
+    now intros Hall q Hq%Hall%is_WF_QAType_correct%WF_AType_WF_AType'.
+  - easy.
+  - rewrite andb_true_iff. intros []; auto.
+  - easy.
+Qed.
+
+Fixpoint ProperAdditivePredicate {n} (P : Predicate n) : Prop :=
+  match P with
+  | AtoPred a => proper_AType a
+  | Cap a_s => Forall proper_AType a_s
+  | Sep _ => False
+  | Cup P Q => ProperAdditivePredicate P /\ ProperAdditivePredicate Q
+  | Err => True
+  end.
+
+Definition is_properAType_len {n} (a : AType n) : bool :=
+  forallb (fun t => length (snd t) =? n)%nat a.
+
+Lemma is_properAType_len_correct {n} (a : AType n) : 
+  is_properAType_len a = true -> proper_AType a.
+Proof.
+  unfold is_properAType_len, proper_AType.
+  rewrite forallb_forall, Forall_forall.
+  intros Hall t Ht%Hall%Nat.eqb_eq; now right.
+Qed.
+
+(* NB : This is an underapproximation, and only allows ATypes all of 
+  whose TTypes have the right length (disallowing those with incorrect
+  length but coefficient 0). *)
+Fixpoint is_ProperAdditivePredicate {n} (P : Predicate n) : bool :=
+  match P with 
+  | AtoPred a => is_properAType_len a
+  | Cap a_s => forallb is_properAType_len a_s
+  | Sep _ => false
+  | Cup P Q => is_ProperAdditivePredicate P && is_ProperAdditivePredicate Q
+  | Err => true
+  end.
+
+Lemma is_ProperAdditivePredicate_correct {n} (P : Predicate n) : 
+  is_ProperAdditivePredicate P = true -> ProperAdditivePredicate P.
+Proof.
+  induction P; cbn.
+  - apply is_properAType_len_correct.
+  - rewrite forallb_forall, <- Forall_forall.
+    apply Forall_impl.
+    apply is_properAType_len_correct.
+  - easy.
+  - rewrite andb_true_iff.
+    intuition fail.
+  - easy.
+Qed.
+
+(* Lemma Forall_Forall2 {A}  *)
+
+Lemma Forall_impl_l {A} {P Q : A -> Prop} l : 
+  Forall (fun a => P a -> Q a) l -> Forall P l -> Forall Q l.
+Proof.
+  induction l; [constructor|].
+  rewrite ?Forall_cons_iff.
+  intuition fail.
+Qed.
+
+Lemma Forall2_impl_l {A B} {P : A -> Prop} {Q : B -> Prop} l l' : 
+  Forall2 (fun a b => P a -> Q b) l l' -> Forall P l -> Forall Q l'.
+Proof.
+  intros Hall.
+  induction Hall; [constructor|].
+  rewrite ?Forall_cons_iff.
+  intuition fail.
+Qed.
+
+
+Lemma WF_AdditivePredicate_pred_eq_struct {n} (P Q : Predicate n) : 
+  pred_eq_struct P Q -> ProperAdditivePredicate Q -> 
+  WF_AdditivePredicate P -> WF_AdditivePredicate Q.
+Proof.
+  intros HPQ.
+  induction HPQ; cbn.
+  - econstructor; eauto.
+  - intros Hb Ha.
+    revert Hb.
+    apply Forall_impl_l.
+    revert Ha.
+    apply Forall2_impl_l.
+    revert Hab_s.
+    apply Forall2_impl.
+    econstructor; eauto.
+  - easy.
+  - intuition fail.
+  - easy.
+Qed.
+
+Lemma prep_validate_refl_lemma'' {n} {P Q : Predicate n} {qP} 
+  `{ParseQPred n qP P} {p} : is_prog_bound n p = true -> 
+  is_ProperAdditivePredicate P = true -> 
+  is_WF_AdditivePredicate qP = true -> 
+  pred_eq (translateQP' (compute_PCQ p qP)) Q -> 
+  {{P}} p {{Q}}.
+Proof.
+  intros Hp HP HPWF.
+  apply prep_validate_refl_lemma'.
+  - apply _.
+  - auto.
+  - apply is_WF_AdditivePredicate_correct in HPWF.
+    revert HPWF.
+    apply WF_AdditivePredicate_pred_eq_struct.
+    + apply parseqpred.
+    + now apply is_ProperAdditivePredicate_correct.
+Qed.
+
+
 Ltac validate_refl :=
-  apply (prep_validate_refl_lemma' _ _ _ _);
-  [lazy; reflexivity| repeat (first [ split | split_Forall ]);
-               apply WF_AType_WF_AType'; WF_auto |];
+  apply prep_validate_refl_lemma'';
+  [lazy; reflexivity..|];
   cbn [compute_PCQ translateQP' map];
   split_pred_eq; 
   (apply Aeq_atype_eq_subrelation;
@@ -5817,9 +5944,9 @@ Ltac validate_refl :=
   [vm_compute; reflexivity]).
 
 Ltac solvePlaceholder_refl_internal := 
-  apply (prep_solve_placeholder_refl_lemma _ _ _ _);
-    [lazy; reflexivity| simpl; split_Forall; apply WF_AType_WF_AType'; WF_auto|
-    validate_red; reflexivity].
+  apply prep_validate_refl_lemma'';
+  [lazy; reflexivity..|];
+  validate_red; reflexivity.
 
 Ltac solvePlaceholder_refl := 
   let G := fresh "G" in 

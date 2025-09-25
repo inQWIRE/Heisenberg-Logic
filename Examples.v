@@ -1174,7 +1174,7 @@ edges_to_CZ
 (3,4)]%nat 
 }}.
 Proof. unfoldGraphState.
-  time validate_refl.
+  Time validate_refl.
   (* time validate. *)
 (* Tactic call ran for 290.807 secs (287.714u,0.924s) (success) *)
 Qed.
