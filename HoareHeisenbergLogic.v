@@ -4934,9 +4934,9 @@ Proof. intros prg_len ctrl targ H0 H1.
     apply WF_plus; auto with wf_db.
   - intros prg_len ctrl H0 H1.
     destruct ctrl; try lia.
-    apply PeanoNat.lt_S_n in H1.
+    apply <- Nat.succ_lt_mono in H1.
     destruct prg_len; try lia.
-    apply PeanoNat.lt_S_n in H0.
+    apply <- Nat.succ_lt_mono in H0.
     rewrite prog_ctrl_reduce'.
     rewrite IHtarg; try lia.
     replace (s targ) with (1 + targ) by lia.

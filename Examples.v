@@ -1,4 +1,5 @@
-Require Import HeisenbergFoundations.Automation.
+Require Import HeisenbergFoundations.Automation
+  HeisenbergFoundations.ReflexiveAutomation.
 
 
 (***************************************************)
@@ -8,29 +9,29 @@ Require Import HeisenbergFoundations.Automation.
 (** Here for reference:
 Definition Td (n : nat) := Z n ;; S n ;; T n. **)
 
-
 Definition TOFFOLI (a b c : nat) :=
   H c ;; CNOT b c ;; Td c ;; CNOT a c ;; T c ;; CNOT b c ;; Td c ;; CNOT a c ;; T b ;; T c ;; H c ;; CNOT a b ;; T a ;; Td b ;; CNOT a b.
 
 
 Example ZIITOFFOLI :
   {{ @AtoPred 3 [(C1, [gZ; gI; gI])] }} TOFFOLI 0 1 2 {{ @AtoPred 3 [(C1, [gZ; gI; gI])] }}.
-Proof. time validate. Qed.
+Proof.
+  validate_refl. 
+Qed.
 
 Example IZITOFFOLI :
   {{ @AtoPred 3 [(C1, [gI; gZ; gI])] }} TOFFOLI 0 1 2 {{ @AtoPred 3 [(C1, [gI; gZ; gI])] }}.
-Proof. time validate. Qed.
+Proof. time validate_refl. Qed.
 
 Example IIXTOFFOLI :
   {{ @AtoPred 3 [(C1, [gI; gI; gX])] }} TOFFOLI 0 1 2 {{ @AtoPred 3 [(C1, [gI; gI; gX])] }}.
-Proof. time validate. Qed.
-
-
+Proof. time validate_refl. Qed.
 
 Example IIZTOFFOLI_solve : 
 exists Placeholder,
 {{ @AtoPred 3 [(C1, [gI; gI; gZ])] }} TOFFOLI 0 1 2 {{ Placeholder }}.
-Proof. time solvePlaceholder.
+Proof.
+  time solvePlaceholder_refl.
 (* time solvePlaceholder.
 Tactic call ran for 60.051 secs (56.539u,1.708s) (success) *)
 assumption.
@@ -56,7 +57,18 @@ Example IIZTOFFOLI :
             ((- C1 / (√ 2 * √ 2 * √ 2 * √ 2))%C, [gZ; gZ; gY]);
             ((- C1 / (√ 2 * √ 2 * √ 2 * √ 2))%C, [gZ; gZ; gZ])]
  }}.
-Proof. time validate. Qed.
+Proof.
+  Time validate_refl. (* 0.164 seconds *)
+  
+(*   
+  Ltac WF_auto ::= WF_auto'.
+  Ltac validate_simp ::= idtac.
+
+  (* Ltac WF_auto ::= WF_auto'. *)
+  Time validate'. (* 10.95 s *)
+  (* erewrite (AType_reduce_lemma' _ (_ :: _ :: _) _);
+  validate_red. *) *)
+Qed.
 (* time validate
 Tactic call ran for 47.226 secs (44.475u,1.429s) (success) *)
 
@@ -64,12 +76,30 @@ Tactic call ran for 47.226 secs (44.475u,1.429s) (success) *)
 Example XIITOFFOLI_solve : 
 exists Placeholder,
 {{ @AtoPred 3 [(C1, [gX; gI; gI])] }} TOFFOLI 0 1 2 {{ Placeholder }}.
-Proof. time solvePlaceholder.
+Proof.
+  Time solvePlaceholder_refl.
+  assumption. 
+  
+  (* (* Ltac WF_auto ::= WF_auto'.
+  Ltac validate_simp ::= idtac. *)
+  Time solvePlaceholder'. (* 9.1 s *)
+  erewrite prep_validate_lemma.
+  2: {
+    etransitivity; [eapply AType_reduce_lemma'; apply _|].
+    Timeout 10 
+    lazy-[Cplus Cminus Cmult Cdiv RtoC sqrt Q2R IZR QC2C Cexp PI sin cos];
+    cbv.
+  }
+  
+  
+  
+  time solvePlaceholder.
 (* time solvePlaceholder.
 Tactic call ran for 32.674 secs (32.509u,0.09s) (success) *)
-assumption.
+assumption. *)
 Qed.
 
+Local Open Scope C_scope.
 
 Example XIITOFFOLI : 
 {{ @AtoPred 3 [(C1, [gX; gI; gI])] }} TOFFOLI 0 1 2 {{ @AtoPred 3  
@@ -90,7 +120,23 @@ Example XIITOFFOLI :
          (C1 / (√ 2 * √ 2 * √ 2 * √ 2), [gY; gI; gX]);
          (- C1 / (√ 2 * √ 2 * √ 2 * √ 2), [gX; gZ; gX])]
  }}.
-Proof. time validate. Qed.
+Proof.
+  validate_refl. 
+  
+  (* Ltac WF_auto ::= WF_auto'.
+  Ltac validate_simp ::= idtac.
+  time validate'. (* 9.5 s *) *)
+(*   
+  erewrite prep_validate_lemma.
+  2: {
+    etransitivity; [eapply AType_reduce_lemma'; apply _|].
+    Timeout 10 
+    lazy-[Cplus Cminus Cmult Cdiv RtoC sqrt Q2R IZR QC2C Cexp PI sin cos atype_eq].
+    reflexivity.
+    
+  } *)
+  
+  (* time validate. *) Qed.
 (* time validate
 Tactic call ran for 17.345 secs (17.035u,0.054s) (success) *)
 
@@ -98,7 +144,13 @@ Tactic call ran for 17.345 secs (17.035u,0.054s) (success) *)
 Example IXITOFFOLI_solve : 
 exists Placeholder,
 {{ @AtoPred 3 [(C1, [gI; gX; gI])] }} TOFFOLI 0 1 2 {{ Placeholder }}.
-Proof. time solvePlaceholder.
+Proof.
+  time solvePlaceholder_refl. 
+  
+  (* Ltac WF_auto ::= WF_auto'.
+  Ltac validate_simp ::= idtac.
+  time solvePlaceholder'. (* 11.4 s *) *)
+  (* time solvePlaceholder. *)
 (* time solvePlaceholder.
 Tactic call ran for 37.36 secs (35.813u,0.256s) (success) *)
 assumption.
@@ -123,7 +175,7 @@ Example IXITOFFOLI :
          (C1 / (√ 2 * √ 2 * √ 2 * √ 2), [gI; gY; gX]);
          (- C1 / (√ 2 * √ 2 * √ 2 * √ 2), [gZ; gX; gX])]
 }}.
-Proof. time validate. Qed.
+Proof. time validate_refl. (* time validate. *) Qed.
 (* time validate
 Tactic call ran for 22.679 secs (21.822u,0.437s) (success) *)
 
@@ -324,12 +376,12 @@ Definition ZL : list (TType 7) := [g1; g2; g3; g4; g5; g6; Zbar].
 Definition XL : list (TType 7) := [g1; g2; g3; g4; g5; g6; Xbar].
 *)
 
-Definition Steane7 q0 q1 q2 q3 q4 q5 q6 := 
+Definition Steane7 (q0 q1 q2 q3 q4 q5 q6 : nat) := 
 H q4 ;; H q5 ;; H q6 ;; 
 CNOT q0 q1 ;; CNOT q0 q2 ;; 
 CNOT q6 q0 ;; CNOT q6 q1 ;; CNOT q6 q3 ;; 
 CNOT q5 q0 ;; CNOT q5 q2 ;; CNOT q5 q3 ;; 
-CNOT q4 q1 ;; CNOT q4 q2 ;; CNOT q4 q3. 
+CNOT q4 q1 ;; CNOT q4 q2 ;; CNOT q4 q3 . 
 
 
 Example Steane7Z_solve : 
@@ -343,11 +395,23 @@ exists Placeholder,
 [(C1, [gI; gI; gI; gI; gI; gZ; gI])];
 [(C1, [gI; gI; gI; gI; gI; gI; gZ])]
 ])) (Steane7 0 1 2 3 4 5 6) (Placeholder).
-Proof. time solvePlaceholder.
+Proof.
+  solvePlaceholder_refl.
+  assumption.
+  (* Ltac WF_auto ::= WF_auto'.
+  Ltac validate_simp ::= idtac.
+  time solvePlaceholder'.
+  (* eapply CAP'.
+  (* eapply SEQ. *)
+  Time split_forall2; validate'. WF_auto'.
+  Show Proof. *)
+  
+  time solvePlaceholder.
 (* time solvePlaceholder.
 Tactic call ran for 6.267 secs (6.226u,0.021s) (success) *)
-assumption.
+assumption. *)
 Qed.
+
 
 
 Example Steane7Z : 
@@ -368,7 +432,7 @@ Example Steane7Z :
 [(C1, [gX; gI; gX; gX; gI; gX; gI])];
 [(C1, [gX; gX; gI; gX; gI; gI; gX])]
 ])).
-Proof. time validate. Qed.
+Proof. time validate_refl. Qed.
 (* time validate
 Tactic call ran for 6.786 secs (6.681u,0.043s) (success) *)
 
@@ -384,7 +448,8 @@ exists Placeholder,
 [(C1, [gI; gI; gI; gI; gI; gZ; gI])];
 [(C1, [gI; gI; gI; gI; gI; gI; gZ])]
 ])) (Steane7 0 1 2 3 4 5 6) (Placeholder).
-Proof. time solvePlaceholder.
+Proof. time solvePlaceholder_refl. 
+  (* time solvePlaceholder. *)
 (* time solvePlaceholder.
 Tactic call ran for 6.441 secs (6.391u,0.024s) (success) *)
 assumption.
@@ -409,7 +474,7 @@ Example Steane7X :
 [(C1, [gX; gI; gX; gX; gI; gX; gI])];
 [(C1, [gX; gX; gI; gX; gI; gI; gX])]
 ])).
-Proof. time validate. Qed.
+Proof. time validate_refl. (* time validate. *) Qed.
 (* time validate
 Tactic call ran for 6.386 secs (6.345u,0.02s) (success) *)
 
@@ -475,7 +540,7 @@ exists Placeholder,
 [(C1, [gI; gI; gI; gI; gI; gI; gI; gZ; gI])];
 [(C1, [gI; gI; gI; gI; gI; gI; gI; gI; gZ])]
 ])) (Shor9 0 1 2 3 4 5 6 7 8) (Placeholder).
-Proof. time solvePlaceholder.
+Proof. time solvePlaceholder_refl. (* time solvePlaceholder. *)
 (* time solvePlaceholder.
 Tactic call ran for 7.665 secs (7.376u,0.052s) (success) *)
 assumption.
@@ -504,7 +569,7 @@ Example Shor9Z :
 [(C1, [gI; gI; gI; gI; gI; gI; gZ; gZ; gI])];
 [(C1, [gI; gI; gI; gI; gI; gI; gZ; gI; gZ])]
 ])).
-Proof. time validate. Qed.
+Proof. time validate_refl. (* time validate. *) Qed.
 (* time validate
 Tactic call ran for 7.362 secs (7.292u,0.033s) (success) *)
 
@@ -523,7 +588,8 @@ exists Placeholder,
 [(C1, [gI; gI; gI; gI; gI; gI; gI; gZ; gI])];
 [(C1, [gI; gI; gI; gI; gI; gI; gI; gI; gZ])]
 ])) (Shor9 0 1 2 3 4 5 6 7 8) (Placeholder).
-Proof. time solvePlaceholder.
+Proof. 
+  time solvePlaceholder_refl.
 (* time solvePlaceholder.
 Tactic call ran for 6.993 secs (6.964u,0.017s) (success) *)
 assumption.
@@ -552,7 +618,7 @@ Example Shor9X :
 [(C1, [gI; gI; gI; gI; gI; gI; gZ; gZ; gI])];
 [(C1, [gI; gI; gI; gI; gI; gI; gZ; gI; gZ])]
 ])).
-Proof. time validate. Qed.
+Proof. time validate_refl. (* time validate. *) Qed.
 (* time validate
 Tactic call ran for 7.768 secs (7.454u,0.043s) (success) *)
 
@@ -665,7 +731,9 @@ Example separation_test2 :
 {{ Cap (map TtoA (normalize Test')) }}
 H 0 ;; H 0
 {{ Sep (separate (normalize Test') [[2; 3; 4]; [0;1]; [5;6]]%nat) }}.
-Proof. time validateCaptoSep.
+Proof.
+  time validateCaptoSep'. 
+  (* time validateCaptoSep. *)
 (* time validateCaptoSep.
 Tactic call ran for 7.411 secs (6.551u,0.452s) (success) *)
 Qed.
@@ -681,53 +749,54 @@ Qed.
 
 Definition CZ q0 q1 := H q1 ;; CNOT q0 q1 ;; H q1.
 
+(* TODO: I-only condition in validate_refl*)
 Lemma IICZII : {{ pII }} CZ 0 1 {{ pII }}.
 Proof. validate. Qed.
 
 Lemma XICZXZ : {{ pXI }} CZ 0 1 {{ pXZ }}.
-Proof. validate. Qed.
+Proof. validate_refl. (* validate. *) Qed.
 
 Lemma IXCZZX : {{ pIX }} CZ 0 1 {{ pZX }}.
-Proof. validate. Qed.
+Proof. validate_refl. (* validate. *) Qed.
 
 Lemma XXCZYY : {{ pXX }} CZ 0 1 {{ pYY }}.
-Proof. validate. Qed.
+Proof. validate_refl. (* validate. *) Qed.
 
 Lemma YICZYZ : {{ pYI }} CZ 0 1 {{ pYZ }}.
-Proof. validate. Qed.
+Proof. validate_refl. (* validate. *) Qed.
 
 Lemma IYCZZY : {{ pIY }} CZ 0 1 {{ pZY }}.
-Proof. validate. Qed.
+Proof. validate_refl. (* validate. *) Qed.
 
 Lemma YYCZXX : {{ pYY }} CZ 0 1 {{ pXX }}.
-Proof. validate. Qed.
+Proof. validate_refl. (* validate. *) Qed.
 
 Lemma YXCZmXY : {{ pYX }} CZ 0 1 {{ mpXY }}.
-Proof. validate. Qed.
+Proof. validate_refl. (* validate. *) Qed.
 
 Lemma XYCZmYX : {{ pXY }} CZ 0 1 {{ mpYX }}.
-Proof. validate. Qed.
+Proof. validate_refl. (* validate. *) Qed.
 
 Lemma ZYCZIY : {{ pZY }} CZ 0 1 {{ pIY }}.
-Proof. validate. Qed.
+Proof. validate_refl. (* validate. *) Qed.
 
 Lemma YZCZYI : {{ pYZ }} CZ 0 1 {{ pYI }}.
-Proof. validate. Qed.
+Proof. validate_refl. (* validate. *) Qed.
 
 Lemma XZCZXI : {{ pXZ }} CZ 0 1 {{ pXI }}.
-Proof. validate. Qed.
+Proof. validate_refl. (* validate. *) Qed.
 
 Lemma ZXCZIX : {{ pZX }} CZ 0 1 {{ pIX }}.
-Proof. validate. Qed.
+Proof. validate_refl. (* validate. *) Qed.
 
 Lemma ZICZZI : {{ pZI }} CZ 0 1 {{ pZI }}.
-Proof. validate. Qed.
+Proof. validate_refl. (* validate. *) Qed.
 
 Lemma IZCZIZ : {{ pIZ }} CZ 0 1 {{ pIZ }}.
-Proof. validate. Qed.
+Proof. validate_refl. (* validate. *) Qed.
 
 Lemma ZZCZZZ : {{ pZZ }} CZ 0 1 {{ pZZ }}.
-Proof. validate. Qed.
+Proof. validate_refl. (* validate. *) Qed.
 
 #[export] Hint Resolve IICZII XICZXZ IXCZZX XXCZYY YICZYZ IYCZZY YYCZXX YXCZmXY XYCZmYX ZYCZIY YZCZYI XZCZXI ZXCZIX ZICZZI IZCZIZ ZZCZZZ : ht_db. 
 
@@ -806,7 +875,8 @@ exists Placeholder,
 edges_to_CZ [ (0, 1); (1, 2) ]%nat
 {{ Placeholder }}.
 Proof. unfoldGraphState.
-  time solvePlaceholder.
+  time solvePlaceholder_refl.
+  (* time solvePlaceholder. *)
   (* Tactic call ran for 1.657 secs (1.163u,0.407s) (success) *)
   assumption.
 Qed.
@@ -820,7 +890,8 @@ Lemma TestGraphState' :
 edges_to_CZ [ (0, 1); (1, 2) ]%nat
 {{ graph_to_Predicate 3 [ (0, 1); (1, 2) ]%nat }}.
 Proof. unfoldGraphState.
-  time validate.
+  time validate_refl.
+  (* time validate. *)
 (* Tactic call ran for 1.17 secs (1.111u,0.028s) (success) *)
 Qed.
 
@@ -829,7 +900,8 @@ Lemma TestGraphState'' : (* complete graph K3 in 10 qubits *)
 edges_to_CZ [ (0, 1); (0, 2); (1, 2)]%nat
 {{ graph_to_Predicate 10 [ (0, 1); (0, 2); (1, 2)]%nat }}.
 Proof. unfoldGraphState.
-  time validate.
+  time validate_refl.
+  (* time validate. *)
 (* Tactic call ran for 8.015 secs (7.593u,0.145s) (success) *)
 Qed.
 
@@ -853,7 +925,8 @@ edges_to_CZ
 (3,4)]%nat
 }}.
 Proof. unfoldGraphState.
-  time validate.
+  time validate_refl.
+  (* time validate. *)
 (* Tactic call ran for 24.79 secs (24.264u,0.274s) (success) *)
 Qed.
 
@@ -874,7 +947,8 @@ edges_to_CZ
  (4,5)]%nat
  }}.
 Proof. unfoldGraphState.
-  time validate.
+  time validate_refl.
+  (* time validate. *)
 (* Tactic call ran for 37.369 secs (36.447u,0.579s) (success) *)
 Qed.
 
@@ -897,7 +971,8 @@ edges_to_CZ
  (5,6)]%nat
  }}.
 Proof. unfoldGraphState.
-  time validate.
+  time validate_refl.
+  (* time validate. *)
 (* Tactic call ran for 51.93 secs (51.364u,0.281s) (success) *)
 Qed.
 
@@ -922,7 +997,8 @@ edges_to_CZ
  (6,7)]%nat
  }}.
 Proof. unfoldGraphState.
-  time validate.
+  time validate_refl.
+  (* time validate. *)
 (* Tactic call ran for 70.124 secs (69.321u,0.382s) (success) *)
 Qed.
 
@@ -949,7 +1025,8 @@ edges_to_CZ
  (7,8)]%nat
  }}.
 Proof. unfoldGraphState.
-  time validate.
+  time validate_refl.
+  (* time validate. *)
 (* Tactic call ran for 93.225 secs (91.966u,0.49s) (success) *)
 Qed.
 
@@ -978,7 +1055,8 @@ edges_to_CZ
  (8,9)]%nat
  }}.
 Proof. unfoldGraphState.
-  time validate.
+  time validate_refl.
+  (* time validate. *)
 (* Tactic call ran for 112.954 secs (111.8u,0.357s) (success) *)
 Qed.
 
@@ -1001,7 +1079,8 @@ edges_to_CZ
 (3,4)]%nat 
 }}.
 Proof. unfoldGraphState.
-  time validate.
+  time validate_refl.
+  (* time validate. *)
 (* Tactic call ran for 8.942 secs (8.74u,0.033s) (success) *)
 Qed.
 
@@ -1019,7 +1098,8 @@ edges_to_CZ
 (3,4)]%nat 
 }}.
 Proof. unfoldGraphState.
-  time validate.
+  time validate_refl.
+  (* time validate. *)
 (* Tactic call ran for 23.505 secs (23.316u,0.08s) (success) *)
 Qed.
 
@@ -1037,7 +1117,8 @@ edges_to_CZ
 (3,4)]%nat 
 }}.
 Proof. unfoldGraphState.
-  time validate.
+  time validate_refl.
+  (* time validate. *)
 (* Tactic call ran for 53.248 secs (52.705u,0.146s) (success) *)
 Qed.
 
@@ -1055,7 +1136,8 @@ edges_to_CZ
 (3,4)]%nat 
 }}.
 Proof. unfoldGraphState.
-  time validate.
+  time validate_refl.
+  (* time validate. *)
 (* Tactic call ran for 107.479 secs (106.487u,0.337s) (success) *)
 Qed.
 
@@ -1073,7 +1155,8 @@ edges_to_CZ
 (3,4)]%nat 
 }}.
 Proof. unfoldGraphState.
-  time validate.
+  time validate_refl.
+  (* time validate. *)
 (* Tactic call ran for 184.291 secs (182.705u,0.568s) (success) *)
 Qed.
 
@@ -1091,7 +1174,8 @@ edges_to_CZ
 (3,4)]%nat 
 }}.
 Proof. unfoldGraphState.
-  time validate.
+  time validate_refl.
+  (* time validate. *)
 (* Tactic call ran for 290.807 secs (287.714u,0.924s) (success) *)
 Qed.
 
@@ -1135,7 +1219,8 @@ GHZ_init 5
 GHZ 5
 {{ Placeholder }} .
 Proof. unfoldGHZ.
- time solvePlaceholder.
+ time solvePlaceholder_refl.
+ (* time solvePlaceholder. *)
 (* Tactic call ran for 2.778 secs (1.798u,0.534s) (success) *)
 assumption.
 Qed.
@@ -1148,7 +1233,8 @@ GHZ_init 10
 GHZ 10
 {{ Placeholder }} .
 Proof. unfoldGHZ.
- time solvePlaceholder.
+ time solvePlaceholder_refl.
+ (* time solvePlaceholder. *)
 (* Tactic call ran for 10.08 secs (9.141u,0.25s) (success) *)
 assumption.
 Qed.
@@ -1161,7 +1247,8 @@ GHZ_init 15
 GHZ 15
 {{ Placeholder }} .
 Proof. unfoldGHZ.
- time solvePlaceholder.
+ time solvePlaceholder_refl.
+ (* time solvePlaceholder. *)
 (* Tactic call ran for 31.872 secs (29.814u,0.663s) (success) *)
 assumption.
 Qed.
@@ -1174,7 +1261,8 @@ GHZ_init 20
 GHZ 20
 {{ Placeholder }} .
 Proof. unfoldGHZ.
- time solvePlaceholder.
+ time solvePlaceholder_refl.
+ (* time solvePlaceholder. *)
 (* Tactic call ran for 87.723 secs (80.864u,1.411s) (success) *)
 assumption.
 Qed.
@@ -1187,7 +1275,8 @@ GHZ_init 25
 GHZ 25
 {{ Placeholder }} .
 Proof. unfoldGHZ.
- time solvePlaceholder.
+ time solvePlaceholder_refl.
+ (* time solvePlaceholder. *)
 (* Tactic call ran for 172.687 secs (165.89u,1.452s) (success) *)
 assumption.
 Qed.
@@ -1200,7 +1289,8 @@ GHZ_init 30
 GHZ 30
 {{ Placeholder }} .
 Proof. unfoldGHZ.
- time solvePlaceholder.
+ time solvePlaceholder_refl.
+ (* time solvePlaceholder. *)
 (* Tactic call ran for 326.225 secs (312.609u,2.966s) (success) *)
 assumption.
 Qed.
@@ -1233,7 +1323,8 @@ exists Placeholder,
 Ts 1
 {{ Placeholder }} .
 Proof. unfold Ts; simpl.
-  time solvePlaceholder.
+ time solvePlaceholder_refl.
+ (* time solvePlaceholder. *)
 (* Tactic call ran for 0.305 secs (0.268u,0.034s) (success) *)
 assumption.
 Qed.
@@ -1246,7 +1337,8 @@ exists Placeholder,
 Ts 2
 {{ Placeholder }} .
 Proof. unfold Ts; simpl.
-  time solvePlaceholder.
+ time solvePlaceholder_refl.
+ (* time solvePlaceholder. *)
 (* Tactic call ran for 0.869 secs (0.848u,0.008s) (success) *)
 assumption.
 Qed.
@@ -1259,7 +1351,8 @@ exists Placeholder,
 Ts 3
 {{ Placeholder }} .
 Proof. unfold Ts; simpl.
-  time solvePlaceholder.
+ time solvePlaceholder_refl.
+ (* time solvePlaceholder. *)
 (* Tactic call ran for 2.469 secs (2.444u,0.031s) (success) *)
 assumption.
 Qed.
@@ -1272,7 +1365,8 @@ exists Placeholder,
 Ts 4
 {{ Placeholder }} .
 Proof. unfold Ts; simpl.
-  time solvePlaceholder.
+ time solvePlaceholder_refl.
+ (* time solvePlaceholder. *)
 (* Tactic call ran for 10.841 secs (10.198u,0.073s) (success) *)
 assumption.
 Qed.
@@ -1285,7 +1379,8 @@ exists Placeholder,
 Ts 5
 {{ Placeholder }} .
 Proof. unfold Ts; simpl.
-  time solvePlaceholder.
+ time solvePlaceholder_refl.
+ (* time solvePlaceholder. *)
 (* Tactic call ran for 42.227 secs (41.509u,0.25s) (success) *)
 assumption.
 Qed.
@@ -1298,7 +1393,8 @@ exists Placeholder,
 Ts 6
 {{ Placeholder }} .
 Proof. unfold Ts; simpl.
-  time solvePlaceholder.
+ time solvePlaceholder_refl.
+ (* time solvePlaceholder. *)
 (* Tactic call ran for 260.36 secs (250.444u,2.145s) (success) *)
 assumption.
 Qed.
@@ -1311,7 +1407,8 @@ exists Placeholder,
 Ts 7
 {{ Placeholder }} .
 Proof. unfold Ts; simpl.
-  time solvePlaceholder.
+ time solvePlaceholder_refl.
+ (* time solvePlaceholder. *)
 (* Tactic call ran for 1204.312 secs (1178.374u,9.61s) (success) *)
 assumption.
 Qed.
