@@ -7,6 +7,11 @@ Require Export HeisenbergFoundations.Separability.
 
 Local Open Scope Predicate_scope.
 
+
+Declare Scope pg_scope.
+Delimit Scope pg_scope with pg.
+Local Open Scope pg_scope.
+
 (*********************)
 (* defining programs *)
 (*********************)
@@ -23,7 +28,7 @@ Notation s := Datatypes.S.
 
 (*** I & Paulis can be derived ***)
 
-Infix ";;" := seq (at level 51, right associativity).
+Notation "x ;; z" := (seq x z) (at level 100, z at level 200, right associativity) : pg_scope.
 
 Fixpoint translate_prog (prg_len : nat) (p : prog) : Square (2^prg_len) :=
   match p with 
@@ -3570,6 +3575,7 @@ Reserved Infix "⇒" (at level 65, no associativity).
 Inductive implies {n} : Predicate n -> Predicate n -> Prop :=
 | ImpliesComp : forall (A B C : Predicate n), A ⇒ B -> B ⇒ C -> A ⇒ C
 | ID_implies : forall (A : Predicate n), A ⇒ A
+| CapIntro : forall (a : AType n), (AtoPred a) ⇒ (Cap [a])
 | CapElim : forall (La La' : list (AType n)), incl La La' -> Cap La' ⇒ Cap La
 | CupIntro : forall (A B : Predicate n), (A) ⇒ (Cup A B)
 | CupComm : forall (A B : Predicate n), (Cup A B) ⇒ (Cup B A)
@@ -3698,6 +3704,9 @@ Proof.
   induction H0.
   - auto.
   - auto.
+  - simpl. unfold vecSatisfiesP in *. split. 
+    + unfold vecSatisfies in H1. destruct H1. auto.
+    + constructor; auto.
   - inversion H1. constructor; auto.
     apply (incl_Forall H0); auto.
   - constructor; auto.
@@ -4024,15 +4033,15 @@ Qed.
 
 (*** Normalization is admissible ***)
 Lemma normalization_admissible :
-  forall {n : nat} (P : Predicate n) (U : prog) (Lt : list (TType n)),
+  forall {n : nat} (m : nat) (P : Predicate n) (U : prog) (Lt : list (TType n)),
     Forall proper_length_TType Lt ->
     {{P}} U {{Cap (map TtoA Lt)}} ->
-    {{P}} U {{Cap (map TtoA (normalize Lt))}}.
-Proof. intros n P U Lt ForallPLT H0.
+    {{P}} U {{Cap (map TtoA (normalize m Lt))}}.
+Proof. intros n m P U Lt ForallPLT H0.
   bdestruct (length Lt =? 0)%nat.
   - rewrite length_zero_iff_nil in H1.
     subst. rewrite normalize_nil. auto.
-  - destruct (normalize_PauliMult_listT_chain_Permutation n Lt H1) as [[Lt' [H2 H3]]].
+  - destruct (normalize_PauliMult_listT_chain_Permutation m Lt H1) as [[Lt' [H2 H3]]].
     apply CONS with (A := P) (B := Cap (map TtoA Lt')).
     apply ID_implies. apply CapElim.
     apply Permutation_sym in H3.
@@ -4051,11 +4060,39 @@ Proof. intros n P U Lt ForallPLT H0.
 Qed.
 
 Lemma normalization_admissible' :
-  forall {n : nat} (P : Predicate n) (U : prog) (Lt : list (TType n)),
+  forall {n : nat} (m : nat) (P Q Q' : Predicate n) (U : prog) (Lt : list (TType n)) (La : list (AType n)),
+    {{P}} U {{Q}} -> 
+    Q = Cap La ->
+    Forall (fun a => length a = 1%nat) La ->
+    Lt = map AtoT La ->
+    Forall proper_length_TType Lt ->
+    Q' = Cap (map TtoA (normalize m Lt)) ->
+    {{P}} U {{Q'}}.
+Proof. intros; subst.
+  apply normalization_admissible; auto.
+  unfold TtoA, AtoT. rewrite map_map.
+  assert (map (fun x : AType n => [hd (defaultT_I n) x]) La = La).
+  { apply nth_ext with (d := (defaultA_I n)) (d' := (defaultA_I n)).
+    rewrite map_length; auto.
+    intros n0 H1. 
+    rewrite map_length in H1.
+    rewrite Forall_nth in H2.
+    specialize (H2 n0 (defaultA_I n) H1).
+    rewrite map_nth with (d := (defaultA_I n)).
+    destruct (nth n0 La (defaultA_I n)) eqn:E.
+    - setoid_rewrite E in H2. discriminate.
+    - destruct a; auto.
+      setoid_rewrite E in H2. discriminate. }
+  setoid_rewrite H1. auto.
+Qed.
+
+
+Lemma normalization_admissible_WF :
+  forall {n : nat} (m : nat) (P : Predicate n) (U : prog) (Lt : list (TType n)),
     Forall WF_TType Lt ->
     {{P}} U {{Cap (map TtoA Lt)}} ->
-    {{P}} U {{Cap (map TtoA (normalize Lt))}}.
-Proof. intros n P U Lt H0 H1.
+    {{P}} U {{Cap (map TtoA (normalize m Lt))}}.
+Proof. intros n m P U Lt H0 H1.
   apply normalization_admissible; auto.
   apply Forall_impl with (P := WF_TType); auto.
   intros a H2.
@@ -6575,4 +6612,26 @@ Proof.
 Qed.
 
 #[export] Hint Resolve ZTdZ XTdXmY2 YTdXY2 : ht_db. 
+
+
+Definition Id (n : nat) := H n ;; H n.
+
+Lemma ZIdZ : {{ pZ }} Id 0 {{ pZ }}.
+Proof. 
+  eapply SEQ; auto with ht_db. 
+Qed.
+
+Lemma XIdX : {{ pX }} Id 0 {{ pX }}.
+Proof. 
+  eapply SEQ; auto with ht_db. 
+Qed.
+
+Lemma YIdY : {{ pY }} Id 0 {{ pY }}.
+Proof. 
+  eapply SEQ; auto with ht_db. 
+  eapply FLIP; auto with ht_db; do 2 WF_auto. 
+Qed.
+
+#[export] Hint Resolve ZIdZ XIdX YIdY : ht_db.
+
 

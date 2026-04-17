@@ -12,4 +12,6 @@ F2Math.v
 Separability.v
 HoareHeisenbergLogic.v
 Automation.v
-Examples.v
+ReflexiveAutomation.v
+PivotRule.v
+Measurement.v

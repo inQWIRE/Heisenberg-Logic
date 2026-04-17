@@ -4577,6 +4577,7 @@ Qed.
 
 
 
+
 (*** Functions for Separability Computation ***)
 
 Definition all_in_qubits (K : list nat) (term_qubit : list (nat * nat)) :=
