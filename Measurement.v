@@ -2144,94 +2144,6 @@ Lemma NORMALIZE_RULE {n : nat} (i : nat) (A : cpred) (lt : list (TType n)) (mp :
 
 Require Export HeisenbergFoundations.ReflexiveAutomation.
 
-
-
-
-
-
-(*** Example ***)
-
-Definition g1 : TType 8 := (C1, [gI; gI; gI; gX; gX; gX; gX; gI]).
-Definition g2 : TType 8 := (C1, [gI; gX; gX; gI; gI; gX; gX; gI]).
-Definition g3 : TType 8 := (C1, [gX; gI; gX; gI; gX; gI; gX; gI]).
-Definition g4 : TType 8 := (C1, [gI; gI; gI; gZ; gZ; gZ; gZ; gI]).
-Definition g5 : TType 8 := (C1, [gI; gZ; gZ; gI; gI; gZ; gZ; gI]).
-Definition g6 : TType 8 := (C1, [gZ; gI; gZ; gI; gZ; gI; gZ; gI]).
-Definition Xbar : TType 8 := (C1, [gX; gX; gX; gX; gX; gX; gX; gI]).
-Definition Zbar : TType 8 := (C1, [gZ; gZ; gZ; gZ; gZ; gZ; gZ; gI]).
-Definition Zanc : TType 8 := (C1, [gI; gI; gI; gI; gI; gI; gI; gZ]).
-Definition ZL : list (TType 8) := [g1; g2; g3; g4; g5; g6; Zbar; Zanc].
-Definition XL : list (TType 8) := [g1; g2; g3; g4; g5; g6; Xbar; Zanc].
-
-Definition Steane7 q0 q1 q2 q3 q4 q5 q6 : prog := 
-(H q4 ;; H q5 ;; H q6 ;; 
-CNOT q0 q1 ;; CNOT q0 q2 ;; 
-CNOT q6 q0 ;; CNOT q6 q1 ;; CNOT q6 q3 ;; 
-CNOT q5 q0 ;; CNOT q5 q2 ;; CNOT q5 q3 ;; 
-CNOT q4 q1 ;; CNOT q4 q2 ;; CNOT q4 q3)%pg. 
-
-Definition synd_s1z_0 : mprog := 
-U (CNOT 0 7 ;; CNOT 2 7 ;; CNOT 4 7 ;; CNOT 6 7)%pg ;;; MEAS 7 0 ;;; ITE (REG 0) (Id 7) (X 7).
-
-Definition synd_s2z_1 : mprog := 
-U (CNOT 1 7 ;; CNOT 2 7 ;; CNOT 5 7 ;; CNOT 6 7)%pg ;;; MEAS 7 1 ;;; ITE (REG 1) (Id 7) (X 7).
-
-Definition synd_s3z_2 : mprog := 
-U (CNOT 3 7 ;; CNOT 4 7 ;; CNOT 5 7 ;; CNOT 6 7)%pg ;;; MEAS 7 2 ;;; ITE (REG 2) (Id 7) (X 7).
-
-Definition synd_s1x_3 : mprog := 
-U (H 7 ;; CNOT 7 0 ;; CNOT 7 2 ;; CNOT 7 4 ;; CNOT 7 6 ;; H 7)%pg ;;; MEAS 7 3 ;;; ITE (REG 3) (Id 7) (X 7).
-
-Definition synd_s2x_4 : mprog := 
-U (H 7 ;; CNOT 7 1 ;; CNOT 7 2 ;; CNOT 7 5 ;; CNOT 7 6 ;; H 7)%pg ;;; MEAS 7 4 ;;; ITE (REG 4) (Id 7) (X 7).
-
-Definition synd_s3x_5 : mprog := 
-U (H 7 ;; CNOT 7 3 ;; CNOT 7 4 ;; CNOT 7 5 ;; CNOT 7 6 ;; H 7)%pg ;;; MEAS 7 5 ;;; ITE (REG 5) (Id 7) (X 7).
-
-Definition correctZ : mprog :=
-ITE (AND (AND (REG 0) (REG 1)) (REG 2)) (Id 7) (Id 7) ;;;
-ITE (AND (AND (REG 0) (REG 1)) (NOT (REG 2))) (Z 0) (Id 7) ;;;
-ITE (AND (AND (REG 0) (NOT (REG 1))) (REG 2)) (Z 1) (Id 7) ;;;
-ITE (AND (AND (REG 0) (NOT (REG 1))) (NOT (REG 2))) (Z 2) (Id 7) ;;;
-ITE (AND (AND (NOT (REG 0)) (REG 1)) (REG 2)) (Z 3) (Id 7) ;;;
-ITE (AND (AND (NOT (REG 0)) (REG 1)) (NOT (REG 2))) (Z 4) (Id 7) ;;;
-ITE (AND (AND (NOT (REG 0)) (NOT (REG 1))) (REG 2)) (Z 5) (Id 7) ;;;
-ITE (AND (AND (NOT (REG 0)) (NOT (REG 1))) (NOT (REG 2))) (Z 6) (Id 7).
-
-Definition correctX : mprog :=
-ITE (AND (AND (REG 3) (REG 4)) (REG 5)) (Id 7) (Id 7) ;;;
-ITE (AND (AND (REG 3) (REG 4)) (NOT (REG 5))) (X 0) (Id 7) ;;;
-ITE (AND (AND (REG 3) (NOT (REG 4))) (REG 5)) (X 1) (Id 7) ;;;
-ITE (AND (AND (REG 3) (NOT (REG 4))) (NOT (REG 5))) (X 2) (Id 7) ;;;
-ITE (AND (AND (NOT (REG 3)) (REG 4)) (REG 5)) (X 3) (Id 7) ;;;
-ITE (AND (AND (NOT (REG 3)) (REG 4)) (NOT (REG 5))) (X 4) (Id 7) ;;;
-ITE (AND (AND (NOT (REG 3)) (NOT (REG 4))) (REG 5)) (X 5) (Id 7) ;;;
-ITE (AND (AND (NOT (REG 3)) (NOT (REG 4))) (NOT (REG 5))) (X 6) (Id 7).
-
-
-Example Steane7QEC :
-{{{
-[
-(TRUE, 
-[
-(C1, [gZ; gI; gI; gI; gI; gI; gI; gI]);
-(C1, [gI; gZ; gI; gI; gI; gI; gI; gI]);
-(C1, [gI; gI; gZ; gI; gI; gI; gI; gI]);
-(C1, [gI; gI; gI; gZ; gI; gI; gI; gI]);
-(C1, [gI; gI; gI; gI; gZ; gI; gI; gI]);
-(C1, [gI; gI; gI; gI; gI; gZ; gI; gI]);
-(C1, [gI; gI; gI; gI; gI; gI; gZ; gI]);
-(C1, [gI; gI; gI; gI; gI; gI; gI; gZ])
-]
-)
-]
-}}}
-(U (Steane7 0 1 2 3 4 5 6)) ;;; (U (Id 7)) ;;; 
-synd_s1z_0 ;;; synd_s2z_1 ;;; synd_s3z_2 ;;; synd_s1x_3 ;;; synd_s2x_4 ;;; synd_s3x_5 ;;;
-correctZ ;;; correctX
-{{{ [(TRUE, normalize 0%nat [g1; g2; g3; g4; g5; g6; Zbar; Zanc])] }}}.
-Proof. 
-
 Ltac finalize := 
   eapply FINALIZE_RULE.
 
@@ -2303,7 +2215,7 @@ Ltac kill_i :=
              | intro; discriminate
              | reflexivity])).
 
-Ltac kill := unshelve (repeat (try apply KILL_FALSE_RULE'; kill_rep; kill_i; kill_f)).
+Ltac kill := repeat (try apply KILL_FALSE_RULE'; kill_rep; kill_i; kill_f).
 
 Ltac mseqs :=
   repeat tryif mseq then [> mseqs; idtac | idtac] else idtac.
@@ -2315,125 +2227,26 @@ Ltac normal i :=
 Ltac cpred_iff cpred :=
   erewrite (SIMPLIFY_CPRED_PRE_RULE cpred).
 
-
-(*Ltac msolve :=
-  repeat 
-    (kill;
-     match goal with
-     | |- _ <> [] => try (intro; discriminate)
-     | |- {{{ _ }}} _ ;;; _ {{{ _ }}} => mseq
-     | |- context [apply_MEAS _ _ _] => simplify
-     | |- context [_ ++ _] => simplify
-     | |- {{{ _ :: _ :: _ }}} _ {{{ _ }}} => branch; kill
-     | |- {{{ _ }}} MEAS _ _ {{{ _ }}} => meas
-     | |- {{{ _ }}} ITE _ _ _ {{{ _ }}} => ite; kill
-     | |- {{{ _ }}} U _ {{{ _ }}} => kill; triple
-     | |- _ => try apply ([(FALSE,[])])
-     end).
-
 Ltac mstep :=
-  simplify; kill;
+  simplify; branch; kill; try (normal 0%nat);
   match goal with
-  | |- {{{ _ }}} _ ;;; _ {{{ _ }}} => mseq
-  | |- {{{ _ :: _ :: _ }}} _ {{{ _ }}} => branch
+  | |- {{{ _ }}} ITE _ _ _ {{{ _ }}} => ite; mstep
   | |- {{{ _ }}} MEAS _ _ {{{ _ }}} => meas
-  | |- {{{ _ }}} ITE _ _ _ {{{ _ }}} => ite
   | |- {{{ _ }}} U _ {{{ _ }}} => triple
-  (*  | |- _ => try (intro; discriminate);
-          try apply ([(FALSE,[])]) *)
-  end;
-  kill.
+  end. 
 
-Ltac msolve :=
-  tryif mseq then [> msolve; repeat mstep | repeat mstep] else (repeat mstep). *)
+Ltac msolve := tryif mseq then [> repeat msolve | idtac] else mstep.
 
-finalize. Unshelve. 
-mseq. triple.
-mseq. triple.
-mseq. simplify.
-mseq. triple.
-mseq. meas.
-simplify. branch.
-ite.
-kill. triple.
-simplify. kill.
-ite.
-kill. shelve. Unshelve.
-kill. triple.
-mseq. simplify.
-mseq. branch.
-triple. triple.
-mseq. simplify. branch.
-meas. meas.
-simplify. branch.
-kill. ite.
-kill. triple.
-simplify. kill.
-kill. ite.
-kill. shelve. Unshelve.
-kill. triple.
-kill. kill.
-mseq. simplify.
-mseq. branch.
-triple. triple.
-kill. kill.
-mseq. simplify. branch.
-meas. meas. kill. kill.
-simplify. branch.
-kill. ite. 
-kill. triple.
-kill.
-kill. ite.
-kill. shelve. Unshelve.
-kill. triple.
-kill. kill. kill. kill.
-mseq. simplify.
-mseq. branch.
-triple. triple. kill. kill. kill. kill.
-mseq. simplify. branch.
-meas. meas. kill. kill. kill. kill.
-simplify. branch.
-kill. ite.
-kill. triple.
-kill.
-kill. ite. 
-kill. shelve. Unshelve. 
-kill. triple.
-kill. kill. kill. kill. kill. kill.
-mseq. simplify.
-mseq. branch.
-triple. triple. kill. kill. kill. kill. kill. kill.
-mseq. simplify. branch.
-meas. meas. kill. kill. kill. kill. kill. kill.
-simplify. branch.
-kill. ite.
-kill. triple.
-kill.
-kill. ite.
-kill. shelve. Unshelve.
-kill. triple.
-kill. kill. kill. kill. kill. kill. kill. kill.
-mseq. simplify.
-mseq. branch.
-triple. triple. kill. kill. kill. kill. kill. kill. kill. kill.
-mseq. simplify. branch.
-meas. meas. kill. kill. kill. kill. kill. kill. kill. kill.
-simplify. branch.
-kill. ite.
-kill. triple.
-kill.
-kill. ite.
-kill. shelve. Unshelve.
-kill. triple.
-kill. kill. kill. kill. kill. kill. kill. kill. kill. kill.
-mseq. simplify.
-mseq. branch.
-normal 0%nat. kill.
-ite.
-cpred_iff (AND
-            (AND (AND (AND (AND (AND TRUE (REG 0)) (REG 1)) (REG 2)) (REG 3))
-               (REG 4)) (REG 5)).
-2: intro; simpl;
+
+
+
+
+(*** Steane7 QEC Example ***)
+
+Ltac steane7_true cpred :=
+cpred_iff cpred;
+[triple
+| intros r; simpl;
 destruct 
   (r !! 0%nat)%stdpp as [b0|], 
   (r !! 1%nat)%stdpp as [b1|],
@@ -2441,14 +2254,14 @@ destruct
   (r !! 3%nat)%stdpp as [b3|],
   (r !! 4%nat)%stdpp as [b4|],
   (r !! 5%nat)%stdpp as [b5|];
-auto;
+try reflexivity;
 destruct b0, b1, b2, b3, b4, b5;
-auto.
-triple.
-cpred_iff (AND (AND
-            (AND (AND (AND (AND (AND TRUE (REG 0)) (REG 1)) (REG 2)) (REG 3))
-               (REG 4)) (REG 5)) FALSE).
-2: intro; simpl;
+reflexivity].
+
+Ltac steane7_false cpred :=
+cpred_iff (AND cpred FALSE);
+[kill 
+| intros r; simpl;
 destruct 
   (r !! 0%nat)%stdpp as [b0|], 
   (r !! 1%nat)%stdpp as [b1|],
@@ -2456,450 +2269,80 @@ destruct
   (r !! 3%nat)%stdpp as [b3|],
   (r !! 4%nat)%stdpp as [b4|],
   (r !! 5%nat)%stdpp as [b5|];
-auto;
+try reflexivity;
 destruct b0, b1, b2, b3, b4, b5;
-auto.
-kill.
-normal 0%nat. kill. kill. kill. kill. kill. kill. kill. kill. kill. kill. kill.
-mseq. simplify. branch.
-ite.
-cpred_iff (AND (AND
-            (AND (AND (AND (AND (AND TRUE (REG 0)) (REG 1)) (REG 2)) (REG 3))
-               (REG 4)) (REG 5)) FALSE).
-2: intro; simpl;
-destruct 
-  (r !! 0%nat)%stdpp as [b0|], 
-  (r !! 1%nat)%stdpp as [b1|],
-  (r !! 2%nat)%stdpp as [b2|],
-  (r !! 3%nat)%stdpp as [b3|],
-  (r !! 4%nat)%stdpp as [b4|],
-  (r !! 5%nat)%stdpp as [b5|];
-auto;
-destruct b0, b1, b2, b3, b4, b5;
-auto.
-kill. shelve. Unshelve.
-cpred_iff (AND
-            (AND (AND (AND (AND (AND TRUE (REG 0)) (REG 1)) (REG 2)) (REG 3))
-               (REG 4)) (REG 5)).
-2: intro; simpl;
-destruct 
-  (r !! 0%nat)%stdpp as [b0|], 
-  (r !! 1%nat)%stdpp as [b1|],
-  (r !! 2%nat)%stdpp as [b2|],
-  (r !! 3%nat)%stdpp as [b3|],
-  (r !! 4%nat)%stdpp as [b4|],
-  (r !! 5%nat)%stdpp as [b5|];
-auto;
-destruct b0, b1, b2, b3, b4, b5;
-auto.
-triple.
-kill. kill. kill. kill. kill. kill. kill. kill. kill. kill. kill.
-
-
-
-
-Lemma SIMPLIFY_CPRED_PRE_RULE (B : cpred) {A : cpred} {n : nat} {lt : list (TType n)} {mp : mprog} {Q : MPredicate n} :
-  equiv_cpred A B ->
-  {{{ [ (A, lt) ] }}} mp {{{ Q }}}
-  <-> {{{ [ (B, lt) ] }}} mp {{{ Q }}}.
-
-Lemma NORMALIZE_RULE {n : nat} (i : nat) (P : MPredicate n) (A : cpred) (lt : list (TType n)) (mp : mprog) :
-  WF_L lt ->
-  {{{ P }}} mp {{{ [(A, lt)] }}} ->
-  {{{ P }}} mp {{{ [(A, normalize i lt)] }}}.
-
-
-WF_L lt ->
-{{{ [(A,normalize i lt)] }}} mp {{{ Q }}} ->
-{{{ [(A,lt)] }}} mp {{{ Q }}}
-
-
-
-
-
-kill. shelve. Unshelve.
-kill. shelve. Unshelve.
-8-9: apply ([(FALSE,[])]).
-mseq. simplify.
-mseq. branch.
-triple. triple.
-kill. shelve. Unshelve.
-kill. shelve. Unshelve.
-13-14: apply ([(FALSE,[])]).
-mseq. simplify. branch.
-meas. meas.
-kill. shelve. Unshelve.
-kill. shelve. Unshelve.
-15-16: apply ([(FALSE,[])]).
-simplify. branch.
-kill. ite.
-kill. triple.
-simplify. kill.
-kill. ite.
-kill. shelve. Unshelve.
-kill. triple.
-kill. shelve. Unshelve.
-kill. shelve. Unshelve.
-kill. shelve. Unshelve.
-kill. shelve. Unshelve.
-mseq.
-16-19: apply ([(FALSE,[])]).
-simplify.
-mseq. branch.
-triple. triple.
-kill. shelve. Unshelve.
-kill. shelve. Unshelve.
-kill. shelve. Unshelve.
-kill. shelve. Unshelve.
-mseq.
-23-26: apply ([(FALSE,[])]).
-simplify. branch.
-meas. meas.
-kill. shelve. Unshelve.
-kill. shelve. Unshelve.
-kill. shelve. Unshelve.
-kill. shelve. Unshelve.
-26-29: apply ([(FALSE,[])]).
-simplify. branch.
-kill. ite.
-kill. triple.
-kill. 
-kill. ite.
-kill. shelve. Unshelve.
-kill. triple.
-kill. shelve. Unshelve.
-kill. shelve. Unshelve.
-kill. shelve. Unshelve.
-kill. shelve. Unshelve.
-kill. shelve. Unshelve.
-kill. shelve. Unshelve.
-mseq. 
-29-34: apply ([(FALSE,[])]).
-simplify.
-mseq. branch. 
-triple. triple.
-kill. shelve. Unshelve.
-kill. shelve. Unshelve.
-kill. shelve. Unshelve.
-kill. shelve. Unshelve.
-kill. shelve. Unshelve.
-kill. shelve. Unshelve.
-
-
-msolve .
-
-kill. msolve mseq.
-
-msolve mseq.
-msolve mseq.
-
-
-msolve simplify.
-
-msolve simplify.
-
-simplify
-kill
-try (intro; discriminate)
-try apply ([(FALSE,[])])
-
-finalize. 
-
-(unshelve msolve; ).
-
-
-
-repeat (unshelve msolve; try apply ([(FALSE,[])])).
-             
-mseq. msolve.
-mseq. msolve.
-mseq. msolve.
-mseq. msolve. 
-mseq.
-
-simplify.
-mseq. branch. mstep. mstep.
-unshelve mstep.
-
-
-
-
-
-
- msolve. 
-simplify; kill.
-branch.
-
-msolve. 
-
-
-
-mstep.
-
-msolve. 
-
-
-
-simplify; kill;
-     match goal with
-     | |- {{{ _ }}} _ ;;; _ {{{ _ }}} => mseq
-     | |- {{{ _ :: _ :: _ }}} _ {{{ _ }}} => branch
-     | |- {{{ _ }}} MEAS _ _ {{{ _ }}} => meas
-     | |- {{{ _ }}} ITE _ _ _ {{{ _ }}} => ite
-     | |- {{{ _ }}} U _ {{{ _ }}} => triple
-     | |- _ => simplify; 
-             try apply ([(FALSE,[])]); 
-             try (intro; discriminate);
-             try (let temp := fresh "temp" in 
-                  assert (temp: ([(FALSE,[])]) <> []) by (intro; discriminate);
-                  apply temp)
-     end.
-simplify; kill;
-     match goal with
-     | |- {{{ _ }}} _ ;;; _ {{{ _ }}} => mseq
-     | |- {{{ _ :: _ :: _ }}} _ {{{ _ }}} => branch
-     | |- {{{ _ }}} MEAS _ _ {{{ _ }}} => meas
-     | |- {{{ _ }}} ITE _ _ _ {{{ _ }}} => ite
-     | |- {{{ _ }}} U _ {{{ _ }}} => triple
-     | |- _ => simplify; 
-             try apply ([(FALSE,[])]); 
-             try (intro; discriminate);
-             try (let temp := fresh "temp" in 
-                  assert (temp: ([(FALSE,[])]) <> []) by (intro; discriminate);
-                  apply temp)
-     end.
-simplify; kill;
-     match goal with
-     | |- {{{ _ }}} _ ;;; _ {{{ _ }}} => mseq
-     | |- {{{ _ :: _ :: _ }}} _ {{{ _ }}} => branch
-     | |- {{{ _ }}} MEAS _ _ {{{ _ }}} => meas
-     | |- {{{ _ }}} ITE _ _ _ {{{ _ }}} => ite
-     | |- {{{ _ }}} U _ {{{ _ }}} => triple
-     | |- _ => simplify; 
-             try apply ([(FALSE,[])]); 
-             try (intro; discriminate);
-             try (let temp := fresh "temp" in 
-                  assert (temp: ([(FALSE,[])]) <> []) by (intro; discriminate);
-                  apply temp)
-     end.
-simplify; kill;
-     match goal with
-     | |- {{{ _ }}} _ ;;; _ {{{ _ }}} => mseq
-     | |- {{{ _ :: _ :: _ }}} _ {{{ _ }}} => branch
-     | |- {{{ _ }}} MEAS _ _ {{{ _ }}} => meas
-     | |- {{{ _ }}} ITE _ _ _ {{{ _ }}} => ite
-     | |- {{{ _ }}} U _ {{{ _ }}} => triple
-     | |- _ => simplify; 
-             try apply ([(FALSE,[])]); 
-             try (intro; discriminate);
-             try (let temp := fresh "temp" in 
-                  assert (temp: ([(FALSE,[])]) <> []) by (intro; discriminate);
-                  apply temp)
-     end.
-simplify; kill;
-     match goal with
-     | |- {{{ _ }}} _ ;;; _ {{{ _ }}} => mseq
-     | |- {{{ _ :: _ :: _ }}} _ {{{ _ }}} => branch
-     | |- {{{ _ }}} MEAS _ _ {{{ _ }}} => meas
-     | |- {{{ _ }}} ITE _ _ _ {{{ _ }}} => ite
-     | |- {{{ _ }}} U _ {{{ _ }}} => triple
-     | |- _ => simplify; 
-             try apply ([(FALSE,[])]); 
-             try (intro; discriminate);
-             try (let temp := fresh "temp" in 
-                  assert (temp: ([(FALSE,[])]) <> []) by (intro; discriminate);
-                  apply temp)
-     end.
-simplify; kill;
-     match goal with
-     | |- {{{ _ }}} _ ;;; _ {{{ _ }}} => mseq
-     | |- {{{ _ :: _ :: _ }}} _ {{{ _ }}} => branch
-     | |- {{{ _ }}} MEAS _ _ {{{ _ }}} => meas
-     | |- {{{ _ }}} ITE _ _ _ {{{ _ }}} => ite
-     | |- {{{ _ }}} U _ {{{ _ }}} => triple
-     | |- _ => simplify; 
-             try apply ([(FALSE,[])]); 
-             try (intro; discriminate);
-             try (let temp := fresh "temp" in 
-                  assert (temp: ([(FALSE,[])]) <> []) by (intro; discriminate);
-                  apply temp)
-     end.
-simplify; kill;
-     match goal with
-     | |- {{{ _ }}} _ ;;; _ {{{ _ }}} => mseq
-     | |- {{{ _ :: _ :: _ }}} _ {{{ _ }}} => branch
-     | |- {{{ _ }}} MEAS _ _ {{{ _ }}} => meas
-     | |- {{{ _ }}} ITE _ _ _ {{{ _ }}} => ite
-     | |- {{{ _ }}} U _ {{{ _ }}} => triple
-     | |- _ => simplify; 
-             try apply ([(FALSE,[])]); 
-             try (intro; discriminate);
-             try (let temp := fresh "temp" in 
-                  assert (temp: ([(FALSE,[])]) <> []) by (intro; discriminate);
-                  apply temp)
-     end.
-simplify; kill;
-     match goal with
-     | |- {{{ _ }}} _ ;;; _ {{{ _ }}} => mseq
-     | |- {{{ _ :: _ :: _ }}} _ {{{ _ }}} => branch
-     | |- {{{ _ }}} MEAS _ _ {{{ _ }}} => meas
-     | |- {{{ _ }}} ITE _ _ _ {{{ _ }}} => ite
-     | |- {{{ _ }}} U _ {{{ _ }}} => triple
-     | |- _ => simplify; 
-             try apply ([(FALSE,[])]); 
-             try (intro; discriminate);
-             try (let temp := fresh "temp" in 
-                  assert (temp: ([(FALSE,[])]) <> []) by (intro; discriminate);
-                  apply temp)
-     end.
-simplify; kill;
-     match goal with
-     | |- {{{ _ }}} _ ;;; _ {{{ _ }}} => mseq
-     | |- {{{ _ :: _ :: _ }}} _ {{{ _ }}} => branch
-     | |- {{{ _ }}} MEAS _ _ {{{ _ }}} => meas
-     | |- {{{ _ }}} ITE _ _ _ {{{ _ }}} => ite
-     | |- {{{ _ }}} U _ {{{ _ }}} => triple
-     | |- _ => simplify; 
-             try apply ([(FALSE,[])]); 
-             try (intro; discriminate);
-             try (let temp := fresh "temp" in 
-                  assert (temp: ([(FALSE,[])]) <> []) by (intro; discriminate);
-                  apply temp)
-     end.
-simplify; kill;
-     match goal with
-     | |- {{{ _ }}} _ ;;; _ {{{ _ }}} => mseq
-     | |- {{{ _ :: _ :: _ }}} _ {{{ _ }}} => branch
-     | |- {{{ _ }}} MEAS _ _ {{{ _ }}} => meas
-     | |- {{{ _ }}} ITE _ _ _ {{{ _ }}} => ite
-     | |- {{{ _ }}} U _ {{{ _ }}} => triple
-     | |- _ => simplify; 
-             try apply ([(FALSE,[])]); 
-             try (intro; discriminate);
-             try (let temp := fresh "temp" in 
-                  assert (temp: ([(FALSE,[])]) <> []) by (intro; discriminate);
-                  apply temp)
-     end.
-2: simplify; kill;
-     match goal with
-     | |- {{{ _ }}} _ ;;; _ {{{ _ }}} => mseq
-     | |- {{{ _ :: _ :: _ }}} _ {{{ _ }}} => branch
-     | |- {{{ _ }}} MEAS _ _ {{{ _ }}} => meas
-     | |- {{{ _ }}} ITE _ _ _ {{{ _ }}} => ite
-     | |- {{{ _ }}} U _ {{{ _ }}} => triple
-     | |- _ => simplify; 
-             try apply ([(FALSE,[])]); 
-             try (intro; discriminate)
-     end.
-simplify; kill;
-     match goal with
-     | |- {{{ _ }}} _ ;;; _ {{{ _ }}} => mseq
-     | |- {{{ _ :: _ :: _ }}} _ {{{ _ }}} => branch
-     | |- {{{ _ }}} MEAS _ _ {{{ _ }}} => meas
-     | |- {{{ _ }}} ITE _ _ _ {{{ _ }}} => ite
-     | |- {{{ _ }}} U _ {{{ _ }}} => triple
-     | |- _ => simplify; 
-             try apply ([(FALSE,[])]); 
-             try (intro; discriminate)
-     end.
-simplify; kill;
-     match goal with
-     | |- {{{ _ }}} _ ;;; _ {{{ _ }}} => mseq
-     | |- {{{ _ :: _ :: _ }}} _ {{{ _ }}} => branch
-     | |- {{{ _ }}} MEAS _ _ {{{ _ }}} => meas
-     | |- {{{ _ }}} ITE _ _ _ {{{ _ }}} => ite
-     | |- {{{ _ }}} U _ {{{ _ }}} => triple
-     | |- _ => simplify; 
-             try apply ([(FALSE,[])]); 
-             try (intro; discriminate)
-     end.
-
-
-simplify; kill;
-     match goal with
-     | |- {{{ _ }}} _ ;;; _ {{{ _ }}} => mseq
-     | |- {{{ _ :: _ :: _ }}} _ {{{ _ }}} => branch
-     | |- {{{ _ }}} MEAS _ _ {{{ _ }}} => meas
-     | |- {{{ _ }}} ITE _ _ _ {{{ _ }}} => ite
-     | |- {{{ _ }}} U _ {{{ _ }}} => triple
-     | |- _ => simplify; 
-             try apply ([(FALSE,[])]); 
-             try (intro; discriminate);
-             try (let temp := fresh "temp" in 
-                  eassert (temp: ([(FALSE,[])]) <> []) by (intro; discriminate);
-                  apply temp)
-     end.
-simplify; kill;
-     match goal with
-     | |- {{{ _ }}} _ ;;; _ {{{ _ }}} => mseq
-     | |- {{{ _ :: _ :: _ }}} _ {{{ _ }}} => branch
-     | |- {{{ _ }}} MEAS _ _ {{{ _ }}} => meas
-     | |- {{{ _ }}} ITE _ _ _ {{{ _ }}} => ite
-     | |- {{{ _ }}} U _ {{{ _ }}} => triple
-     | |- _ => simplify; 
-             try apply ([(FALSE,[])]); 
-             try (intro; discriminate);
-             try (let temp := fresh "temp" in 
-                  eassert (temp: ([(FALSE,[])]) <> []) by (intro; discriminate);
-                  apply temp)
-     end.
-
-(let temp := fresh "temp" in 
-                  eassert (temp: ([(FALSE,[])]) <> []) by (intro; discriminate);
-                  apply temp). 
-mstep. mstep. 
-mseq.
-
-mstep.
-
-simplify. kill;
-     match goal with
-     | |- {{{ _ }}} _ ;;; _ {{{ _ }}} => mseq
-     | |- {{{ _ :: _ :: _ }}} _ {{{ _ }}} => branch
-     | |- {{{ _ }}} MEAS _ _ {{{ _ }}} => meas
-     | |- {{{ _ }}} ITE _ _ _ {{{ _ }}} => ite
-     | |- {{{ _ }}} U _ {{{ _ }}} => triple
-     | |- _ => try apply ([(FALSE,[])]); try (intro; discriminate)
-     end.
-
-
-mstep. mstep. mstep. mstep. mstep. mstep. mstep. mstep. mstep. mstep. mstep. mstep. mstep. mstep. mstep. mstep. mstep. mstep. 
-
-simplify. mseqs. msolve. msolve. 
-simplify.
-branch.
-ite. kill. msolve.
-
- msolve. ite.
-
- msolve.
-
-msolve. msolve_seq. msolve_seq. triple. simplify.
-
-
- msolve_seq. msolve_seq.
-mseq. msolve_seq. simplify. repeat msolve. msolve. try (intro; discriminate).
-
-
-mseq. simplify. msolve.
-
-mseq. simplify.
-branch. msolve. msolve. kill. kill_f. kill_f. simplify. 
-
-eapply 
-KILL_AND_FALSE_R_RULE.
-kill_f.
-
-
- solveM. kill_f.
-
-
-
-
-
-Qed.
-
-Example Steane7QEC_test :
+reflexivity].
+
+Ltac steane7_correction_step cpred := simplify; branch; try (ite; first [steane7_true cpred | steane7_false cpred]).
+
+Ltac steane7_correction cpred :=
+  mseq; 
+  [ do 7 (mseq; [steane7_correction_step cpred; kill | idtac]); 
+    steane7_correction_step cpred; kill
+  | idtac];
+  do 7 (mseq; [steane7_correction_step cpred; kill | idtac]); 
+  steane7_correction_step cpred; kill_f.
+
+
+Definition g1 : TType 8 := (C1, [gI; gI; gI; gX; gX; gX; gX; gI]).
+Definition g2 : TType 8 := (C1, [gI; gX; gX; gI; gI; gX; gX; gI]).
+Definition g3 : TType 8 := (C1, [gX; gI; gX; gI; gX; gI; gX; gI]).
+Definition g4 : TType 8 := (C1, [gI; gI; gI; gZ; gZ; gZ; gZ; gI]).
+Definition g5 : TType 8 := (C1, [gI; gZ; gZ; gI; gI; gZ; gZ; gI]).
+Definition g6 : TType 8 := (C1, [gZ; gI; gZ; gI; gZ; gI; gZ; gI]).
+Definition Xbar : TType 8 := (C1, [gX; gX; gX; gX; gX; gX; gX; gI]).
+Definition Zbar : TType 8 := (C1, [gZ; gZ; gZ; gZ; gZ; gZ; gZ; gI]).
+Definition Zanc : TType 8 := (C1, [gI; gI; gI; gI; gI; gI; gI; gZ]).
+Definition ZL : list (TType 8) := [g1; g2; g3; g4; g5; g6; Zbar; Zanc].
+Definition XL : list (TType 8) := [g1; g2; g3; g4; g5; g6; Xbar; Zanc].
+
+Definition Steane7 q0 q1 q2 q3 q4 q5 q6 : prog := 
+(H q4 ;; H q5 ;; H q6 ;; 
+CNOT q0 q1 ;; CNOT q0 q2 ;; 
+CNOT q6 q0 ;; CNOT q6 q1 ;; CNOT q6 q3 ;; 
+CNOT q5 q0 ;; CNOT q5 q2 ;; CNOT q5 q3 ;; 
+CNOT q4 q1 ;; CNOT q4 q2 ;; CNOT q4 q3)%pg. 
+
+Definition synd_s1z_0 : mprog := 
+U (CNOT 0 7 ;; CNOT 2 7 ;; CNOT 4 7 ;; CNOT 6 7)%pg ;;; MEAS 7 0 ;;; ITE (REG 0) (Id 7) (X 7).
+
+Definition synd_s2z_1 : mprog := 
+U (CNOT 1 7 ;; CNOT 2 7 ;; CNOT 5 7 ;; CNOT 6 7)%pg ;;; MEAS 7 1 ;;; ITE (REG 1) (Id 7) (X 7).
+
+Definition synd_s3z_2 : mprog := 
+U (CNOT 3 7 ;; CNOT 4 7 ;; CNOT 5 7 ;; CNOT 6 7)%pg ;;; MEAS 7 2 ;;; ITE (REG 2) (Id 7) (X 7).
+
+Definition synd_s1x_3 : mprog := 
+U (H 7 ;; CNOT 7 0 ;; CNOT 7 2 ;; CNOT 7 4 ;; CNOT 7 6 ;; H 7)%pg ;;; MEAS 7 3 ;;; ITE (REG 3) (Id 7) (X 7).
+
+Definition synd_s2x_4 : mprog := 
+U (H 7 ;; CNOT 7 1 ;; CNOT 7 2 ;; CNOT 7 5 ;; CNOT 7 6 ;; H 7)%pg ;;; MEAS 7 4 ;;; ITE (REG 4) (Id 7) (X 7).
+
+Definition synd_s3x_5 : mprog := 
+U (H 7 ;; CNOT 7 3 ;; CNOT 7 4 ;; CNOT 7 5 ;; CNOT 7 6 ;; H 7)%pg ;;; MEAS 7 5 ;;; ITE (REG 5) (Id 7) (X 7).
+
+Definition correctX : mprog :=
+ITE (AND (AND (REG 2) (REG 1)) (REG 0)) (Id 7) (Id 7) ;;;
+ITE (AND (AND (REG 2) (REG 1)) (NOT (REG 0))) (X 0) (Id 7) ;;;
+ITE (AND (AND (REG 2) (NOT (REG 1))) (REG 0)) (X 1) (Id 7) ;;;
+ITE (AND (AND (REG 2) (NOT (REG 1))) (NOT (REG 0))) (X 2) (Id 7) ;;;
+ITE (AND (AND (NOT (REG 2)) (REG 1)) (REG 0)) (X 3) (Id 7) ;;;
+ITE (AND (AND (NOT (REG 2)) (REG 1)) (NOT (REG 0))) (X 4) (Id 7) ;;;
+ITE (AND (AND (NOT (REG 2)) (NOT (REG 1))) (REG 0)) (X 5) (Id 7) ;;;
+ITE (AND (AND (NOT (REG 2)) (NOT (REG 1))) (NOT (REG 0))) (X 6) (Id 7).
+
+Definition correctZ : mprog :=
+ITE (AND (AND (REG 5) (REG 4)) (REG 3)) (Id 7) (Id 7) ;;;
+ITE (AND (AND (REG 5) (REG 4)) (NOT (REG 3))) (Z 0) (Id 7) ;;;
+ITE (AND (AND (REG 5) (NOT (REG 4))) (REG 3)) (Z 1) (Id 7) ;;;
+ITE (AND (AND (REG 5) (NOT (REG 4))) (NOT (REG 3))) (Z 2) (Id 7) ;;;
+ITE (AND (AND (NOT (REG 5)) (REG 4)) (REG 3)) (Z 3) (Id 7) ;;;
+ITE (AND (AND (NOT (REG 5)) (REG 4)) (NOT (REG 3))) (Z 4) (Id 7) ;;;
+ITE (AND (AND (NOT (REG 5)) (NOT (REG 4))) (REG 3)) (Z 5) (Id 7) ;;;
+ITE (AND (AND (NOT (REG 5)) (NOT (REG 4))) (NOT (REG 3))) (Z 6) (Id 7).
+
+
+Example Steane7QEC_Id :
 {{{
 [
 (TRUE, 
@@ -2916,9 +2359,138 @@ Example Steane7QEC_test :
 )
 ]
 }}}
-Steane7 0 1 2 3 4 5 6
+(U (Steane7 0 1 2 3 4 5 6)) ;;; (U (Id 7)) ;;; 
+synd_s1z_0 ;;; synd_s2z_1 ;;; synd_s3z_2 ;;; synd_s1x_3 ;;; synd_s2x_4 ;;; synd_s3x_5 ;;;
+correctX ;;; correctZ
 {{{ [(TRUE, normalize 0%nat [g1; g2; g3; g4; g5; g6; Zbar; Zanc])] }}}.
-Proof. apply TRIPLE_RULE.
-validate_refl'_normalized 0%nat.
+Proof. 
+finalize.
+do 8 msolve.
+(*** Copy Paste cpred ***)
+steane7_correction (AND
+         (AND (AND (AND (AND (AND TRUE (REG 0)) (REG 1)) (REG 2)) (REG 3)) (REG 4))
+         (REG 5)).
+simpl.
+Unshelve.
+all: try apply ([(TRUE,normalize 0%nat [g1; g2; g3; g4; g5; g6; Zbar; Zanc])]).
+f_equal.
+solveNormalize; reflexivity.
+solveNormalize; reflexivity.
+all: try (intro; discriminate).
 Qed.
- 
+
+Example Steane7QEC_Z0 :
+{{{
+[
+(TRUE, 
+[
+(C1, [gZ; gI; gI; gI; gI; gI; gI; gI]);
+(C1, [gI; gZ; gI; gI; gI; gI; gI; gI]);
+(C1, [gI; gI; gZ; gI; gI; gI; gI; gI]);
+(C1, [gI; gI; gI; gZ; gI; gI; gI; gI]);
+(C1, [gI; gI; gI; gI; gZ; gI; gI; gI]);
+(C1, [gI; gI; gI; gI; gI; gZ; gI; gI]);
+(C1, [gI; gI; gI; gI; gI; gI; gZ; gI]);
+(C1, [gI; gI; gI; gI; gI; gI; gI; gZ])
+]
+)
+]
+}}}
+(U (Steane7 0 1 2 3 4 5 6)) ;;; (U (Z 0)) ;;; 
+synd_s1z_0 ;;; synd_s2z_1 ;;; synd_s3z_2 ;;; synd_s1x_3 ;;; synd_s2x_4 ;;; synd_s3x_5 ;;;
+correctX ;;; correctZ
+{{{ [(TRUE, normalize 0%nat [g1; g2; g3; g4; g5; g6; Zbar; Zanc])] }}}.
+Proof. 
+finalize.
+do 8 msolve.
+(*** Copy Paste cpred ***)
+steane7_correction (AND
+         (AND (AND (AND (AND (AND TRUE (REG 0)) (REG 1)) (REG 2)) (NOT (REG 3)))
+            (REG 4)) (REG 5)).
+simpl.
+Unshelve.
+all: try apply ([(TRUE,normalize 0%nat [g1; g2; g3; g4; g5; g6; Zbar; Zanc])]).
+f_equal.
+solveNormalize; reflexivity.
+solveNormalize; reflexivity.
+all: try (intro; discriminate).
+Qed.
+
+
+Example Steane7QEC_X1 :
+{{{
+[
+(TRUE, 
+[
+(C1, [gZ; gI; gI; gI; gI; gI; gI; gI]);
+(C1, [gI; gZ; gI; gI; gI; gI; gI; gI]);
+(C1, [gI; gI; gZ; gI; gI; gI; gI; gI]);
+(C1, [gI; gI; gI; gZ; gI; gI; gI; gI]);
+(C1, [gI; gI; gI; gI; gZ; gI; gI; gI]);
+(C1, [gI; gI; gI; gI; gI; gZ; gI; gI]);
+(C1, [gI; gI; gI; gI; gI; gI; gZ; gI]);
+(C1, [gI; gI; gI; gI; gI; gI; gI; gZ])
+]
+)
+]
+}}}
+(U (Steane7 0 1 2 3 4 5 6)) ;;; (U (X 1)) ;;; 
+synd_s1z_0 ;;; synd_s2z_1 ;;; synd_s3z_2 ;;; synd_s1x_3 ;;; synd_s2x_4 ;;; synd_s3x_5 ;;;
+correctX ;;; correctZ
+{{{ [(TRUE, normalize 0%nat [g1; g2; g3; g4; g5; g6; Zbar; Zanc])] }}}.
+Proof. 
+finalize.
+do 8 msolve.
+(*** Copy Paste cpred ***)
+steane7_correction (AND
+         (AND (AND (AND (AND (AND TRUE (REG 0)) (NOT (REG 1))) (REG 2)) (REG 3))
+            (REG 4)) (REG 5)).
+simpl.
+Unshelve.
+all: try apply ([(TRUE,normalize 0%nat [g1; g2; g3; g4; g5; g6; Zbar; Zanc])]).
+f_equal.
+solveNormalize; reflexivity.
+solveNormalize; reflexivity.
+all: try (intro; discriminate).
+Qed.
+
+
+Example Steane7QEC_Y2 :
+{{{
+[
+(TRUE, 
+[
+(C1, [gZ; gI; gI; gI; gI; gI; gI; gI]);
+(C1, [gI; gZ; gI; gI; gI; gI; gI; gI]);
+(C1, [gI; gI; gZ; gI; gI; gI; gI; gI]);
+(C1, [gI; gI; gI; gZ; gI; gI; gI; gI]);
+(C1, [gI; gI; gI; gI; gZ; gI; gI; gI]);
+(C1, [gI; gI; gI; gI; gI; gZ; gI; gI]);
+(C1, [gI; gI; gI; gI; gI; gI; gZ; gI]);
+(C1, [gI; gI; gI; gI; gI; gI; gI; gZ])
+]
+)
+]
+}}}
+(U (Steane7 0 1 2 3 4 5 6)) ;;; (U (Y 2)) ;;; 
+synd_s1z_0 ;;; synd_s2z_1 ;;; synd_s3z_2 ;;; synd_s1x_3 ;;; synd_s2x_4 ;;; synd_s3x_5 ;;;
+correctX ;;; correctZ
+{{{ [(TRUE, normalize 0%nat [g1; g2; g3; g4; g5; g6; Zbar; Zanc])] }}}.
+Proof. 
+finalize.
+do 8 msolve.
+(*** Copy Paste cpred ***)
+steane7_correction (AND
+         (AND
+            (AND (AND (AND (AND TRUE (NOT (REG 0))) (NOT (REG 1))) (REG 2))
+               (NOT (REG 3))) (NOT (REG 4))) (REG 5)).
+simpl.
+Unshelve.
+all: try apply ([(TRUE,normalize 0%nat [g1; g2; g3; g4; g5; g6; Zbar; Zanc])]).
+f_equal.
+solveNormalize; reflexivity.
+solveNormalize; reflexivity.
+all: try (intro; discriminate).
+Qed.
+
+
