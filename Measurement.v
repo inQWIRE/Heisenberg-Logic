@@ -1631,7 +1631,7 @@ Bind Scope cpred_scope with cpred.
 Notation "b && c" := (AND b%cpred c%cpred) : cpred_scope.
 Notation "b || c" := (OR b%cpred c%cpred) : cpred_scope.
 Notation "¬ b" := (NOT b%cpred) : cpred_scope.
-Notation " n ↦ b " := (REG n b) : cpred_scope.
+Notation " n ↦ b " := (REG n%nat b%bool) (at level 20) : cpred_scope.
 
 Local Open Scope cpred_scope.
 
@@ -3108,7 +3108,7 @@ Ltac meas :=
 eapply MEAS_RULE;
   [ lia
   | repeat (constructor; auto)
-  | simpl; lia
+  (* | simpl; lia *)
   | repeat (constructor; auto)].
 
 Ltac branch :=
