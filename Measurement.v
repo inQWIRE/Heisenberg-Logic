@@ -219,7 +219,7 @@ Proof. unfold prog_simpl_app. bdestruct_all.
          rewrite map_repeat.
          simpl.
          rewrite firstn_repeat.
-         minmax_breakdown. 
+         minmax_breakdown.
          bdestruct (i0 <? i)%nat.
          - rewrite nth_indep with (d' := I 2); try rewrite repeat_length; auto.
            rewrite nth_repeat. auto with wf_db.
@@ -246,7 +246,7 @@ Proof. unfold prog_simpl_app. bdestruct_all.
     rewrite big_kron_app.
     2: { intros i0. simpl. destruct i0; auto with wf_db.
          destruct i0; auto with wf_db. }
-    2: {intros i0. rewrite <- skipn_map. rewrite map_repeat. 
+    2: {intros i0. rewrite <- skipn_map. rewrite map_repeat.
         replace (translate_P gI) with (I 2) by auto.
         rewrite skipn_repeat.
         bdestruct (i0 <? n - s i)%nat.
@@ -333,6 +333,9 @@ Proof. rewrite translate_switch_gZ_prog_simpl_app_z_minus.
     rewrite Mmult_0_l. rewrite Mmult_0_r. auto.
 Qed.
 
+Lemma length_cons {A} (a : A) l : length (a :: l) = Datatypes.S (length l).
+Proof. reflexivity. Qed.
+
 Lemma translate_Zprojector_plus_eigenvector_IZ {n : nat} (q : nat) (t : TType n) (v : Vector (2 ^ n)):
   (q < n)%nat -> PivotRule.WF_T t -> isIZ (entry q t) = true -> translate t × v = v ->
   translate t × (Zprojector_plus n q × v) = Zprojector_plus n q × v.
@@ -373,11 +376,11 @@ Proof. intros H H0 H1 H2.
   rewrite ! kron_assoc. 2-4: auto with wf_db.
   rewrite ! app_length. rewrite ! map_length. rewrite ! firstn_length. minmax_breakdown. rewrite ! skipn_length. rewrite ! H0. rewrite ! length_cons. rewrite <- ! Nat.pow_add_r.
   setoid_rewrite kron_mixed_product'; try (try rewrite <- Nat.pow_add_r; f_equal; try setoid_rewrite length_nil; lia).
-  rewrite Mmult_1_r. 
+  rewrite Mmult_1_r.
   2: { pose (WF_Matrix_Big_Pauli (take q t.2)) as e.
        rewrite ! map_length in e. rewrite ! firstn_length in e. minmax_breakdown_context.
        apply e. }
-  rewrite Mmult_1_l. 
+  rewrite Mmult_1_l.
   2: { pose (WF_Matrix_Big_Pauli (take q t.2)) as e.
        rewrite ! map_length in e. rewrite ! firstn_length in e. minmax_breakdown_context.
        apply e. }
@@ -385,18 +388,20 @@ Proof. intros H H0 H1 H2.
   setoid_rewrite kron_mixed_product'; try (try rewrite <- Nat.pow_add_r; f_equal; try setoid_rewrite length_nil; lia).
   f_equal. f_equal. lia. f_equal. lia.
   simpl. unfold isIZ, entry in H1. destruct (nth q t.2 gI); try discriminate; simpl; lma'.
-  rewrite Mmult_1_l. 
+  rewrite Mmult_1_l.
   2: { pose (WF_Matrix_Big_Pauli (drop (s q) t.2)) as e.
        rewrite ! map_length in e. rewrite ! skipn_length in e. rewrite ! H0 in e.
        replace (n - q - 1)%nat with (n - s q)%nat by lia.
        apply e. }
-  rewrite <- Mmult_1_r. 
+  rewrite <- Mmult_1_r.
   2: { pose (WF_Matrix_Big_Pauli (drop (s q) t.2)) as e.
        rewrite ! map_length in e. rewrite ! skipn_length in e. rewrite ! H0 in e.
        replace (n - q - 1)%nat with (n - s q)%nat by lia.
        apply e. }
   replace (n - q - 1)%nat with (n - s q)%nat by lia.
   reflexivity.
+  all: rewrite <- ?Nat.pow_add_r.
+  all: f_equal; cbn; lia.
 Qed.
 
 Lemma translate_Zprojector_minus_eigenvector_IZ {n : nat} (q : nat) (t : TType n) (v : Vector (2 ^ n)):
@@ -479,11 +484,11 @@ Proof. intros H H0 H1 H2.
   rewrite ! kron_assoc. 2-4: auto with wf_db.
   rewrite ! app_length. rewrite ! map_length. rewrite ! firstn_length. minmax_breakdown. rewrite ! skipn_length. rewrite ! H0. rewrite ! length_cons. rewrite <- ! Nat.pow_add_r.
   setoid_rewrite kron_mixed_product'; try (try rewrite <- Nat.pow_add_r; f_equal; try setoid_rewrite length_nil; lia).
-  rewrite Mmult_1_r. 
+  rewrite Mmult_1_r.
   2: { pose (WF_Matrix_Big_Pauli (take q t.2)) as e.
        rewrite ! map_length in e. rewrite ! firstn_length in e. minmax_breakdown_context.
        apply e. }
-  rewrite Mmult_1_l. 
+  rewrite Mmult_1_l.
   2: { pose (WF_Matrix_Big_Pauli (take q t.2)) as e.
        rewrite ! map_length in e. rewrite ! firstn_length in e. minmax_breakdown_context.
        apply e. }
@@ -491,18 +496,20 @@ Proof. intros H H0 H1 H2.
   setoid_rewrite kron_mixed_product'; try (try rewrite <- Nat.pow_add_r; f_equal; try setoid_rewrite length_nil; lia).
   f_equal. f_equal. lia. f_equal. lia.
   simpl. unfold isIZ, entry in H1. destruct (nth q t.2 gI); try discriminate; simpl; lma'.
-  rewrite Mmult_1_l. 
+  rewrite Mmult_1_l.
   2: { pose (WF_Matrix_Big_Pauli (drop (s q) t.2)) as e.
        rewrite ! map_length in e. rewrite ! skipn_length in e. rewrite ! H0 in e.
        replace (n - q - 1)%nat with (n - s q)%nat by lia.
        apply e. }
-  rewrite <- Mmult_1_r. 
+  rewrite <- Mmult_1_r.
   2: { pose (WF_Matrix_Big_Pauli (drop (s q) t.2)) as e.
        rewrite ! map_length in e. rewrite ! skipn_length in e. rewrite ! H0 in e.
        replace (n - q - 1)%nat with (n - s q)%nat by lia.
        apply e. }
   replace (n - q - 1)%nat with (n - s q)%nat by lia.
   reflexivity.
+  all: rewrite <- ?Nat.pow_add_r.
+  all: f_equal; cbn; lia.
 Qed.
 
 
@@ -514,33 +521,24 @@ Check {[2%nat := true]} : creg.
 Inductive cpred :=
 | TRUE
 | FALSE
-| EMPTY
-| REG (n : nat)
+| REG (n : nat) (b : bool)
 | AND (a b : cpred)
 | OR (a b : cpred)
 | NOT (a : cpred).
 
-Fixpoint translate_cpred (p : cpred) (r : creg) : option bool :=
+
+Fixpoint translate_cpred (p : cpred) (r : creg) : bool :=
   match p with
-  | TRUE => Some true
-  | FALSE => Some false
-  | EMPTY => None
-  | REG n => r !! n
-  | AND a b => 
-      match translate_cpred a r, translate_cpred b r with
-      | Some b1, Some b2 => Some (andb b1 b2)
-      | _, _ => None
-      end
+  | TRUE => true
+  | FALSE => false
+  | REG n b =>
+    from_option (λ rn, eqb rn b) false (r !! n) (* true if register n stores b, false otherwise *)
+  | AND a b =>
+    translate_cpred a r && translate_cpred b r
   | OR a b =>
-      match translate_cpred a r, translate_cpred b r with
-      | Some b1, Some b2 => Some (orb b1 b2)
-      | _, _ => None
-      end
-  | NOT a => 
-      match translate_cpred a r with
-      | Some b => Some (negb b)
-      | None => None
-      end
+    translate_cpred a r || translate_cpred b r
+  | NOT a =>
+    ¬ translate_cpred a r
   end.
 
 
@@ -566,20 +564,16 @@ Fixpoint apply_mprog {n} (mp : mprog) (cqs : cqlist n) {struct mp} : cqlist n :=
   | U p => map (fun cq => (fst cq, Mmult (translate_prog n p) (snd cq))) cqs
   | MEAS q i =>
       if (q <? n) then
-        flat_map 
+        flat_map
           (fun cq => [
                (<[i := true]> (fst cq), Mmult (Zprojector_plus n q) (snd cq)); (** Zero vec introduction? **)
                (<[i := false]> (fst cq), Mmult (Zprojector_minus n q) (snd cq)) (** Zero vec introduction? **)
           ]) cqs
       else cqs
   | ITE c p1 p2 =>
-      flat_map 
-        (fun cq =>
-           match translate_cpred c (fst cq) with
-           | Some true => [(fst cq, Mmult (translate_prog n p1) (snd cq))]
-           | Some false => [(fst cq, Mmult (translate_prog n p2) (snd cq))]
-           | None => []
-           end
+      map (fun cq =>
+          (fst cq, Mmult (translate_prog n
+            (if translate_cpred c cq.1 then p1 else p2)) (snd cq))
         ) cqs
   | mseq mp1 mp2 => apply_mprog mp2 (apply_mprog mp1 cqs)
   end.
@@ -597,7 +591,7 @@ Proof. gen cql1 cql2. induction mp; intros.
   - simpl.
     bdestruct_all; auto.
     rewrite flat_map_app. auto.
-  - simpl. rewrite flat_map_app. auto.
+  - simpl. rewrite map_app. auto.
   - simpl. rewrite IHmp1. rewrite IHmp2. auto.
 Qed.
 
@@ -606,7 +600,7 @@ Lemma apply_mprog_cons {n} (mp : mprog) (cq : cqstate n) (cql : cqlist n):
 Proof. rewrite cons_conc. rewrite apply_mprog_app. auto. Qed.
 
 Lemma apply_mprog_seq {n} (mp1 mp2 : mprog) (cql1 : cqlist n) (cq2 cq3 : cqstate n):
- In cq2 (apply_mprog mp1 cql1) -> In cq3 (apply_mprog mp2 [cq2]) -> 
+ In cq2 (apply_mprog mp1 cql1) -> In cq3 (apply_mprog mp2 [cq2]) ->
  In cq3 (apply_mprog (mp1;;; mp2) cql1).
 Proof.  intros H H0.
    simpl.
@@ -631,10 +625,11 @@ Proof. intros H.
     rewrite in_flat_map in H.
     destruct H as [x [xcq' inx]].
     exists x. auto.
-  - simpl in *. setoid_rewrite app_nil_r.
-    rewrite in_flat_map in H.
-    destruct H as [x [xcq' inx]].
-    exists x. auto.
+  - cbn in *.
+    apply in_map_iff in H as (cq & Hcqeq & Hcq).
+    exists cq.
+    split; [easy|].
+    now left.
   - simpl in *.
     specialize (IHmp2 cq' (apply_mprog mp1 cql) H).
     destruct IHmp2 as [cq1 [incq1 incq']].
@@ -673,26 +668,19 @@ Proof. intros H.
       destruct H.
       rewrite Forall_app.
       split; auto.
-      simpl. 
+      simpl.
       bdestruct_all. 2:{ constructor; auto. }
       constructor.
       * simpl. auto with wf_db.
       * constructor.
         -- simpl. auto with wf_db.
         -- constructor.
-  - induction cql.
-    + rewrite apply_mprog_nil. auto.
-    + rewrite apply_mprog_cons.
-      rewrite Forall_cons_iff in H.
-      destruct H.
-      rewrite Forall_app.
-      split; auto.
-      simpl.
-      rewrite app_nil_r.
-      destruct (translate_cpred c (fst a)) eqn:E; try destruct u; try destruct o; auto.
-      destruct b; auto.
-      * constructor; simpl; auto with wf_db.
-      * constructor; simpl; auto with wf_db.
+  - cbn.
+    rewrite Forall_map.
+    eapply list.Forall_impl; [eassumption|].
+    intros [].
+    cbn.
+    now auto with wf_db.
   - simpl. auto.
 Qed.
 
@@ -702,7 +690,7 @@ Proof. intros H H0.
   assert (Forall (fun cq => WF_Matrix (snd cq)) [cq]).
   { constructor; auto. }
   apply apply_mprog_preserves_Forall_WF_Matrix with (mp := mp) in H1.
-  inversion H1. 
+  inversion H1.
   - rewrite <- H3 in H0. inversion H0.
   - rewrite <- H2 in H0.
     destruct H0; subst; auto.
@@ -736,22 +724,16 @@ Proof. intros H.
            inversion H0; subst; simpl.
            setoid_rewrite H.
            rewrite Mmult_0_r. auto.
-        -- destruct H0. 
+        -- destruct H0.
            ++ inversion H0; subst; simpl.
               setoid_rewrite H.
               rewrite Mmult_0_r. auto.
            ++ inversion H0.
       * destruct H1; subst; auto. inversion H0.
-    + rewrite app_nil_r in H1.
-      destruct (translate_cpred c (fst a)) eqn:E; try destruct u; try destruct o; auto.
-      * destruct b.
-        -- destruct H1.
-           ++ rewrite H in H0. rewrite <- H0. simpl. rewrite Mmult_0_r. auto.
-           ++ inversion H0.
-        -- destruct H1.
-           ++ rewrite H in H0. rewrite <- H0. simpl. rewrite Mmult_0_r. auto.
-           ++ inversion H0.
-      * inversion H1.
+    + destruct H1 as [<-|[]].
+      cbn.
+      rewrite H.
+      now rewrite Mmult_0_r.
     + apply apply_mprog_seq_inv in H1.
       destruct H1 as [cq [incq inx]].
       apply IHmp1 in incq; auto.
@@ -767,13 +749,13 @@ Definition cqSatisfiesMbranch {n} (cq : cqstate n) (b : Mbranch n) (H : WF_Matri
   if Mat_eq_dec (2 ^ n) (1%nat) (snd cq) (Zero) H (WF_Zero (2 ^ n) 1%nat)
   then True
   else match translate_cpred (fst b) (fst cq) with
-          | Some true => Forall (fun t : TType n => vecSatisfies (snd cq) (translate t)) (snd b)
+          | true => Forall (fun t : TType n => vecSatisfies (snd cq) (translate t)) (snd b)
           | _ => False
           end.
 
 
 Definition Mtriple {n} (A : MPredicate n) (mp : mprog) (B : MPredicate n) :=
-  forall a, In a A -> forall cq (H : WF_Matrix (snd cq)), cqSatisfiesMbranch cq a H -> forall cq', In cq' (apply_mprog mp [cq]) -> 
+  forall a, In a A -> forall cq (H : WF_Matrix (snd cq)), cqSatisfiesMbranch cq a H -> forall cq', In cq' (apply_mprog mp [cq]) ->
    exists b, In b B /\ exists (H0 : WF_Matrix (snd cq')), cqSatisfiesMbranch cq' b H0.
 
 Notation "{{{ A }}} g {{{ B }}}" := (Mtriple A g B) (at level 70, no associativity).
@@ -783,7 +765,7 @@ Notation "{{{ A }}} g {{{ B }}}" := (Mtriple A g B) (at level 70, no associativi
 
 Lemma MSEQ_RULE {n} (A B C : MPredicate n) (mp1 mp2 : mprog):
   Mtriple A mp1 B -> Mtriple B mp2 C -> Mtriple A (mp1 ;;; mp2) C.
-Proof. intros H H0. 
+Proof. intros H H0.
   unfold Mtriple in *.
   intros a H1 cq H2 H3 cq' H4.
   apply apply_mprog_seq_inv in H4.
@@ -808,7 +790,7 @@ Qed.
 
 Lemma PERM_POST_IFF {n} (A B B' : MPredicate n) (mp : mprog):
   Permutation B B' -> (Mtriple A mp B <-> Mtriple A mp B').
-Proof. intros H. split; intros H0. 
+Proof. intros H. split; intros H0.
   - apply (PERM_POST A B B' mp H H0).
   - apply Permutation_sym in H. apply (PERM_POST A B' B mp H H0).
 Qed.
@@ -872,21 +854,12 @@ Proof. intros H H0.
   unfold cqSatisfiesMbranch in H3.
   destruct (Mat_eq_dec (2 ^ n) 1 (snd cq) Zero H2 (WF_Zero (2 ^ n) 1)) eqn:E.
   - simpl in H4.
-    rewrite app_nil_r in H4.
     assert (snd cq' = Zero).
-    { destruct (translate_cpred C (fst cq)) eqn:E'.
-      - destruct b.
-        + destruct H4. 2: inversion H1.
-          rewrite e in H1.
-          rewrite <- H1.
-          simpl. rewrite Mmult_0_r. auto.
-        + destruct H4. 2: inversion H1.
-          rewrite e in H1.
-          rewrite <- H1.
-          simpl. rewrite Mmult_0_r. auto.
-      - inversion H4. }
+    { destruct H4 as [H4|[]].
+      subst cq'.
+      rewrite e.
+      apply Mmult_0_r. }
     destruct (translate_cpred C (fst cq)) eqn:E'.
-    + destruct b.
       * assert (In (AND A C, lt) [(AND A C, lt)]).
         { left. auto. }
         assert (cqSatisfiesMbranch cq (AND A C, lt) H2).
@@ -901,14 +874,11 @@ Proof. intros H H0.
           rewrite E. auto. }
         specialize (H0 (AND A (NOT C), lt) H5 cq H2 H6 cq' H4).
         auto.
-    + inversion H4.
   - simpl in H3.
     destruct (translate_cpred A (fst cq)) eqn:E';
     try destruct b; try contradiction.
     simpl in H4.
-    rewrite app_nil_r in H4.
     destruct (translate_cpred C (fst cq)) eqn:E''.
-    destruct b.
     + assert (In (AND A C, lt) [(AND A C, lt)]).
       { left. auto. }
       specialize (H (AND A C, lt) H1 cq H2).
@@ -931,7 +901,6 @@ Proof. intros H H0.
         simpl. auto. }
       specialize (H0 H5 cq' H4).
       auto.
-    + inversion H4.
 Qed.
 
 
@@ -939,16 +908,16 @@ Definition apply_MEAS {n} (i : nat) (b : bool) (lt : list (TType n)) : list (TTy
   let LQT := pivots_normalize i lt in
   if b then
   match pivot_search LQT i with
-  | gX | gY => (C1, (switch (repeat gI n) gZ i)) :: (map snd (filter (fun p => 
-                                                                      match fst p with 
+  | gX | gY => (C1, (switch (repeat gI n) gZ i)) :: (map snd (filter (fun p =>
+                                                                      match fst p with
                                                                       | Some j => negb (Nat.eqb i j)
                                                                       | None => true
                                                                       end) LQT))
   | gZ | gI => (C1, (switch (repeat gI n) gZ i)) :: (map snd LQT)
   end
   else match pivot_search LQT i with
-  | gX | gY => (- C1, (switch (repeat gI n) gZ i)) :: (map snd (filter (fun p => 
-                                                                      match fst p with 
+  | gX | gY => (- C1, (switch (repeat gI n) gZ i)) :: (map snd (filter (fun p =>
+                                                                      match fst p with
                                                                       | Some j => negb (Nat.eqb i j)
                                                                       | None => true
                                                                       end) LQT))
@@ -961,13 +930,12 @@ Definition apply_MEAS {n} (i : nat) (b : bool) (lt : list (TType n)) : list (TTy
 Inductive does_not_appear (i : nat) : cpred -> Prop :=
 | dna_TRUE : does_not_appear i TRUE
 | dna_FALSE : does_not_appear i FALSE
-| dna_EMPTY : does_not_appear i EMPTY
-| dna_REG : forall (j : nat), (i <> j) -> does_not_appear i (REG j)
-| dna_AND : forall (c1 c2 : cpred), 
-    does_not_appear i c1 -> does_not_appear i c2 
+| dna_REG : forall (j : nat) b, (i <> j) -> does_not_appear i (REG j b)
+| dna_AND : forall (c1 c2 : cpred),
+    does_not_appear i c1 -> does_not_appear i c2
     -> does_not_appear i (AND c1 c2)
-| dna_OR : forall (c1 c2 : cpred), 
-    does_not_appear i c1 -> does_not_appear i c2 
+| dna_OR : forall (c1 c2 : cpred),
+    does_not_appear i c1 -> does_not_appear i c2
     -> does_not_appear i (OR c1 c2)
 | dna_NOT : forall (c : cpred), does_not_appear i c
                            -> does_not_appear i (NOT c).
@@ -983,28 +951,63 @@ Proof. intros H.
   - rewrite <- IHdoes_not_appear1, <- IHdoes_not_appear2. auto.
   - rewrite <- IHdoes_not_appear1, <- IHdoes_not_appear2. auto.
   - rewrite <- IHdoes_not_appear. auto.
-Qed. 
+Qed.
 
+Lemma pivots_normalize_nil start {n} :
+  @pivots_normalize start n [] = [].
+Proof.
+  unfold pivots_normalize.
+  remember (_ ++ _) as l eqn:Hl.
+  clear Hl.
+  assert (Hnil : forall m, (loop_normalization l m n [] []) = ([],[])). 1:{
+    revert l; induction n; intros l m; [done|].
+    cbn.
+    done.
+  }
+  unfold loop_normalization_final.
+  rewrite Hnil.
+  done.
+Qed.
 
+Definition apply_MEAS' {n} i b (lt : list (TType n)) :=
+  match lt with
+  | [] => []
+  | _ => apply_MEAS i b lt
+  end.
 
-Lemma Forall_vecSatisfies_Zprojector_plus_apply_MEAS_true (n : nat) (lt : list (TType n)) (q : nat) (H : (q <? n) = true) (WF_L_lt : WF_L lt) (len_lt : length lt ≠ 0%nat) (cq : creg * Vector (2 ^ n)) (H2 : WF_Matrix cq.2) (E : cq.2 ≠ Zero) (H3 : Forall (λ t : TType n, vecSatisfies cq.2 (translate t)) lt) (H' : (q < n)%nat) (H1 : WF_Matrix (Zprojector_plus n q × cq.2)) (E' : Zprojector_plus n q × cq.2 ≠ Zero) :
+Lemma apply_MEAS'_eq {n} i b (lt : list (TType n)) :
+  apply_MEAS' i b lt =
+  if decide (length lt = 0%nat) then
+    []
+  else apply_MEAS i b lt.
+Proof.
+  destruct lt; done.
+Qed.
+
+Lemma Forall_vecSatisfies_Zprojector_plus_apply_MEAS'_true (n : nat) (lt : list (TType n)) (q : nat) (H : (q <? n) = true) (WF_L_lt : WF_L lt) (cq : creg * Vector (2 ^ n)) (H2 : WF_Matrix cq.2) (E : cq.2 ≠ Zero) (H3 : Forall (λ t : TType n, vecSatisfies cq.2 (translate t)) lt) (H' : (q < n)%nat) (H1 : WF_Matrix (Zprojector_plus n q × cq.2)) (E' : Zprojector_plus n q × cq.2 ≠ Zero) :
   Forall (λ t : TType n, vecSatisfies (Zprojector_plus n q × cq.2) (translate t))
-    (apply_MEAS q true lt).
-Proof.         simpl.
+    (apply_MEAS' q true lt).
+Proof.
+  rewrite apply_MEAS'_eq.
+  case_decide as len_lt.
+  1:{
+    constructor.
+  }
+  simpl.
         pose (pivots_normalize_first_qubit_ok q lt WF_L_lt len_lt H') as G.
         unfold FirstQubitNormalized_out in G.
         assert (temp: nth 0 (drop q (List.seq 0 n) ++ take q (List.seq 0 n)) 0%nat = q).
         { rewrite app_nth1. rewrite nth_skipn. rewrite Nat.add_0_r. rewrite seq_nth. lia. lia.
           rewrite skipn_length. rewrite seq_length. lia. }
         rewrite ! temp in G.
-        destruct (pivot_search (pivots_normalize q lt) q) eqn:G'; 
-          destruct (pivot_term q (pivots_normalize q lt)) eqn:G''; 
+        destruct (pivot_search (pivots_normalize q lt) q) eqn:G';
+          destruct (pivot_term q (pivots_normalize q lt)) eqn:G'';
           try contradiction.
         -- apply Forall_cons.
            ++ unfold vecSatisfies. split; auto with wf_db.
               unfold Eigenvectors.Eigenpair. simpl. rewrite Mscale_1_l. apply Zi_Zprojector_plus_eigenvector.
            ++ apply (Forall_vecSatisfies_normalize q lt cq.2 WF_L_lt H2) in H3.
-              rewrite Forall_forall in *. intros x H4. 
+              rewrite Forall_forall in *. intros x H4.
               specialize (H3 x H4). specialize (G x H4). unfold entry in G.
               unfold vecSatisfies. split; auto with wf_db.
               unfold Eigenvectors.Eigenpair. simpl. rewrite Mscale_1_l.
@@ -1015,7 +1018,7 @@ Proof.         simpl.
               specialize (WF_L_lt x H4). auto.
               unfold isIZ, entry. rewrite G; auto.
               unfold vecSatisfies in H3. destruct H3.
-              unfold Eigenvectors.Eigenpair in H3. simpl in H3. 
+              unfold Eigenvectors.Eigenpair in H3. simpl in H3.
               rewrite Mscale_1_l in H3. auto.
         -- assert (temp': pivot_search (pivots_normalize q lt) q = gX
      ∨ pivot_search (pivots_normalize q lt) q = gY) by auto.
@@ -1025,7 +1028,7 @@ Proof.         simpl.
            ++ unfold vecSatisfies. split; auto with wf_db.
               unfold Eigenvectors.Eigenpair. simpl. rewrite Mscale_1_l. apply Zi_Zprojector_plus_eigenvector.
            ++ apply (Forall_vecSatisfies_normalize q lt cq.2 WF_L_lt H2) in H3.
-              rewrite Forall_forall in *. intros x H4. 
+              rewrite Forall_forall in *. intros x H4.
               assert (H5: In x (normalize q lt)).
               { unfold normalize. rewrite in_map_iff in *. setoid_rewrite filter_In in H4.
                 destruct H4 as [x0 [x02x [inx0 drop_qqx0]]].
@@ -1049,7 +1052,7 @@ Proof.         simpl.
            ++ unfold vecSatisfies. split; auto with wf_db.
               unfold Eigenvectors.Eigenpair. simpl. rewrite Mscale_1_l. apply Zi_Zprojector_plus_eigenvector.
            ++ apply (Forall_vecSatisfies_normalize q lt cq.2 WF_L_lt H2) in H3.
-              rewrite Forall_forall in *. intros x H4. 
+              rewrite Forall_forall in *. intros x H4.
               assert (H5: In x (normalize q lt)).
               { unfold normalize. rewrite in_map_iff in *. setoid_rewrite filter_In in H4.
                 destruct H4 as [x0 [x02x [inx0 drop_qqx0]]].
@@ -1069,7 +1072,7 @@ Proof.         simpl.
            ++ unfold vecSatisfies. split; auto with wf_db.
               unfold Eigenvectors.Eigenpair. simpl. rewrite Mscale_1_l. apply Zi_Zprojector_plus_eigenvector.
            ++ apply (Forall_vecSatisfies_normalize q lt cq.2 WF_L_lt H2) in H3.
-              rewrite Forall_forall in *. intros x H4. 
+              rewrite Forall_forall in *. intros x H4.
               specialize (H3 x H4). specialize (G x H4). unfold entry in G.
               unfold vecSatisfies. split; auto with wf_db.
               unfold Eigenvectors.Eigenpair. simpl. rewrite Mscale_1_l.
@@ -1078,7 +1081,7 @@ Proof.         simpl.
               unfold WF_L in *.
               rewrite Forall_forall in WF_L_lt.
               specialize (WF_L_lt x H4). auto.
-              unfold isIZ, entry. 
+              unfold isIZ, entry.
               destruct (Classical_Prop.classic (x = t)).
               subst. unfold pivot_search, pivot_term in *.
               destruct (find
@@ -1090,28 +1093,34 @@ Proof.         simpl.
               inversion G''. rewrite G'. auto.
               rewrite G; auto.
               unfold vecSatisfies in H3. destruct H3.
-              unfold Eigenvectors.Eigenpair in H3. simpl in H3. 
+              unfold Eigenvectors.Eigenpair in H3. simpl in H3.
               rewrite Mscale_1_l in H3. auto.
 Qed.
 
-Lemma Forall_vecSatisfies_Zprojector_minus_apply_MEAS_false (n : nat) (lt : list (TType n)) (q : nat) (H : (q <? n) = true) (WF_L_lt : WF_L lt) (len_lt : length lt ≠ 0%nat) (cq : creg * Vector (2 ^ n)) (H2 : WF_Matrix cq.2) (E : cq.2 ≠ Zero) (H3 : Forall (λ t : TType n, vecSatisfies cq.2 (translate t)) lt) (H' : (q < n)%nat) (H1 : WF_Matrix (Zprojector_minus n q × cq.2)) (E' : Zprojector_minus n q × cq.2 ≠ Zero) :
+Lemma Forall_vecSatisfies_Zprojector_minus_apply_MEAS'_false (n : nat) (lt : list (TType n)) (q : nat) (H : (q <? n) = true) (WF_L_lt : WF_L lt) (cq : creg * Vector (2 ^ n)) (H2 : WF_Matrix cq.2) (E : cq.2 ≠ Zero) (H3 : Forall (λ t : TType n, vecSatisfies cq.2 (translate t)) lt) (H' : (q < n)%nat) (H1 : WF_Matrix (Zprojector_minus n q × cq.2)) (E' : Zprojector_minus n q × cq.2 ≠ Zero) :
   Forall (λ t : TType n, vecSatisfies (Zprojector_minus n q × cq.2) (translate t))
-    (apply_MEAS q false lt).
-Proof.         simpl.
+    (apply_MEAS' q false lt).
+Proof.
+  rewrite apply_MEAS'_eq.
+  case_decide as len_lt.
+  1:{
+    constructor.
+  }
+  simpl.
         pose (pivots_normalize_first_qubit_ok q lt WF_L_lt len_lt H') as G.
         unfold FirstQubitNormalized_out in G.
         assert (temp: nth 0 (drop q (List.seq 0 n) ++ take q (List.seq 0 n)) 0%nat = q).
         { rewrite app_nth1. rewrite nth_skipn. rewrite Nat.add_0_r. rewrite seq_nth. lia. lia.
           rewrite skipn_length. rewrite seq_length. lia. }
         rewrite ! temp in G.
-        destruct (pivot_search (pivots_normalize q lt) q) eqn:G'; 
-          destruct (pivot_term q (pivots_normalize q lt)) eqn:G''; 
+        destruct (pivot_search (pivots_normalize q lt) q) eqn:G';
+          destruct (pivot_term q (pivots_normalize q lt)) eqn:G'';
           try contradiction.
         -- apply Forall_cons.
            ++ unfold vecSatisfies. split; auto with wf_db.
               unfold Eigenvectors.Eigenpair. simpl. rewrite Mscale_1_l. apply Zi_Zprojector_minus_eigenvector.
            ++ apply (Forall_vecSatisfies_normalize q lt cq.2 WF_L_lt H2) in H3.
-              rewrite Forall_forall in *. intros x H4. 
+              rewrite Forall_forall in *. intros x H4.
               specialize (H3 x H4). specialize (G x H4). unfold entry in G.
               unfold vecSatisfies. split; auto with wf_db.
               unfold Eigenvectors.Eigenpair. simpl. rewrite Mscale_1_l.
@@ -1122,7 +1131,7 @@ Proof.         simpl.
               specialize (WF_L_lt x H4). auto.
               unfold isIZ, entry. rewrite G; auto.
               unfold vecSatisfies in H3. destruct H3.
-              unfold Eigenvectors.Eigenpair in H3. simpl in H3. 
+              unfold Eigenvectors.Eigenpair in H3. simpl in H3.
               rewrite Mscale_1_l in H3. auto.
         -- assert (temp': pivot_search (pivots_normalize q lt) q = gX
      ∨ pivot_search (pivots_normalize q lt) q = gY) by auto.
@@ -1132,7 +1141,7 @@ Proof.         simpl.
            ++ unfold vecSatisfies. split; auto with wf_db.
               unfold Eigenvectors.Eigenpair. simpl. rewrite Mscale_1_l. apply Zi_Zprojector_minus_eigenvector.
            ++ apply (Forall_vecSatisfies_normalize q lt cq.2 WF_L_lt H2) in H3.
-              rewrite Forall_forall in *. intros x H4. 
+              rewrite Forall_forall in *. intros x H4.
               assert (H5: In x (normalize q lt)).
               { unfold normalize. rewrite in_map_iff in *. setoid_rewrite filter_In in H4.
                 destruct H4 as [x0 [x02x [inx0 drop_qqx0]]].
@@ -1156,7 +1165,7 @@ Proof.         simpl.
            ++ unfold vecSatisfies. split; auto with wf_db.
               unfold Eigenvectors.Eigenpair. simpl. rewrite Mscale_1_l. apply Zi_Zprojector_minus_eigenvector.
            ++ apply (Forall_vecSatisfies_normalize q lt cq.2 WF_L_lt H2) in H3.
-              rewrite Forall_forall in *. intros x H4. 
+              rewrite Forall_forall in *. intros x H4.
               assert (H5: In x (normalize q lt)).
               { unfold normalize. rewrite in_map_iff in *. setoid_rewrite filter_In in H4.
                 destruct H4 as [x0 [x02x [inx0 drop_qqx0]]].
@@ -1176,7 +1185,7 @@ Proof.         simpl.
            ++ unfold vecSatisfies. split; auto with wf_db.
               unfold Eigenvectors.Eigenpair. simpl. rewrite Mscale_1_l. apply Zi_Zprojector_minus_eigenvector.
            ++ apply (Forall_vecSatisfies_normalize q lt cq.2 WF_L_lt H2) in H3.
-              rewrite Forall_forall in *. intros x H4. 
+              rewrite Forall_forall in *. intros x H4.
               specialize (H3 x H4). specialize (G x H4). unfold entry in G.
               unfold vecSatisfies. split; auto with wf_db.
               unfold Eigenvectors.Eigenpair. simpl. rewrite Mscale_1_l.
@@ -1185,7 +1194,7 @@ Proof.         simpl.
               unfold WF_L in *.
               rewrite Forall_forall in WF_L_lt.
               specialize (WF_L_lt x H4). auto.
-              unfold isIZ, entry. 
+              unfold isIZ, entry.
               destruct (Classical_Prop.classic (x = t)).
               subst. unfold pivot_search, pivot_term in *.
               destruct (find
@@ -1197,13 +1206,13 @@ Proof.         simpl.
               inversion G''. rewrite G'. auto.
               rewrite G; auto.
               unfold vecSatisfies in H3. destruct H3.
-              unfold Eigenvectors.Eigenpair in H3. simpl in H3. 
+              unfold Eigenvectors.Eigenpair in H3. simpl in H3.
               rewrite Mscale_1_l in H3. auto.
 Qed.
 
 
 Lemma MEAS_RULE {n} (A : cpred) (lt : list (TType n)) (q i : nat):
-(q < n)%nat -> WF_L lt → length lt ≠ 0%nat -> does_not_appear i A -> 
+(q < n)%nat -> WF_L lt → does_not_appear i A ->
 
 {{{
 [
@@ -1214,14 +1223,14 @@ Lemma MEAS_RULE {n} (A : cpred) (lt : list (TType n)) (q i : nat):
  }}} MEAS q i {{{
 [
 
-(AND A (REG i), apply_MEAS q true lt);
+(AND A (REG i true), apply_MEAS' q true lt);
 
-(AND A (NOT (REG i)), apply_MEAS q false lt)
+(AND A (REG i false), apply_MEAS' q false lt)
 
 ]
  }}}.
 Proof. unfold Mtriple.
-  intros H WF_L_lt len_lt H0 a H1 cq H2 H3 cq' H4.
+  intros H WF_L_lt H0 a H1 cq H2 H3 cq' H4.
   remember H as H'. clear HeqH'.
   unfold In in H1.
   unfold In.
@@ -1234,7 +1243,7 @@ Proof. unfold Mtriple.
   destruct H4.
   - symmetry in H1.
     subst.
-    exists (AND A (REG i), apply_MEAS q true lt).
+    exists (AND A (REG i true), apply_MEAS' q true lt).
     split; auto.
     simpl (<[i:=true]> cq.1, Zprojector_plus n q × cq.2).2.
     assert (WF_Matrix (Zprojector_plus n q × cq.2)) by auto with wf_db.
@@ -1242,9 +1251,9 @@ Proof. unfold Mtriple.
     unfold cqSatisfiesMbranch in *.
     simpl in H3.
     simpl ((<[i:=true]> cq.1, Zprojector_plus n q × cq.2).2).
-    simpl ((AND A (REG i), apply_MEAS q true lt).1).
+    simpl ((AND A (REG i true), apply_MEAS' q true lt).1).
     simpl ((<[i:=true]> cq.1, Zprojector_plus n q × cq.2).1).
-    replace ((AND A (REG i), apply_MEAS q true lt).2) with (apply_MEAS q true lt) by auto.
+    replace ((AND A (REG i true), apply_MEAS' q true lt).2) with (apply_MEAS' q true lt) by auto.
     destruct (Mat_eq_dec (2 ^ n) 1 cq.2 Zero H2 (WF_Zero (2 ^ n) 1)) as [E | E].
     + destruct (Mat_eq_dec (2 ^ n) 1 (Zprojector_plus n q × cq.2) Zero H1 (WF_Zero (2 ^ n) 1)) as [E' | E']; auto.
       rewrite E in E'. rewrite Mmult_0_r in E'. contradiction.
@@ -1252,109 +1261,53 @@ Proof. unfold Mtriple.
       induction H0; simpl in H3.
       * assert (<[i:=true]> cq.1 !! i = Some true).
         { setoid_rewrite lookup_insert. auto. }
-        simpl (translate_cpred (AND TRUE (REG i)) (<[i:=true]> cq.1)).   
+        simpl (translate_cpred (AND TRUE (REG i true)) (<[i:=true]> cq.1)).
         rewrite H0.
 (** Hard Part : quantum predicate **)
-        clear - n lt q H WF_L_lt len_lt cq H2 E H3 H' H1 E'.
-        eapply Forall_vecSatisfies_Zprojector_plus_apply_MEAS_true; eauto.
+        clear - n lt q H WF_L_lt cq H2 E H3 H' H1 E'.
+        eapply Forall_vecSatisfies_Zprojector_plus_apply_MEAS'_true; eauto.
       * contradiction.
-      * contradiction.
-      * simpl (translate_cpred (AND (REG j) (REG i)) (<[i:=true]> cq.1)).
+      * simpl (translate_cpred (AND (REG j b) (REG i true)) (<[i:=true]> cq.1)).
         assert (<[i:=true]> cq.1 !! j = cq.1 !! j).
         { setoid_rewrite lookup_insert_ne; auto. }
+
         rewrite H4.
         destruct (cq.1 !! j) eqn:E''; try contradiction.
-        destruct b; try contradiction.
         assert (<[i:=true]> cq.1 !! i = Some true).
         { setoid_rewrite lookup_insert. auto. }
         rewrite H5.
-        replace (if true && true
-                 then
-                   Forall (λ t : TType n, vecSatisfies (Zprojector_plus n q × cq.2) (translate t))
-                     (apply_MEAS q true lt)
-                 else False)
-                  with
-                  (Forall (λ t : TType n, vecSatisfies (Zprojector_plus n q × cq.2) (translate t))
-                     (apply_MEAS q true lt))
-          by auto.
+        rewrite andb_true_r.
+        destruct (from_option _ false _); [|auto].
 (** Hard Part : quantum predicate **)
-        clear - n lt q H WF_L_lt len_lt cq H2 E H3 H' H1 E'.
-        eapply Forall_vecSatisfies_Zprojector_plus_apply_MEAS_true; eauto.
-      * simpl (translate_cpred (AND (AND c1 c2) (REG i)) (<[i:=true]> cq.1)).
-        rewrite <- ! does_not_appear_preserves_translate_cpred; auto.
+        clear - n lt q H WF_L_lt cq H2 E H3 H' H1 E'.
+        eapply Forall_vecSatisfies_Zprojector_plus_apply_MEAS'_true; eauto.
+      * simpl (translate_cpred _ _) in *.
+        rewrite <- ! does_not_appear_preserves_translate_cpred in * by auto.
         destruct (translate_cpred c1 cq.1) eqn:E''; try contradiction.
         destruct (translate_cpred c2 cq.1) eqn:E'''; try contradiction.
-        destruct b, b0; try contradiction.
         simpl in H3.
-        specialize (IHdoes_not_appear1 H3).
-        specialize (IHdoes_not_appear2 H3).
-        simpl (translate_cpred (AND c1 (REG i)) (<[i:=true]> cq.1)) in IHdoes_not_appear1.
-        simpl (translate_cpred (AND c2 (REG i)) (<[i:=true]> cq.1)) in IHdoes_not_appear2.
-        rewrite <- does_not_appear_preserves_translate_cpred in IHdoes_not_appear1; auto.
-        rewrite <- does_not_appear_preserves_translate_cpred in IHdoes_not_appear2; auto.
-        rewrite E'' in IHdoes_not_appear1.
-        rewrite E''' in IHdoes_not_appear2.
-        assert (<[i:=true]> cq.1 !! i = Some true).
+        now apply IHdoes_not_appear1.
+      * simpl (translate_cpred _ _) in *.
+        rewrite <- ! does_not_appear_preserves_translate_cpred in * by auto.
+        assert (<[i:=true]> cq.1 !! i = Some true) as Hcqi.
         { setoid_rewrite lookup_insert. auto. }
-        rewrite H0 in IHdoes_not_appear1, IHdoes_not_appear2.
-        replace (if true && true
-                 then Forall (λ t : TType n, vecSatisfies (Zprojector_plus n q × cq.2) (translate t)) (apply_MEAS 0 true lt)
-                 else False)
-          with
-          (Forall (λ t : TType n, vecSatisfies (Zprojector_plus n q × cq.2) (translate t)) (apply_MEAS 0 true lt))
-          in IHdoes_not_appear1, IHdoes_not_appear2
-          by auto.
-        rewrite H0.
-        replace (if true && true && true
-                 then Forall (λ t : TType n, vecSatisfies (Zprojector_plus n q × cq.2) (translate t)) (apply_MEAS 0 true lt)
-                 else False)
-                  with
-                  (Forall (λ t : TType n, vecSatisfies (Zprojector_plus n q × cq.2) (translate t)) (apply_MEAS 0 true lt))
-          by auto.
-        auto.
-      * simpl (translate_cpred (AND (OR c1 c2) (REG i)) (<[i:=true]> cq.1)).
-        simpl (translate_cpred (AND c1 (REG i)) (<[i:=true]> cq.1)) in IHdoes_not_appear1.
-        simpl (translate_cpred (AND c2 (REG i)) (<[i:=true]> cq.1)) in IHdoes_not_appear2.
-        rewrite <- does_not_appear_preserves_translate_cpred in IHdoes_not_appear1; auto.
-        rewrite <- does_not_appear_preserves_translate_cpred in IHdoes_not_appear2; auto.
-        rewrite <- does_not_appear_preserves_translate_cpred; auto.
-        rewrite <- does_not_appear_preserves_translate_cpred; auto.
-        destruct (translate_cpred c1 cq.1) eqn:E''; try contradiction.
-        destruct (translate_cpred c2 cq.1) eqn:E'''; try contradiction.
-        assert (<[i:=true]> cq.1 !! i = Some true).
+        rewrite Hcqi in *.
+        change (from_option _ _ (Some true)) with true in *.
+        destruct (translate_cpred c1 cq.1) eqn:E''; try contradiction;
+        destruct (translate_cpred c2 cq.1) eqn:E'''; try contradiction;
+        cbn [orb andb] in *; auto.
+      * simpl (translate_cpred _ _) in *.
+        rewrite <- ! does_not_appear_preserves_translate_cpred in * by auto.
+        assert (<[i:=true]> cq.1 !! i = Some true) as Hcqi.
         { setoid_rewrite lookup_insert. auto. }
-        rewrite H0 in *.
-        rewrite andb_true_r in *.
-        destruct (b || b0) eqn:E''''; try contradiction.
-        destruct b, b0; try contradiction; simpl in H3;
-          try specialize (IHdoes_not_appear1 H3);
-          try specialize (IHdoes_not_appear2 H3);
-          auto.
-        simpl in E''''; discriminate.
-      * simpl (translate_cpred (AND (NOT c) (REG i)) (<[i:=true]> cq.1)).
-        simpl (translate_cpred (AND c (REG i)) (<[i:=true]> cq.1)) in IHdoes_not_appear.
-        rewrite <- does_not_appear_preserves_translate_cpred in *; auto.
+        rewrite Hcqi in *.
         destruct (translate_cpred c cq.1) eqn:E''; try contradiction.
-        destruct b; try contradiction.
-        simpl in H3.
-        assert (<[i:=true]> cq.1 !! i = Some true).
-        { setoid_rewrite lookup_insert. auto. }
-        rewrite H4 in *.
-        replace (if (¬ false) && true
-                 then
-                   Forall (λ t : TType n, vecSatisfies (Zprojector_plus n q × cq.2) (translate t))
-                     (apply_MEAS q true lt)
-                 else False)
-          with (Forall (λ t : TType n, vecSatisfies (Zprojector_plus n q × cq.2) (translate t))
-                     (apply_MEAS q true lt))
-          by auto.
-(** Hard Part : quantum predicate **)
-        clear - n lt q H WF_L_lt len_lt cq H2 E H3 H' H1 E'.
-        eapply Forall_vecSatisfies_Zprojector_plus_apply_MEAS_true; eauto.
+        clear - n lt q H WF_L_lt cq H2 E H3 H' H1 E'.
+        eapply Forall_vecSatisfies_Zprojector_plus_apply_MEAS'_true; eauto.
   - destruct H1. 2: inversion H1.
     symmetry in H1.
     subst.
-    exists (AND A (NOT (REG i)), apply_MEAS q false lt).
+    exists (AND A (REG i false), apply_MEAS' q false lt).
     split; auto.
     simpl ((<[i:=false]> cq.1, Zprojector_minus n q × cq.2).2).
     assert (WF_Matrix (Zprojector_minus n q × cq.2)) by auto with wf_db.
@@ -1362,118 +1315,66 @@ Proof. unfold Mtriple.
     unfold cqSatisfiesMbranch in *.
     simpl in H3.
     simpl ((<[i:=false]> cq.1, Zprojector_minus n q × cq.2).2).
-    simpl ((AND A (NOT (REG i)), apply_MEAS q false lt).1).
+    simpl ((AND A (REG i false), apply_MEAS' q false lt).1).
     simpl ((<[i:=false]> cq.1, Zprojector_minus n q × cq.2).1).
-    replace ((AND A (NOT (REG i)), apply_MEAS q false lt).2) with (apply_MEAS q false lt) by auto.
+    replace ((AND A (REG i false), apply_MEAS' q false lt).2) with (apply_MEAS' q false lt) by auto.
     destruct (Mat_eq_dec (2 ^ n) 1 cq.2 Zero H2 (WF_Zero (2 ^ n) 1)) as [E | E].
     + destruct (Mat_eq_dec (2 ^ n) 1 (Zprojector_minus n q × cq.2) Zero H1 (WF_Zero (2 ^ n) 1)) as [E' | E']; auto.
       rewrite E in E'. rewrite Mmult_0_r in E'. contradiction.
     + destruct (Mat_eq_dec (2 ^ n) 1 (Zprojector_minus n q × cq.2) Zero H1 (WF_Zero (2 ^ n) 1)) as [E' | E']; auto.
       induction H0; simpl in H3.
-      * simpl (translate_cpred (AND TRUE (NOT (REG i))) (<[i:=false]> cq.1)).
+      * simpl (translate_cpred (AND TRUE (REG i false)) (<[i:=false]> cq.1)).
         assert (<[i:=false]> cq.1 !! i = Some false).
         { setoid_rewrite lookup_insert. auto. }
         rewrite H0.
         replace (if ¬ false
-                 then Forall (λ t : TType n, vecSatisfies (Zprojector_minus n q × cq.2) (translate t)) (apply_MEAS q false lt)
+                 then Forall (λ t : TType n, vecSatisfies (Zprojector_minus n q × cq.2) (translate t)) (apply_MEAS' q false lt)
                  else False)
-          with (Forall (λ t : TType n, vecSatisfies (Zprojector_minus n q × cq.2) (translate t)) (apply_MEAS q false lt))
+          with (Forall (λ t : TType n, vecSatisfies (Zprojector_minus n q × cq.2) (translate t)) (apply_MEAS' q false lt))
           by auto.
 (** Hard Part : quantum predicate **)
-        clear - n lt q H WF_L_lt len_lt cq H2 E H3 H' H1 E'.
-        eapply Forall_vecSatisfies_Zprojector_minus_apply_MEAS_false; eauto.
+        clear - n lt q H WF_L_lt cq H2 E H3 H' H1 E'.
+        eapply Forall_vecSatisfies_Zprojector_minus_apply_MEAS'_false; eauto.
       * contradiction.
-      * contradiction.
-      * simpl (translate_cpred (AND (REG j) (NOT (REG i))) (<[i:=false]> cq.1)).
+      * simpl (translate_cpred _ _) in *.
         assert (<[i:=false]> cq.1 !! j = cq.1 !! j).
         { setoid_rewrite lookup_insert_ne; auto. }
         rewrite H4.
         destruct (cq.1 !! j) eqn:E''; try contradiction.
-        destruct b; try contradiction.
-        assert (<[i:=false]> cq.1 !! i = Some false).
+        assert (<[i:=false]> cq.1 !! i = Some false) as ->.
         { setoid_rewrite lookup_insert. auto. }
-        rewrite H5.
-        replace (if true && (¬ false)
-                 then Forall (λ t : TType n, vecSatisfies (Zprojector_minus n q × cq.2) (translate t)) (apply_MEAS q false lt)
-                 else False)
-                  with
-                  (Forall (λ t : TType n, vecSatisfies (Zprojector_minus n q × cq.2) (translate t)) (apply_MEAS q false lt))
-          by auto.
+        rewrite andb_true_r.
+        destruct (from_option _ false _); [|auto].
 (** Hard Part : quantum predicate **)
-        clear - n lt q H WF_L_lt len_lt cq H2 E H3 H' H1 E'.
-        eapply Forall_vecSatisfies_Zprojector_minus_apply_MEAS_false; eauto.
-      * simpl (translate_cpred (AND (AND c1 c2) (NOT (REG i))) (<[i:=false]> cq.1)).
-        rewrite <- ! does_not_appear_preserves_translate_cpred; auto.
+        clear - n lt q H WF_L_lt cq H2 E H3 H' H1 E'.
+        eapply Forall_vecSatisfies_Zprojector_minus_apply_MEAS'_false; eauto.
+      * simpl (translate_cpred _ _) in *.
+        rewrite <- ! does_not_appear_preserves_translate_cpred in * by auto.
         destruct (translate_cpred c1 cq.1) eqn:E''; try contradiction.
         destruct (translate_cpred c2 cq.1) eqn:E'''; try contradiction.
-        destruct b, b0; try contradiction.
         simpl in H3.
-        specialize (IHdoes_not_appear1 H3).
-        specialize (IHdoes_not_appear2 H3).
-        simpl (translate_cpred (AND c1 (NOT (REG i))) (<[i:=false]> cq.1)) in IHdoes_not_appear1.
-        simpl (translate_cpred (AND c2 (NOT (REG i))) (<[i:=false]> cq.1)) in IHdoes_not_appear2.
-        rewrite <- does_not_appear_preserves_translate_cpred in IHdoes_not_appear1; auto.
-        rewrite <- does_not_appear_preserves_translate_cpred in IHdoes_not_appear2; auto.
-        rewrite E'' in IHdoes_not_appear1.
-        rewrite E''' in IHdoes_not_appear2.
-        assert (<[i:=false]> cq.1 !! i = Some false).
+        now apply IHdoes_not_appear1.
+      * simpl (translate_cpred _ _) in *.
+        rewrite <- ! does_not_appear_preserves_translate_cpred in * by auto.
+        assert (<[i:=false]> cq.1 !! i = Some false) as Hcqi.
         { setoid_rewrite lookup_insert. auto. }
-        rewrite H0 in IHdoes_not_appear1, IHdoes_not_appear2.
-        replace (if true && (¬ false)
-                       then
-                        Forall (λ t : TType n, vecSatisfies (Zprojector_minus n q × cq.2) (translate t))
-                          (apply_MEAS 0 false lt)
-                       else False)
-          with (Forall (λ t : TType n, vecSatisfies (Zprojector_minus n q × cq.2) (translate t)) (apply_MEAS 0 false lt))
-          in IHdoes_not_appear1, IHdoes_not_appear2
-          by auto.
-        rewrite H0.
-        replace (if true && true && (¬ false)
-                  then Forall (λ t : TType n, vecSatisfies (Zprojector_minus n q × cq.2) (translate t)) (apply_MEAS 0 false lt)
-                  else False)
-          with (Forall (λ t : TType n, vecSatisfies (Zprojector_minus n q × cq.2) (translate t)) (apply_MEAS 0 false lt))
-          by auto.
-        auto.
-      * simpl (translate_cpred (AND (OR c1 c2) (NOT (REG i))) (<[i:=false]> cq.1)).
-        simpl (translate_cpred (AND c1 (NOT (REG i))) (<[i:=false]> cq.1)) in IHdoes_not_appear1.
-        simpl (translate_cpred (AND c2 (NOT (REG i))) (<[i:=false]> cq.1)) in IHdoes_not_appear2.
-        rewrite <- does_not_appear_preserves_translate_cpred in IHdoes_not_appear1; auto.
-        rewrite <- does_not_appear_preserves_translate_cpred in IHdoes_not_appear2; auto.
-        rewrite <- does_not_appear_preserves_translate_cpred; auto.
-        rewrite <- does_not_appear_preserves_translate_cpred; auto.
-        destruct (translate_cpred c1 cq.1) eqn:E''; try contradiction.
-        destruct (translate_cpred c2 cq.1) eqn:E'''; try contradiction.
-        assert (<[i:=false]> cq.1 !! i = Some false).
+        rewrite Hcqi in *.
+        change (from_option _ false _) with true in *.
+        destruct (translate_cpred c1 cq.1) eqn:E''; try contradiction;
+        destruct (translate_cpred c2 cq.1) eqn:E'''; try contradiction;
+        cbn [orb andb] in *; auto.
+      * simpl (translate_cpred _ _) in *.
+        rewrite <- ! does_not_appear_preserves_translate_cpred in * by auto.
+        assert (<[i:=false]> cq.1 !! i = Some false) as Hcqi.
         { setoid_rewrite lookup_insert. auto. }
-        rewrite H0 in *.
-        rewrite andb_true_r in *.
-        destruct (b || b0) eqn:E''''; try contradiction.
-        destruct b, b0; try contradiction; simpl in H3;
-          try specialize (IHdoes_not_appear1 H3);
-          try specialize (IHdoes_not_appear2 H3);
-          auto.
-        simpl in E''''; discriminate.
-      * simpl (translate_cpred (AND (NOT c) (NOT (REG i))) (<[i:=false]> cq.1)).
-        simpl (translate_cpred (AND c (NOT (REG i))) (<[i:=false]> cq.1)) in IHdoes_not_appear.
-        rewrite <- does_not_appear_preserves_translate_cpred in *; auto.
+        rewrite Hcqi in *.
         destruct (translate_cpred c cq.1) eqn:E''; try contradiction.
-        destruct b; try contradiction.
-        simpl in H3.
-        assert (<[i:=false]> cq.1 !! i = Some false).
-        { setoid_rewrite lookup_insert. auto. }
-        rewrite H4 in *.
-        replace (if (¬ false) && (¬ false)
-                then Forall (λ t : TType n, vecSatisfies (Zprojector_minus n q × cq.2) (translate t)) (apply_MEAS q false lt)
-                else False)
-          with (Forall (λ t : TType n, vecSatisfies (Zprojector_minus n q × cq.2) (translate t)) (apply_MEAS q false lt))
-          by auto.
-(** Hard Part : quantum predicate **)
-        clear - n lt q H WF_L_lt len_lt cq H2 E H3 H' H1 E'.
-        eapply Forall_vecSatisfies_Zprojector_minus_apply_MEAS_false; eauto.
+        clear - n lt q H WF_L_lt cq H2 E H3 H' H1 E'.
+        eapply Forall_vecSatisfies_Zprojector_minus_apply_MEAS'_false; eauto.
 Qed.
 
 Lemma triple_RULE {n : nat} (lt lt' : list (TType n)) (cp : cpred) (g : prog) :
-  {{ Cap (map TtoA lt) }} g {{ Cap (map TtoA lt') }} -> 
+  {{ Cap (map TtoA lt) }} g {{ Cap (map TtoA lt') }} ->
   {{{ [ (cp, lt) ] }}} U g {{{ [ (cp, lt')] }}}.
 Proof. intros H.
   unfold triple, Mtriple in *.
@@ -1500,7 +1401,6 @@ Proof. intros H.
     auto.
   rewrite e, Mmult_0_r in n0; contradiction.
   destruct (translate_cpred cp cq.1) eqn:E'; auto.
-  destruct b; auto.
   assert (WF_Matrix cq.2
           ∧ Forall (λ a0 : AType n, vecSatisfies cq.2 (translateA a0)) (map TtoA lt)).
   { split; auto.
@@ -1522,7 +1422,7 @@ Proof. intros H.
 Qed.
 
 Lemma TRIPLE_RULE {n : nat} (lt lt' : list (TType n)) (cp : cpred) (g : prog) (Q : Predicate n) (la : list (AType n)) :
-  {{ Cap (map TtoA lt) }} g {{ Q }} -> 
+  {{ Cap (map TtoA lt) }} g {{ Q }} ->
   Q = Cap la ->
   repeat 1%nat (length la) = map length la ->
   lt' = map AtoT la ->
@@ -1540,7 +1440,7 @@ Proof. intros H H0 H1 H2.
       rewrite map_nth with (d := (defaultA_I n)).
       destruct (nth n0 la (defaultA_I n)) eqn:E.
       + assert (length (nth n0 la (defaultA_I n)) = 1%nat).
-        { rewrite <- map_nth. 
+        { rewrite <- map_nth.
           setoid_rewrite <- H1.
           rewrite nth_repeat.
           auto. }
@@ -1549,7 +1449,7 @@ Proof. intros H H0 H1 H2.
       + simpl in *.
         destruct a; auto.
         assert (length (nth n0 la (defaultA_I n)) = 1%nat).
-        { rewrite <- map_nth. 
+        { rewrite <- map_nth.
           setoid_rewrite <- H1.
           rewrite nth_repeat.
           auto. }
@@ -1557,7 +1457,7 @@ Proof. intros H H0 H1 H2.
         discriminate. }
   rewrite H0. auto.
 Qed.
-  
+
 
 Lemma cqSatisfiesMbranch_TRUE_weakening {n : nat} (cq : cqstate n) (cp : cpred) (lt : list (TType n)) (H : WF_Matrix cq.2) :
   cqSatisfiesMbranch cq (cp, lt) H -> cqSatisfiesMbranch cq (TRUE, lt) H.
@@ -1565,8 +1465,7 @@ Proof. intros H0.
   unfold cqSatisfiesMbranch in *.
   simpl in *.
   destruct (Mat_eq_dec (2 ^ n) 1 cq.2 Zero H (WF_Zero (2 ^ n) 1)); auto.
-  destruct (translate_cpred cp cq.1); try contradiction.
-  destruct b; try contradiction; auto.
+  destruct (translate_cpred cp cq.1); try contradiction; auto.
 Qed.
 
 Lemma TRUE_POST_WEAKENING_RULE {n : nat} (mp : mprog) (P Q Q' : MPredicate n) :
@@ -1578,7 +1477,7 @@ Proof. intros H H0.
   intros a H0 cq H1 H2 cq' H3.
   destruct (H a H0 cq H1 H2 cq' H3) as [[cp lt] [H4 [H5 H6]]].
   exists (TRUE, lt).
-  split.  
+  split.
   rewrite in_map_iff.
   exists (cp, lt); auto.
   exists H5.
@@ -1587,11 +1486,11 @@ Qed.
 
 Lemma DELETE_REDUNDANCY_RULE {n : nat} (mp : mprog) (P Q : MPredicate n) (x : Mbranch n) :
   {{{ P }}} mp {{{ Q }}} -> hd_error Q = Some x -> Q = repeat x (length Q) ->
-  {{{ P }}} mp {{{ [x] }}}. 
+  {{{ P }}} mp {{{ [x] }}}.
 Proof. intros H H0 H1.
   rewrite H1 in H.
   unfold Mtriple in *.
-  intros a H2 cq H3 H4 cq' H5. 
+  intros a H2 cq H3 H4 cq' H5.
   destruct (H a H2 cq H3 H4 cq' H5) as [b [inb [H6 H7]]].
   apply repeat_spec in inb. subst.
   exists x. split. constructor; auto.
@@ -1629,14 +1528,14 @@ Definition equiv_cpred (p p' : cpred) : Prop :=
 
 Lemma equiv_cpred_refl (p : cpred) :
   equiv_cpred p p.
-Proof. 
+Proof.
   unfold equiv_cpred.
   auto.
 Qed.
 
 Lemma equiv_cpred_sym (p p' : cpred) :
   equiv_cpred p p' -> equiv_cpred p' p.
-Proof. 
+Proof.
   unfold equiv_cpred.
   intros.
   auto.
@@ -1644,14 +1543,14 @@ Qed.
 
 Lemma equiv_cpred_trans (p p' p'' : cpred) :
   equiv_cpred p p' -> equiv_cpred p' p'' -> equiv_cpred p p''.
-Proof. 
+Proof.
   unfold equiv_cpred.
   intros.
   rewrite H.
   auto.
 Qed.
 
-Add Parametric Relation : cpred equiv_cpred 
+Add Parametric Relation : cpred equiv_cpred
   reflexivity proved by equiv_cpred_refl
   symmetry proved by equiv_cpred_sym
   transitivity proved by equiv_cpred_trans
@@ -1662,14 +1561,14 @@ Definition equiv_cpred_cqSatisfiesMbranch (p p' : cpred) : Prop :=
 
 Lemma equiv_cpred_cqSatisfiesMbranch_refl (p : cpred) :
   equiv_cpred_cqSatisfiesMbranch p p.
-Proof. 
+Proof.
   unfold equiv_cpred_cqSatisfiesMbranch.
   auto.
 Qed.
 
 Lemma equiv_cpred_cqSatisfiesMbranch_sym (p p' : cpred) :
   equiv_cpred_cqSatisfiesMbranch p p' -> equiv_cpred_cqSatisfiesMbranch p' p.
-Proof. 
+Proof.
   unfold equiv_cpred_cqSatisfiesMbranch.
   intros.
   rewrite H.
@@ -1678,14 +1577,14 @@ Qed.
 
 Lemma equiv_cpred_cqSatisfiesMbranch_trans (p p' p'' : cpred) :
   equiv_cpred_cqSatisfiesMbranch p p' -> equiv_cpred_cqSatisfiesMbranch p' p'' -> equiv_cpred_cqSatisfiesMbranch p p''.
-Proof. 
+Proof.
   unfold equiv_cpred_cqSatisfiesMbranch.
   intros.
   rewrite H.
   auto.
 Qed.
 
-Add Parametric Relation : cpred equiv_cpred_cqSatisfiesMbranch 
+Add Parametric Relation : cpred equiv_cpred_cqSatisfiesMbranch
   reflexivity proved by equiv_cpred_cqSatisfiesMbranch_refl
   symmetry proved by equiv_cpred_cqSatisfiesMbranch_sym
   transitivity proved by equiv_cpred_cqSatisfiesMbranch_trans
@@ -1700,6 +1599,973 @@ Proof. intros;
   simpl in *;
   intros; try rewrite H; auto.
 Qed.
+
+
+#[export] Instance AND_proper : Proper (equiv_cpred ==> equiv_cpred ==> equiv_cpred) AND.
+Proof.
+  intros c c' Hc d d' Hd m.
+  cbn.
+  now rewrite <- Hc, <- Hd.
+Qed.
+
+#[export] Instance OR_proper : Proper (equiv_cpred ==> equiv_cpred ==> equiv_cpred) OR.
+Proof.
+  intros c c' Hc d d' Hd m.
+  cbn.
+  now rewrite <- Hc, <- Hd.
+Qed.
+
+#[export] Instance NOT_proper : Proper (equiv_cpred ==> equiv_cpred) NOT.
+Proof.
+  intros c c' Hc m.
+  cbn.
+  now rewrite <- Hc.
+Qed.
+
+#[export] Instance Equiv_cpred : Equiv cpred := equiv_cpred.
+
+Declare Scope cpred_scope.
+Delimit Scope cpred_scope with cpred.
+Bind Scope cpred_scope with cpred.
+
+Notation "b && c" := (AND b%cpred c%cpred) : cpred_scope.
+Notation "b || c" := (OR b%cpred c%cpred) : cpred_scope.
+Notation "¬ b" := (NOT b%cpred) : cpred_scope.
+Notation " n ↦ b " := (REG n b) : cpred_scope.
+
+Local Open Scope cpred_scope.
+
+Lemma AND_FALSE_l c : equiv_cpred (AND FALSE c) FALSE.
+Proof.
+  done.
+Qed.
+
+Lemma AND_FALSE_r c : equiv_cpred (AND c FALSE) FALSE.
+Proof.
+  hnf.
+  cbn.
+  intros; apply andb_false_r.
+Qed.
+
+Lemma AND_TRUE_l c : equiv_cpred (AND TRUE c) c.
+Proof.
+  done.
+Qed.
+
+Lemma AND_TRUE_r c : equiv_cpred (AND c TRUE) c.
+Proof.
+  hnf.
+  cbn.
+  intros; apply andb_true_r.
+Qed.
+
+Lemma OR_FALSE_l c : equiv_cpred (OR FALSE c) c.
+Proof.
+  done.
+Qed.
+
+Lemma OR_FALSE_r c : equiv_cpred (OR c FALSE) c.
+Proof.
+  hnf.
+  cbn.
+  intros; apply orb_false_r.
+Qed.
+
+Lemma OR_TRUE_l c : equiv_cpred (OR TRUE c) TRUE.
+Proof.
+  done.
+Qed.
+
+Lemma OR_TRUE_r c : equiv_cpred (OR c TRUE) TRUE.
+Proof.
+  hnf.
+  cbn.
+  intros; apply orb_true_r.
+Qed.
+
+Lemma AND_OR_l c d e : (c || d) && e ≡ c && e || d && e.
+Proof.
+  intros m; apply andb_orb_distrib_l.
+Qed.
+
+Lemma AND_OR_r c d e : c && (d || e) ≡ c && d || c && e.
+Proof.
+  intros m; apply andb_orb_distrib_r.
+Qed.
+
+#[export] Instance AND_assoc : Assoc (≡) AND.
+Proof.
+  intros ? ? ? m; apply andb_assoc.
+Qed.
+
+#[export] Instance OR_assoc : Assoc (≡) OR.
+Proof.
+  intros ? ? ? m; apply orb_assoc.
+Qed.
+
+Fixpoint ANDS (cs : list cpred) : cpred :=
+  match cs with
+  | [] => TRUE
+  | c :: cs => c && ANDS cs
+  end.
+
+Fixpoint ORS (cs : list cpred) : cpred :=
+  match cs with
+  | [] => FALSE
+  | c :: cs => c || ORS cs
+  end.
+
+Lemma ANDS_app cs ds : ANDS (cs ++ ds) ≡ ANDS cs && ANDS ds.
+Proof.
+  induction cs.
+  - now rewrite AND_TRUE_l.
+  - cbn.
+    rewrite IHcs.
+    now rewrite (assoc _).
+Qed.
+
+Lemma ORS_app cs ds : ORS (cs ++ ds) ≡ ORS cs || ORS ds.
+Proof.
+  induction cs.
+  - now rewrite OR_FALSE_l.
+  - cbn.
+    rewrite IHcs.
+    now rewrite (assoc _).
+Qed.
+
+Lemma NOT_AND c d : (¬ (c && d)) ≡ ((¬ c) || ¬ d).
+Proof.
+  intros m.
+  cbn.
+  apply negb_andb.
+Qed.
+
+Lemma NOT_OR c d : (¬ (c || d)) ≡ ((¬ c) && ¬ d).
+Proof.
+  intros m.
+  cbn.
+  apply negb_orb.
+Qed.
+
+Lemma NOT_ANDS cs : (¬ ANDS cs) ≡ ORS (NOT <$> cs).
+Proof.
+  induction cs.
+  - cbn.
+    done.
+  - cbn.
+    rewrite NOT_AND, IHcs.
+    done.
+Qed.
+
+Lemma NOT_ORS cs : (¬ ORS cs) ≡ ANDS (NOT <$> cs).
+Proof.
+  induction cs.
+  - cbn.
+    done.
+  - cbn.
+    rewrite NOT_OR, IHcs.
+    done.
+Qed.
+
+Lemma NOT_NOT c : NOT (NOT c) ≡ c.
+Proof.
+  intros m; apply negb_involutive.
+Qed.
+
+#[export] Instance ANDS_proper : Proper (Forall2 (≡) ==> (≡)) ANDS.
+Proof.
+  intros cs ds Heq.
+  induction Heq; [done|].
+  cbn.
+  f_equiv; auto.
+Qed.
+
+#[export] Instance ORS_proper : Proper (Forall2 (≡) ==> (≡)) ORS.
+Proof.
+  intros cs ds Heq.
+  induction Heq; [done|].
+  cbn.
+  f_equiv; auto.
+Qed.
+
+#[export] Instance AND_comm : Comm (≡) AND.
+Proof.
+  intros c d m; cbn; Btauto.btauto.
+Qed.
+
+#[export] Instance OR_comm : Comm (≡) OR.
+Proof.
+  intros c d m; cbn; Btauto.btauto.
+Qed.
+
+
+#[export] Instance AND_idemp : IdemP (≡) AND.
+Proof.
+  intros c m; cbn; Btauto.btauto.
+Qed.
+
+#[export] Instance OR_idemp : IdemP (≡) OR.
+Proof.
+  intros c m; cbn; Btauto.btauto.
+Qed.
+
+
+
+Definition dnf_cpred0 n (c : option (option bool)) : cpred :=
+  match c with
+  | None => TRUE
+  | Some None => NOT (REG n true || REG n false)
+  | Some (Some b) => REG n b
+  end.
+
+
+Definition dnf_cpred1_aux k (c : list (option (option bool))) : cpred :=
+  ANDS (imap (dnf_cpred0 ∘ Nat.add k) c).
+
+Definition dnf_cpred_aux k (c : list (list (option (option bool)))) : cpred :=
+  ORS (dnf_cpred1_aux k <$> c).
+Definition dnf_cpred1 (c : list (option (option bool))) : cpred :=
+  ANDS (imap dnf_cpred0 c).
+
+Definition dnf_cpred (c : list (list (option (option bool)))) : cpred :=
+  ORS (dnf_cpred1 <$> c).
+
+Definition dnf_and0 (c d : option (option bool)) : option (option (option bool)) :=
+  match c, d with
+  | None, None => Some None
+  | Some c, None => Some (Some c)
+  | None, Some d => Some (Some d)
+  | Some c, Some d => _ ← guard (c = d); Some (Some c)
+  end.
+
+Fixpoint dnf_and1 (cs ds : list (option (option bool))) : option (list (option (option bool))) :=
+  match cs with
+  | [] => Some ds
+  | c :: cs =>
+    match ds with
+    | [] => Some (c :: cs)
+    | d :: ds =>
+      c' ← dnf_and0 c d;
+      (c'::.) <$> dnf_and1 cs ds
+    end
+  end.
+
+Definition dnf_and (cs ds : list (list (option (option bool)))) : list (list (option (option bool))) :=
+  omap (uncurry dnf_and1) (list_prod cs ds).
+
+Definition dnf_ands cs := foldr dnf_and [[]] cs.
+
+Definition dnf_not0 (cs : option (option bool)) : list (list (option (option bool))) :=
+  match cs with
+  | None => []
+  | Some None => [[Some (Some true)]; [Some (Some false)]]
+  | Some (Some true) => [[Some (Some false)]; [Some None]]
+  | Some (Some false) => [[Some (Some true)]; [Some None]]
+  end.
+
+Fixpoint dnf_not1 (cs : list (option (option bool))) : list (list (option (option bool))) :=
+  match cs with
+  | [] => []
+  | c :: cs =>
+    dnf_not0 c ++
+    ((None::.) <$>
+      (dnf_not1 cs))
+  end.
+
+
+Definition dnf_not (cs : list (list (option (option bool)))) : list (list (option (option bool))) :=
+  dnf_ands (dnf_not1 <$> cs).
+
+
+Fixpoint cpred_dnf (c : cpred) : list (list (option (option bool))) :=
+  match c with
+  | TRUE => [[]]
+  | FALSE => []
+  | REG n b => [replicate n None ++ [Some (Some b)]]
+  | AND a b => dnf_and (cpred_dnf a) (cpred_dnf b)
+  | OR a b =>
+    cpred_dnf a ++ cpred_dnf b
+  | NOT a =>
+    dnf_not (cpred_dnf a)
+  end. (* match c with
+  | TRUE => Some [[(true, None)]]
+  | FALSE => Some [[(false, None)]]
+  | EMPTY => None
+  | REG n => Some [[(true, Some n)]]
+  | AND a b =>
+    intersection_with (λ ds es, Some $ app <$>  ds es) (cpred_dnf a) (cpred_dnf b)
+  | OR a b =>
+    intersection_with (λ ds es, Some (ds ++ es)) (cpred_dnf a) (cpred_dnf b)
+  | NOT a =>
+    (fmap (fmap (prod_map negb id)) <$> cpred_dnf a)
+  end. *)
+
+Lemma dnf_cpred0_and_dnf_cpred0 n c d :
+  dnf_cpred0 n c && dnf_cpred0 n d ≡
+  from_option (dnf_cpred0 n) FALSE (dnf_and0 c d).
+Proof.
+  destruct c as [c|], d as [d|]; [|try destruct c; try destruct d; cbn; intros m;
+    cbn; try destruct (m !! n); Btauto.btauto..].
+  cbn.
+  case_guard as Hcd.
+  - subst.
+    apply (idemp _).
+  - destruct c as [c|], d as [d|]; try congruence;
+    (try destruct c; try destruct d); try congruence; cbn;
+    intros m;
+    cbn; try destruct (m !! n); unfold eqb; cbn; Btauto.btauto.
+Qed.
+
+Lemma dnf_cpred_and1_aux k c d :
+  equiv_cpred (from_option (dnf_cpred1_aux k) FALSE (dnf_and1 c d))
+  (dnf_cpred1_aux k c && dnf_cpred1_aux k d).
+Proof.
+  revert k d; induction c as [|c cs IHcs]; intros k d.
+  - cbn.
+    now rewrite AND_TRUE_l.
+  - destruct d as [|d ds]; [cbn; now rewrite AND_TRUE_r|].
+    cbn.
+    rewrite <- (AND_assoc _ _ (_ && _)).
+    rewrite (AND_comm (ANDS _) (_ && _)).
+    rewrite 2 (AND_assoc _).
+    rewrite dnf_cpred0_and_dnf_cpred0.
+    destruct (dnf_and0 c d) as [c'|].
+    2:{
+      cbn.
+      now rewrite AND_FALSE_l.
+    }
+    cbn.
+    specialize (IHcs (s k) ds).
+    cbv zeta in IHcs.
+    unfold compose in *.
+    rewrite 2 (imap_ext (λ x, dnf_cpred0 (k + s x)) (λ x, dnf_cpred0 (s k + x))) by now intros; f_equal; lia.
+    rewrite <- (AND_assoc _).
+    rewrite (AND_comm (ANDS _)).
+    rewrite <- IHcs.
+    destruct (dnf_and1 cs ds) as [cs'|].
+    2:{
+      cbn.
+      now rewrite AND_FALSE_r.
+    }
+    cbn.
+    f_equiv.
+    f_equiv.
+    unfold dnf_cpred1_aux.
+    erewrite imap_ext; [reflexivity|].
+    intros; cbn; f_equal; lia.
+Qed.
+
+Lemma dnf_cpred_and1 c d : equiv_cpred (from_option dnf_cpred1 FALSE (dnf_and1 c d))
+  (dnf_cpred1 c && dnf_cpred1 d).
+Proof.
+  rewrite (dnf_cpred_and1_aux 0 c d).
+  done.
+Qed.
+
+Lemma dnf_cpred_and c d : equiv_cpred (dnf_cpred (dnf_and c d)) (dnf_cpred c && dnf_cpred d).
+Proof.
+  unfold dnf_cpred, dnf_and.
+  revert d;
+  induction c as [|a1 c IHc]; intros d.
+  * cbn.
+    now rewrite AND_FALSE_l.
+  * cbn.
+    rewrite AND_OR_l.
+    rewrite omap_app, fmap_app.
+    rewrite ORS_app.
+    rewrite IHc.
+    f_equiv.
+    clear IHc.
+    induction d; [cbn; now rewrite AND_FALSE_r|].
+    cbn -[omap].
+    cbn [omap list_omap uncurry].
+    rewrite AND_OR_r.
+    rewrite <- dnf_cpred_and1.
+    destruct (dnf_and1 _ _) as [a'|].
+    2:{
+      cbn.
+      rewrite OR_FALSE_l.
+      apply IHd.
+    }
+    cbn.
+    f_equiv.
+    apply IHd.
+Qed.
+
+Lemma dnf_cpred_ands cs : equiv_cpred (dnf_cpred (dnf_ands cs)) (ANDS (dnf_cpred <$> cs)).
+Proof.
+  induction cs; [done|].
+  cbn -[dnf_and dnf_cpred].
+  rewrite dnf_cpred_and, IHcs.
+  done.
+Qed.
+
+Lemma dnf_cpred_not0 k c : ORS (dnf_cpred1_aux k <$> dnf_not0 c) ≡ (¬ dnf_cpred0 k c).
+Proof.
+  destruct c as [[[]|]|];
+  [cbn;
+  rewrite Nat.add_0_r;
+  intros m; cbn; destruct (m !! k); unfold eqb; cbn; Btauto.btauto..|].
+  cbn.
+  intros m; cbn; Btauto.btauto.
+Qed.
+
+Ltac bsolve_setup :=
+  (repeat intros ?);
+  cbn.
+
+Ltac bsolve_case :=
+  (repeat destruct (_ !! _));
+  cbn;
+  unfold eqb.
+
+Ltac bsolve_solve :=
+  Btauto.btauto.
+
+Ltac bsolve :=
+  bsolve_setup; bsolve_case; bsolve_solve.
+
+Lemma ORS_fmap_AND_l {A} (f : A -> cpred) (c : cpred) (l : list A) :
+  ORS ((λ a, c && f a) <$> l) ≡ c && ORS (f <$> l).
+Proof.
+  induction l; [bsolve|].
+  cbn.
+  rewrite IHl.
+  bsolve.
+Qed.
+
+Lemma dnf_cpred1_aux_S k c : dnf_cpred1_aux (s k) c =
+  ANDS (imap (dnf_cpred0 ∘ Nat.add k ∘ s)%prg c).
+Proof.
+  unfold dnf_cpred1_aux.
+  f_equal.
+  apply imap_ext.
+  intros; cbn; f_equal; lia.
+Qed.
+
+Lemma dnf_cpred_not1_aux k cnj : dnf_cpred_aux k (dnf_not1 cnj) ≡ (¬ dnf_cpred1_aux k cnj).
+Proof.
+  unfold dnf_cpred1_aux.
+  rewrite NOT_ANDS.
+  revert k;
+  induction cnj as [|c cnj IHcnj]; intros k; [done|].
+  cbn.
+  specialize (IHcnj (s k)).
+  cbn in IHcnj.
+  replace (s (k + 0)) with (k + 1)%nat in IHcnj by lia.
+  erewrite imap_ext, <- IHcnj; [|now intros; cbn; f_equal; lia].
+  clear IHcnj.
+  (* remember (match cnj with | [] => dnf_not0 c' | _ :: _ => _ end) as rest eqn:Hrest. *)
+  (* clear Hrest. *)
+  (* clear. *)
+  rewrite Nat.add_0_r.
+  rewrite <- dnf_cpred_not0.
+  rewrite fmap_app.
+  rewrite ORS_app.
+  f_equiv.
+  unfold dnf_cpred_aux.
+  f_equiv.
+  rewrite <- list_fmap_compose.
+  apply Forall2_fmap, Forall_Forall2_diag.
+  rewrite Forall_forall.
+  intros x _.
+  cbn.
+  rewrite dnf_cpred1_aux_S.
+  rewrite AND_TRUE_l.
+  done.
+Qed.
+
+Lemma dnf_cpred_not c : equiv_cpred (dnf_cpred (dnf_not c)) (¬ dnf_cpred c).
+Proof.
+  unfold dnf_not.
+  rewrite dnf_cpred_ands.
+  unfold dnf_cpred at 2.
+  rewrite NOT_ORS.
+  f_equiv.
+  rewrite <- 2 list_fmap_compose.
+  apply Forall2_fmap, Forall_Forall2_diag.
+  rewrite Forall_forall.
+  intros cnj _.
+  cbn.
+  apply (dnf_cpred_not1_aux 0).
+Qed.
+
+Lemma dnf_cpred1_reg_aux k n b :
+  dnf_cpred1_aux k (replicate n None ++ [Some (Some b)]) ≡ REG (k + n) b.
+Proof.
+  revert k; induction n as [|n IHn]; intros k.
+  - cbn.
+    apply AND_TRUE_r.
+  - cbn.
+    rewrite Nat.add_succ_r, <- Nat.add_succ_l, <- IHn.
+    rewrite dnf_cpred1_aux_S.
+    rewrite AND_TRUE_l.
+    done.
+Qed.
+
+Lemma dnf_cpred1_reg n b :
+  dnf_cpred1 (replicate n None ++ [Some (Some b)]) ≡ REG n b.
+Proof.
+  apply (dnf_cpred1_reg_aux 0).
+Qed.
+
+Lemma dnf_cpred_dnf (c : cpred) : equiv_cpred (dnf_cpred (cpred_dnf c)) c.
+Proof.
+  induction c.
+  - done.
+  - done.
+  - cbn.
+    rewrite OR_FALSE_r.
+    apply dnf_cpred1_reg.
+  - rewrite <- IHc1, <- IHc2 at 2.
+    apply dnf_cpred_and.
+  - cbn.
+    rewrite fmap_app, ORS_app.
+    f_equiv; assumption.
+  - cbn [cpred_dnf].
+    rewrite dnf_cpred_not.
+    now f_equiv.
+Qed.
+
+Definition IMPL (c d : cpred) :=
+  NOT c || d.
+
+Definition IFF (c d : cpred) :=
+  IMPL c d && IMPL d c.
+
+#[export] Instance IMPL_proper : Proper ((≡) ==> (≡) ==> (≡)) IMPL.
+Proof.
+  unfold IMPL.
+  solve_proper.
+Qed.
+
+#[export] Instance IFF_proper : Proper ((≡) ==> (≡) ==> (≡)) IFF.
+Proof.
+  unfold IFF.
+  solve_proper.
+Qed.
+
+Lemma IMPL_correct' c d r : translate_cpred (IMPL c d) r <->
+  (translate_cpred c r -> translate_cpred d r).
+Proof.
+  cbn.
+  rewrite 3 Is_true_true.
+  split.
+  - intros Hcd Hc.
+    rewrite Hc in Hcd.
+    rewrite <- Hcd.
+    Btauto.btauto.
+  - intros Hcd.
+    destruct (translate_cpred c r); [|done].
+    cbn.
+    auto.
+Qed.
+
+Lemma IFF_correct' c d r : translate_cpred (IFF c d) r ->
+  translate_cpred c r <-> translate_cpred d r.
+Proof.
+  cbn.
+  rewrite andb_True.
+  intros []; split; now apply IMPL_correct'.
+Qed.
+
+Lemma IFF_correct c d : IFF c d ≡ TRUE <-> c ≡ d.
+Proof.
+  split; [|intros ->; bsolve].
+  intros Hcd m.
+  apply Bool.eq_iff_eq_true.
+  rewrite <- 2 Is_true_true.
+  apply IFF_correct'.
+  rewrite Hcd.
+  done.
+Qed.
+
+Lemma ORS_permutation cs ds : cs ≡ₚ ds -> ORS cs ≡ ORS ds.
+Proof.
+  intros Hcd.
+  induction Hcd; cbn; repeat_on_hyps ltac:(fun H => rewrite H); done || bsolve.
+Qed.
+
+Lemma ORS_correct' cs r : translate_cpred (ORS cs) r <-> Exists (λ c, translate_cpred c r) cs.
+Proof.
+  induction cs.
+  - easy.
+  - cbn.
+    rewrite orb_True.
+    rewrite Exists_cons.
+    now f_equiv.
+Qed.
+
+
+Lemma ORS_seteq cs ds : (forall c, c ∈ cs <-> c ∈ ds) -> ORS cs ≡ ORS ds.
+Proof.
+  intros Hcd r.
+  apply Bool.eq_iff_eq_true.
+  rewrite <- 2 Is_true_true.
+  rewrite 2 ORS_correct'.
+  rewrite 2 list.Exists_exists.
+  naive_solver.
+Qed.
+
+Lemma ORS_subset cs ds : cs ⊆ ds -> IMPL (ORS cs) (ORS ds) ≡ TRUE.
+Proof.
+  intros Hcd r.
+  apply Bool.eq_iff_eq_true.
+  rewrite <- 2 Is_true_true.
+  rewrite IMPL_correct', 2 ORS_correct'.
+  split; [done|].
+  intros _.
+  rewrite 2 list.Exists_exists.
+  naive_solver.
+Qed.
+
+Fixpoint norm_dnf1 (cs : list (option (option bool))) : option (list (option (option bool))) :=
+  match cs with
+  | [] => None
+  | Some c :: cs => Some (Some c :: default [] (norm_dnf1 cs))
+  | None :: cs => (None ::.) <$> norm_dnf1 cs
+  end.
+
+Fixpoint norm_dnf_aux (cs : list (list (option (option bool)))) :=
+  match cs with
+  | [] => Some []
+  | c :: cs =>
+    match norm_dnf1 c with
+    | None => None
+    | Some c' => (c' ::.) <$> norm_dnf_aux cs
+    end
+  end.
+
+Definition norm_dnf cs :=
+  default [[]] (norm_dnf_aux cs).
+
+Lemma dnf_cpred1_norm_dnf1_aux k cs :
+  dnf_cpred1_aux k (default [] (norm_dnf1 cs)) ≡
+  dnf_cpred1_aux k cs.
+Proof.
+  revert k; induction cs as [|c cs IHcs]; intros k; [done|].
+  destruct c as [c|].
+  - cbn.
+    f_equiv.
+    rewrite <- 2 dnf_cpred1_aux_S.
+    apply IHcs.
+  - cbn.
+    rewrite AND_TRUE_l.
+    rewrite <- dnf_cpred1_aux_S, <- IHcs.
+    destruct (norm_dnf1 cs); cbn; [rewrite <- dnf_cpred1_aux_S, AND_TRUE_l|];
+    done.
+Qed.
+
+
+Lemma dnf_cpred1_norm_dnf1 cs :
+  dnf_cpred1 (default [] (norm_dnf1 cs)) ≡
+  dnf_cpred1 cs.
+Proof.
+  apply (dnf_cpred1_norm_dnf1_aux 0).
+Qed.
+
+Lemma dnf_cpred_norm_dnf cs :
+  dnf_cpred (norm_dnf cs) ≡ dnf_cpred cs.
+Proof.
+  unfold dnf_cpred, norm_dnf.
+  induction cs; [done|].
+  cbn -[dnf_cpred].
+  rewrite <- dnf_cpred1_norm_dnf1, <- IHcs.
+  case_match.
+  - cbn -[dnf_cpred1].
+    destruct (norm_dnf_aux _); bsolve.
+  - bsolve.
+Qed.
+
+Lemma norm_dnf1_None c :
+  norm_dnf1 c = None <-> Forall (not ∘ is_Some) c.
+Proof.
+  induction c as [|c cs IHcs]; [easy|].
+  cbn.
+  rewrite list.Forall_cons.
+  destruct c; [naive_solver|].
+  rewrite fmap_None.
+  rewrite IHcs.
+  split; [|easy].
+  split; [|easy].
+  now intros [].
+Qed.
+
+Lemma AND_TRUE c d : c && d ≡ TRUE <-> c ≡ TRUE /\ d ≡ TRUE.
+Proof.
+  split; [|intros [-> ->]; bsolve].
+  intros Hcd.
+  split; intros m;
+  specialize (Hcd m); cbn in *;
+  rewrite andb_true_iff in Hcd;
+  easy.
+Qed.
+
+Lemma dnf_cpred1_aux_TRUE_iff k ds :
+  dnf_cpred1_aux k ds ≡ TRUE <-> Forall (not ∘ is_Some) ds.
+Proof.
+  revert k; induction ds as [|d ds IHds]; intros k; [easy|].
+  rewrite list.Forall_cons.
+  cbn.
+  rewrite <- dnf_cpred1_aux_S.
+  rewrite AND_TRUE.
+  f_equiv; [|auto].
+  destruct d; [|split; [now intros _ [_ [=]]|easy]].
+  split; [|naive_solver].
+  intros HF.
+  exfalso.
+  specialize (HF (match o with | Some _ => ∅ | None => {[k := true]} end)).
+  revert HF.
+  rewrite Nat.add_0_r.
+  destruct o; cbn.
+  - now setoid_rewrite lookup_empty.
+  - setoid_rewrite lookup_insert.
+    done.
+Qed.
+
+Lemma does_not_appear_preserves_translate_cpred' i c m :
+  does_not_appear i c ->
+  translate_cpred c m = translate_cpred c (delete i m).
+Proof.
+  intros Hc.
+  induction Hc; cbn; try congruence.
+  setoid_rewrite lookup_delete_ne; done.
+Qed.
+
+Lemma translate_cpred_dnf_cpred0 n b r :
+  translate_cpred (dnf_cpred0 n b) r <->
+  from_option (r !! n =.) True b.
+Proof.
+  destruct b; [|done].
+  cbn.
+  destruct o as [[]|]; [
+    split; [cbn;destruct (r !! n) as [[]|]; cbn; done|cbn; intros ->;done]..|].
+  split; [|cbn; intros ->; done].
+  cbn.
+  destruct (r !! n) as [[]|]; done.
+Qed.
+
+Fixpoint cpred_supp (c : cpred) : gset nat :=
+  match c with
+  | TRUE | FALSE => ∅
+  | REG n _ => {[n]}
+  | AND c d => cpred_supp c ∪ cpred_supp d
+  | OR c d => cpred_supp c ∪ cpred_supp d
+  | NOT c => cpred_supp c
+  end.
+(*
+Lemma cpred_supp_disj_AND_inj c c' d d' :
+  cpred_supp c ∪ cpred_supp c' ## cpred_supp d ∪ cpred_supp d' ->
+  c && d ≡ c' && d' ->
+  (* ¬ (d ≡ FALSE) *)
+  c ≡ c' /\ d ≡ d'. *)
+
+(* Lemma dnf_cpred0_AND_does_not_appear_equiv_iff
+  n b b' c d : does_not_appear n c -> does_not_appear n b ->
+  dnf_cpred0 n b && c ≡ dnf_cpred0 n b' && d <->
+  b = b' /\  *)
+
+
+(* Lemma REG_AND_dnf_cpred1_aux_equiv_iff *)
+
+(* Lemma norm_dnf1_proper_equiv_aux k cs ds :
+  dnf_cpred1_aux k cs ≡ dnf_cpred1_aux k ds ->
+  norm_dnf1 cs = norm_dnf1 ds.
+Proof.
+  revert k ds;
+  induction cs as [|c cs IHcs]; intros k ds.
+  - cbn.
+    intros Hds%symmetry.
+    rewrite dnf_cpred1_aux_TRUE_iff in Hds.
+    symmetry.
+    now apply norm_dnf1_None.
+  - destruct ds as [|d ds].
+    + rewrite dnf_cpred1_aux_TRUE_iff.
+      now rewrite norm_dnf1_None.
+    + destruct c as [c|], d as [d|].
+      * cbn -[dnf_cpred0].
+        rewrite  *)
+
+
+
+Definition cpred_impl (c d : cpred) : bool :=
+  bool_decide (norm_dnf (cpred_dnf c) ⊆ norm_dnf (cpred_dnf d)).
+
+Lemma list_fmap_subseteq_1 {A B} (f : A -> B) (l l' : list A) :
+  l ⊆ l' -> f <$> l ⊆ f <$> l'.
+Proof.
+  set_solver.
+Qed.
+
+Lemma cpred_impl_correct c d : cpred_impl c d ->
+  IMPL c d ≡ TRUE.
+Proof.
+  intros Hcd%bool_decide_spec.
+  rewrite <- (dnf_cpred_dnf c), <- (dnf_cpred_dnf d).
+  rewrite <- (dnf_cpred_norm_dnf (cpred_dnf c)), <- (dnf_cpred_norm_dnf (cpred_dnf d)).
+  apply ORS_subset.
+  now apply list_fmap_subseteq_1.
+Qed.
+
+#[export] Instance option_relation_dec {A B} (P : A -> B -> Prop)
+  (Q : A -> Prop) (R : B -> Prop)
+  `{HP : forall a b, Decision (P a b), HQ : forall a, Decision (Q a),
+  HR : forall b, Decision (R b)} :
+  RelDecision (option_relation P Q R) :=
+  fun a b =>
+  match a, b with
+  | Some a, Some b => _
+  | Some a, None => _
+  | None, Some b => _
+  | None, None => _
+  end.
+
+Inductive Forall2' {A B} (P : A -> B -> Prop) (Q : A -> Prop) (R : B -> Prop) :
+  list A -> list B -> Prop :=
+  (* | Forall2'_nil : Forall2' P Q R [] [] *)
+  | Forall2'_left l : Forall Q l -> Forall2' P Q R l []
+  | Forall2'_right l' : Forall R l' -> Forall2' P Q R [] l'
+  | Forall2'_conj a b l l' : P a b -> Forall2' P Q R l l' -> Forall2' P Q R (a :: l) (b :: l').
+
+Fixpoint forall2'_fun {A B} (P : A -> B -> Prop) (Q : A -> Prop) (R : B -> Prop)
+  (l : list A) (l' : list B) : Prop :=
+  match l with
+  | [] => Forall R l'
+  | a :: l =>
+    match l' with
+    | [] => Forall Q (a :: l)
+    | b :: l' => P a b /\ forall2'_fun P Q R l l'
+    end
+  end.
+
+Lemma forall2'_fun_correct {A B} (P : A -> B -> Prop) (Q : A -> Prop) (R : B -> Prop)
+  (l : list A) (l' : list B) :
+  forall2'_fun P Q R l l' <-> Forall2' P Q R l l'.
+Proof.
+  split.
+  - revert l'; induction l as [|a l IHl]; intros l'; [now constructor|].
+    destruct l' as [|b l']; [now constructor|].
+    cbn.
+    intros []; constructor; auto.
+  - intros Hll'.
+    induction Hll'.
+    + destruct l; [constructor|].
+      done.
+    + done.
+    + done.
+Qed.
+
+#[export] Instance forall2'_fun_dec {A B} (P : A -> B -> Prop) (Q : A -> Prop) (R : B -> Prop)
+ `{HP : forall a b, Decision (P a b), HQ : forall a, Decision (Q a),
+  HR : forall b, Decision (R b)} :
+  forall l l', Decision (forall2'_fun P Q R l l') :=
+  fix go l l' :=
+  match l with
+  | [] => decide (Forall R l')
+  | a :: l =>
+    match l' with
+    | [] => decide (Forall Q (a :: l))
+    | b :: l' =>
+      and_dec (HP a b) (go l l')
+    end
+  end.
+
+#[export] Instance Forall2'_dec {A B} (P : A -> B -> Prop) (Q : A -> Prop) (R : B -> Prop)
+ `{HP : forall a b, Decision (P a b), HQ : forall a, Decision (Q a),
+  HR : forall b, Decision (R b)} :
+  forall l l', Decision (Forall2' P Q R l l').
+  refine (fun l l' => cast_if (forall2'_fun_dec P Q R l l'));
+  abstract (now rewrite <- forall2'_fun_correct).
+Defined.
+
+
+Lemma dnf_cpred0_impl k c c' :
+  option_relation eq (λ _, True) (λ _, False) c c' ->
+  IMPL (dnf_cpred0 k c) (dnf_cpred0 k c') ≡ TRUE.
+Proof.
+  destruct c as [c|], c' as [c'|]; cbn; try easy; [intros ->|]; bsolve.
+Qed.
+
+
+Definition cpred_impl' (c d : cpred) : bool :=
+  bool_decide (Forall (λ cnj, Exists (λ cnj',
+    Forall2' (option_relation eq (λ _, True) (λ _, False))
+    (λ _, True) (λ _, False) cnj cnj')
+    (norm_dnf (cpred_dnf d)))
+    (norm_dnf (cpred_dnf c))).
+
+
+
+Lemma dnf_cpred1_aux_impl k cnj cnj' :
+  Forall2' (option_relation eq (λ _, True) (λ _, False))
+    (λ _, True) (λ _, False) cnj cnj' ->
+  IMPL (dnf_cpred1_aux k cnj) (dnf_cpred1_aux k cnj') ≡ TRUE.
+Proof.
+  intros Hcnj.
+  revert k;
+  induction Hcnj as [cnj Hcnj|cnj' Hcnj'|c c' cnj cnj' Hc Hcnj IHcnj]; intros k.
+  - bsolve.
+  - induction Hcnj'; easy.
+  - cbn.
+    rewrite <- 2 dnf_cpred1_aux_S.
+    apply (dnf_cpred0_impl k) in Hc.
+    rewrite Nat.add_0_r.
+    intros m.
+    rewrite <- Is_true_true.
+    rewrite IMPL_correct'.
+    cbn.
+    rewrite 2 andb_True.
+    intros [Hcm Hcnjm].
+    split.
+    + specialize (Hc m).
+      rewrite <- Is_true_true, IMPL_correct' in Hc.
+      auto.
+    + specialize (IHcnj (s k) m).
+      rewrite <- Is_true_true, IMPL_correct' in IHcnj.
+      auto.
+Qed.
+
+
+
+Lemma cpred_impl'_correct c d : cpred_impl' c d ->
+  IMPL c d ≡ TRUE.
+Proof.
+  intros Hcd%bool_decide_spec.
+  rewrite <- (dnf_cpred_dnf c), <- (dnf_cpred_dnf d).
+  rewrite <- (dnf_cpred_norm_dnf (cpred_dnf c)), <- (dnf_cpred_norm_dnf (cpred_dnf d)).
+  intros m.
+  rewrite <- Is_true_true.
+  apply IMPL_correct'.
+  unfold dnf_cpred.
+  rewrite 2 ORS_correct'.
+  rewrite 2 list.Exists_exists.
+  intros (_ & (x & -> & Hcx)%elem_of_list_fmap & Hxm).
+  rewrite list.Forall_forall in Hcd.
+  specialize (Hcd _ Hcx).
+  rewrite list.Exists_exists in Hcd.
+  destruct Hcd as (y & Hy & Hxy).
+  exists (dnf_cpred1 y).
+  split; [now apply elem_of_list_fmap_1|].
+  revert Hxm.
+  apply IMPL_correct'.
+  rewrite (dnf_cpred1_aux_impl 0); done.
+Qed.
+
+Definition cpred_dec (c d : cpred) : bool :=
+  cpred_impl' c d && cpred_impl' d c.
+
+Lemma cpred_dec_correct c d : cpred_dec c d ->
+  c ≡ d.
+Proof.
+  intros Hcd%andb_True.
+  apply IFF_correct, AND_TRUE.
+  split; now apply cpred_impl'_correct.
+Qed.
+
+
+
+
+
 
 Lemma SIMPLIFY_CPRED_PRE_RULE (B : cpred) {A : cpred} {n : nat} {lt : list (TType n)} {mp : mprog} {Q : MPredicate n} :
   equiv_cpred A B ->
@@ -1739,12 +2605,7 @@ Lemma KILL_AND_REPEAT_R_RULE {n : nat} (A B : cpred) (lt : list (TType n)) (mp :
       {{{ [ (AND (AND A B) B, lt) ] }}} mp {{{ Q }}}
       <-> {{{ [ (AND A B, lt) ] }}} mp {{{ Q }}}.
 Proof. apply SIMPLIFY_CPRED_PRE_RULE.
-  unfold equiv_cpred.
-  intros r.
-  simpl.
-  destruct (translate_cpred A r) eqn:E; auto.
-  destruct (translate_cpred B r) eqn:E'; auto.
-  destruct b, b0; auto.
+  bsolve.
 Qed.
 
 Lemma KILL_FALSE_RULE {n : nat} (lt : list (TType n)) (mp : mprog) (Q : MPredicate n) (H' : Q <> []) :
@@ -1815,10 +2676,8 @@ Proof. unfold Mtriple.
   exists H5.
   destruct (Mat_eq_dec (2 ^ n) 1 cq'.2 Zero H5
      (WF_Zero (2 ^ n) 1)); auto; contradiction.
-  
-  destruct (translate_cpred A cq.1) eqn:E'; try contradiction.
-  rewrite andb_false_r in H1.
-  contradiction.
+  rewrite andb_false_r in *.
+  easy.
 Qed.
 
 Lemma KILL_AND_FALSE_R_RULE' {n : nat} (A : cpred) (lt : list (TType n)) (mp : mprog) :
@@ -1827,16 +2686,9 @@ Proof. apply KILL_AND_FALSE_R_RULE. intro. discriminate. Qed.
 
 Lemma KILL_AND_TF_R_RULE {n : nat} (A B : cpred) (lt : list (TType n)) (mp : mprog) (Q : MPredicate n) (H' : Q <> []) :
       {{{ [ (AND (AND A B) (NOT B), lt) ] }}} mp {{{ Q }}}.
-Proof. eapply SIMPLIFY_CPRED_PRE_RULE.
-  Unshelve.
-  3: apply (AND (AND A B) FALSE).
-  unfold equiv_cpred.
-  intros r.
-  simpl.
-  destruct (translate_cpred A r) eqn:E; auto.
-  destruct (translate_cpred B r) eqn:E'; auto.
-  destruct b, b0; auto.
-  apply KILL_AND_FALSE_R_RULE; auto.
+Proof. apply SIMPLIFY_CPRED_PRE_RULE with FALSE.
+  - bsolve.
+  - now apply KILL_FALSE_RULE.
 Qed.
 
 Lemma KILL_AND_TF_R_RULE' {n : nat} (A B : cpred) (lt : list (TType n)) (mp : mprog) :
@@ -1845,16 +2697,9 @@ Proof. apply KILL_AND_TF_R_RULE. intro. discriminate. Qed.
 
 Lemma KILL_AND_FT_R_RULE {n : nat} (A B : cpred) (lt : list (TType n)) (mp : mprog) (Q : MPredicate n)  (H' : Q <> []) :
       {{{ [ (AND (AND A (NOT B)) B, lt) ] }}} mp {{{ Q }}}.
-Proof. eapply SIMPLIFY_CPRED_PRE_RULE.
-  Unshelve.
-  3: apply (AND (AND A B) FALSE).
-  unfold equiv_cpred.
-  intros r.
-  simpl.
-  destruct (translate_cpred A r) eqn:E; auto.
-  destruct (translate_cpred B r) eqn:E'; auto.
-  destruct b, b0; auto.
-  apply KILL_AND_FALSE_R_RULE; auto.
+Proof. apply SIMPLIFY_CPRED_PRE_RULE with FALSE.
+  - bsolve.
+  - now apply KILL_FALSE_RULE.
 Qed.
 
 Lemma KILL_AND_FT_R_RULE' {n : nat} (A B : cpred) (lt : list (TType n)) (mp : mprog) :
@@ -1864,7 +2709,7 @@ Proof. apply KILL_AND_FT_R_RULE. intro. discriminate. Qed.
 Lemma REMOVE_LAST_pI_RULE {n : nat} (A : cpred) (lt : list (TType n)) (mp : mprog) (Q : MPredicate n) :
   lt <> [] ->
   last lt (defaultT_I n) = (C1, (repeat gI n)) ->
-      {{{ [ (A, lt ) ] }}} mp {{{ Q }}} <-> 
+      {{{ [ (A, lt ) ] }}} mp {{{ Q }}} <->
         {{{ [ (A, removelast lt ) ] }}} mp {{{ Q }}}.
 Proof. intros H H0.
   split; intros.
@@ -1877,7 +2722,7 @@ Proof. intros H H0.
     specialize (H1 (A, lt)).
     assert (In (A, lt) [(A, lt)]).
     { simpl; auto. }
-    specialize (H1 H6 cq H3). 
+    specialize (H1 H6 cq H3).
     simpl in *.
     destruct (Mat_eq_dec (2 ^ n) 1 cq.2 Zero H3
           (WF_Zero (2 ^ n) 1)).
@@ -1889,7 +2734,7 @@ Proof. intros H H0.
     destruct (Mat_eq_dec (2 ^ n) 1 cq'.2 Zero H'
      (WF_Zero (2 ^ n) 1)); auto.
     destruct (translate_cpred A cq.1) eqn:E; try contradiction.
-    destruct b; try contradiction.
+    (* destruct b; try contradiction. *)
     assert (Forall
          (λ t : TType n,
             vecSatisfies cq.2 (translate t))
@@ -1912,7 +2757,7 @@ Proof. intros H H0.
     specialize (H1 (A, removelast lt)).
     assert (In (A, removelast lt) [(A, removelast lt)]).
     { simpl; auto. }
-    specialize (H1 H6 cq H3). 
+    specialize (H1 H6 cq H3).
     simpl in *.
     destruct (Mat_eq_dec (2 ^ n) 1 cq.2 Zero H3
           (WF_Zero (2 ^ n) 1)).
@@ -1924,7 +2769,7 @@ Proof. intros H H0.
     destruct (Mat_eq_dec (2 ^ n) 1 cq'.2 Zero H'
      (WF_Zero (2 ^ n) 1)); auto.
     destruct (translate_cpred A cq.1) eqn:E; try contradiction.
-    destruct b; try contradiction.
+    (* destruct b; try contradiction. *)
     rewrite @app_removelast_last with (d := (defaultT_I n)) (l := lt) in H4; auto.
     rewrite Forall_app in H4.
     destruct H4.
@@ -1963,7 +2808,7 @@ Proof. intros H'' H H0.
     destruct (Mat_eq_dec (2 ^ n) 1 cq'.2 Zero H7
      (WF_Zero (2 ^ n) 1)); auto; contradiction.
   - destruct (translate_cpred A cq.1) eqn:E; try contradiction.
-    destruct b; try contradiction.
+    (* destruct b; try contradiction. *)
     rewrite @app_removelast_last with (d := (defaultT_I n)) (l := lt) in H4; auto.
     rewrite Forall_app in H4.
     destruct H4.
@@ -2025,17 +2870,110 @@ Proof. intros WFLlt H. unfold Mtriple in *.
        then True
        else
         match translate_cpred A cq.1 with
-        | Some true =>
+        | true =>
             Forall (λ t : TType n, vecSatisfies cq.2 (translate t))
               (normalize i lt)
         | _ => False
         end).
   { destruct (Mat_eq_dec (2 ^ n) 1 cq.2 Zero H1 (WF_Zero (2 ^ n) 1)); auto.
     destruct (translate_cpred A cq.1); try contradiction.
-    destruct b; try contradiction.
+    (* destruct b; try contradiction. *)
     apply Forall_vecSatisfies_normalize; auto. }
   specialize (H H0 cq' H3); auto.
 Qed.
+
+
+Lemma ITE_TRUE_RULE {n} (lt : list (TType n)) (C : cpred) (Q : MPredicate n) (p1 p2 : prog) (A : cpred) :
+  IMPL A C ≡ TRUE ->
+  {{{ [ (A, lt) ] }}} p1 {{{ Q }}} ->
+  (* {{{ [ (FALSE, lt) ] }}} p2 {{{ Q }}} -> *)
+  {{{ [ (A, lt) ] }}} (ITE C p1 p2) {{{ Q }}}.
+Proof.
+  intros HAC HA.
+  apply ITE_RULE.
+  - apply SIMPLIFY_CPRED_PRE_RULE with A; [|done].
+    unfold IMPL in HAC.
+    rewrite <- (AND_TRUE_l A) at 2.
+    rewrite <- HAC.
+    bsolve.
+  - apply SIMPLIFY_CPRED_PRE_RULE with FALSE.
+    + rewrite <- (AND_TRUE_l (_ && _)).
+      rewrite <- HAC.
+      bsolve.
+    + intros b [<-|[]].
+      intros cq Hcq.
+      specialize (HA (A, lt) ltac:(now left) cq Hcq).
+      unfold cqSatisfiesMbranch in HA |- *.
+      cbn.
+      destruct (Mat_eq_dec _ _ _ _) as [Hcq0|]; [intros _|intros []].
+      intros cq' [<-|[]].
+      cbn in HA.
+      specialize (HA Logic.I _ (or_introl eq_refl)) as (b & Hb & HQb).
+      exists b.
+      split; [easy|].
+      cbn.
+      rewrite Hcq0.
+      rewrite Mmult_0_r.
+      exists (WF_Zero _ _).
+      destruct (Mat_eq_dec _ _ _ _ _ _); [|easy].
+      easy.
+Qed.
+
+Lemma ITE_FALSE_RULE {n} (lt : list (TType n)) (C : cpred) (Q : MPredicate n) (p1 p2 : prog) (A : cpred) :
+  IMPL A (¬ C) ≡ TRUE ->
+  {{{ [ (A, lt) ] }}} p2 {{{ Q }}} ->
+  (* {{{ [ (FALSE, lt) ] }}} p2 {{{ Q }}} -> *)
+  {{{ [ (A, lt) ] }}} (ITE C p1 p2) {{{ Q }}}.
+Proof.
+  intros HAC HA.
+  apply ITE_RULE.
+  - apply SIMPLIFY_CPRED_PRE_RULE with FALSE.
+    + rewrite <- (AND_TRUE_l (_ && _)).
+      rewrite <- HAC.
+      bsolve.
+    + intros b [<-|[]].
+      intros cq Hcq.
+      specialize (HA (A, lt) ltac:(now left) cq Hcq).
+      unfold cqSatisfiesMbranch in HA |- *.
+      cbn.
+      destruct (Mat_eq_dec _ _ _ _) as [Hcq0|]; [intros _|intros []].
+      intros cq' [<-|[]].
+      cbn in HA.
+      specialize (HA Logic.I _ (or_introl eq_refl)) as (b & Hb & HQb).
+      exists b.
+      split; [easy|].
+      cbn.
+      rewrite Hcq0.
+      rewrite Mmult_0_r.
+      exists (WF_Zero _ _).
+      destruct (Mat_eq_dec _ _ _ _ _ _); [|easy].
+      easy.
+  - apply SIMPLIFY_CPRED_PRE_RULE with A; [|done].
+    unfold IMPL in HAC.
+    rewrite <- (AND_TRUE_l A) at 2.
+    rewrite <- HAC.
+    bsolve.
+Qed.
+
+Lemma JOIN_RULE {n} (lt lt' : list (TType n)) (A A' : cpred)
+  (Q : MPredicate n) (p : mprog) :
+  {{{[(A, lt)] }}} p {{{Q}}} ->
+  {{{[(A', lt')] }}} p {{{Q}}} ->
+  {{{[(A,lt); (A',lt')] }}} p {{{Q}}}.
+Proof.
+  unfold Mtriple.
+  naive_solver.
+Qed.
+
+(* Lemma ITE_JOIN_RULE {n} (lt : list (TType n)) (C : cpred)
+  (Q : MPredicate n) (p1 p2 : prog) (A : cpred) :
+  {{{ [ (A && C, lt) ] }}} p1 {{{ Q }}} ->
+  {{{ [ (A && ¬ C, lt) ] }}} p2 {{{ Q }}} ->
+  {{{ [ (A, lt) ] }}} (ITE C p1 p2) {{{ Q }}}.
+Proof.
+  intros Hp1 Hp2.
+  ITE_RULE *)
+
 
 (*
 Inductive cpred :=
@@ -2067,7 +3005,7 @@ Definition cqSatisfiesMbranch {n} (cq : cqstate n) (b : Mbranch n) (H : WF_Matri
           end.
 
 Definition Mtriple {n} (A : MPredicate n) (mp : mprog) (B : MPredicate n) :=
-  forall a, In a A -> forall cq (H : WF_Matrix (snd cq)), cqSatisfiesMbranch cq a H -> forall cq', In cq' (apply_mprog mp [cq]) -> 
+  forall a, In a A -> forall cq (H : WF_Matrix (snd cq)), cqSatisfiesMbranch cq a H -> forall cq', In cq' (apply_mprog mp [cq]) ->
    exists b, In b B /\ exists (H0 : WF_Matrix (snd cq')), cqSatisfiesMbranch cq' b H0.
 
 Lemma MSEQ_RULE {n} (A B C : MPredicate n) (mp1 mp2 : mprog):
@@ -2085,13 +3023,13 @@ Lemma ITE_RULE {n} (lt : list (TType n)) (C : cpred) (Q : MPredicate n) (p1 p2 :
   {{{ [ (A, lt) ] }}} (ITE C p1 p2) {{{ Q }}}.
 
 Lemma MEAS_RULE {n} (A : cpred) (lt : list (TType n)) (q i : nat):
-(q < n)%nat -> WF_L lt → length lt ≠ 0%nat -> does_not_appear i A -> 
+(q < n)%nat -> WF_L lt → length lt ≠ 0%nat -> does_not_appear i A ->
 {{{ [(A, lt)] }}} MEAS q i {{{ [
 (AND A (REG i), apply_MEAS q true lt);
-(AND A (NOT (REG i)), apply_MEAS q false lt)] }}}.
+(AND A (REG i false), apply_MEAS q false lt)] }}}.
 
 Lemma TRIPLE_RULE {n : nat} (lt lt' : list (TType n)) (cp : cpred) (g : prog) (Q : Predicate n) (la : list (AType n)) :
-  {{ Cap (map TtoA lt) }} g {{ Q }} -> 
+  {{ Cap (map TtoA lt) }} g {{ Q }} ->
   Q = Cap la ->
   repeat 1%nat (length la) = map length la ->
   lt' = map AtoT la ->
@@ -2126,7 +3064,7 @@ Lemma KILL_AND_FT_R_RULE {n : nat} (A B : cpred) (lt : list (TType n)) (mp : mpr
 Lemma REMOVE_LAST_pI_RULE {n : nat} (A : cpred) (lt : list (TType n)) (mp : mprog) (Q : MPredicate n) :
   lt <> [] ->
   last lt (defaultT_I n) = (C1, (repeat gI n)) ->
-      {{{ [ (A, lt ) ] }}} mp {{{ Q }}} <-> 
+      {{{ [ (A, lt ) ] }}} mp {{{ Q }}} <->
         {{{ [ (A, removelast lt ) ] }}} mp {{{ Q }}}.
 
 Lemma REMOVE_LAST_mI_RULE {n : nat} (A : cpred) (lt : list (TType n)) (mp : mprog) (Q : MPredicate n) (H' : Q <> []) :
@@ -2141,10 +3079,19 @@ Lemma NORMALIZE_RULE {n : nat} (i : nat) (A : cpred) (lt : list (TType n)) (mp :
   {{{ [(A,lt)] }}} mp {{{ Q }}}.
 *)
 
+(* Lemma Mtriple_nonempty_postcond {n} (A B : MPredicate n) (mp : mprog) :
+  {{{A}}} mp {{{B}}} -> A <> [] -> B <> [].
+Proof.
+  intros HAB HA ->.
+  destruct A as [|a A]; [easy|].
+  clear HA.
+  specialize (HAB a ltac:(now left)). *)
+
+
 
 Require Export HeisenbergFoundations.ReflexiveAutomation.
 
-Ltac finalize := 
+Ltac finalize :=
   eapply FINALIZE_RULE.
 
 Ltac mseq :=
@@ -2161,7 +3108,7 @@ Ltac meas :=
 eapply MEAS_RULE;
   [ lia
   | repeat (constructor; auto)
-  | simpl; lia 
+  | simpl; lia
   | repeat (constructor; auto)].
 
 Ltac branch :=
@@ -2175,14 +3122,14 @@ Ltac branch :=
 Ltac simplify :=
   unfold apply_MEAS, AtoT;
   repeat match goal with
-    | |- context [ pivots_normalize _ ?a ] => 
-        rewrite ! (parse_norm_eq _ a _);  
+    | |- context [ pivots_normalize _ ?a ] =>
+        rewrite ! (parse_norm_eq _ a _);
         rewrite <- !TTypeBtoTType_respects_pivots_normalizeB
-    | |- context [ normalize _ ?a ] => 
-        rewrite ! (parse_norm_eq _ a _);  
+    | |- context [ normalize _ ?a ] =>
+        rewrite ! (parse_norm_eq _ a _);
         rewrite <- !TTypeBtoTType_respects_normalize
     end;
-  lazy -[Cplus Cminus Cmult Cdiv Cinv RtoC sqrt 
+  lazy -[Cplus Cminus Cmult Cdiv Cinv RtoC sqrt
            Q2R IZR QC2C Cexp PI sin cos atype_eq Copp
            triple pred_eq Mtriple].
 
@@ -2193,13 +3140,13 @@ Ltac kill_rep :=
   repeat erewrite KILL_AND_REPEAT_R_RULE.
 
 Ltac kill_f :=
-  repeat 
+  repeat
     first [eapply KILL_FALSE_RULE;
-           first [intro; discriminate | shelve] 
+           first [intro; discriminate | shelve]
           | eapply KILL_AND_FALSE_R_RULE;
-           first [intro; discriminate | shelve] 
+           first [intro; discriminate | shelve]
           | eapply KILL_AND_TF_R_RULE;
-            first [intro; discriminate | shelve] 
+            first [intro; discriminate | shelve]
           | eapply KILL_AND_FT_R_RULE;
             first [intro; discriminate | shelve]].
 
@@ -2207,7 +3154,7 @@ Ltac kill_f_r :=
   try apply KILL_AND_FALSE_R_RULE'.
 
 Ltac kill_i :=
-  repeat 
+  repeat
     (repeat (erewrite REMOVE_LAST_pI_RULE;
              [simpl | intro; discriminate | reflexivity]);
      repeat (eapply REMOVE_LAST_mI_RULE';
@@ -2233,7 +3180,7 @@ Ltac mstep :=
   | |- {{{ _ }}} ITE _ _ _ {{{ _ }}} => ite; mstep
   | |- {{{ _ }}} MEAS _ _ {{{ _ }}} => meas
   | |- {{{ _ }}} U _ {{{ _ }}} => triple
-  end. 
+  end.
 
 Ltac msolve := tryif mseq then [> repeat msolve | idtac] else mstep.
 
@@ -2243,44 +3190,42 @@ Ltac msolve := tryif mseq then [> repeat msolve | idtac] else mstep.
 
 (*** Steane7 QEC Example ***)
 
+Ltac bsolve_slow :=
+  let r := fresh "r" in
+  intros r; simpl;
+  destruct
+    (r !! 0%nat)%stdpp as [b0|],
+    (r !! 1%nat)%stdpp as [b1|],
+    (r !! 2%nat)%stdpp as [b2|],
+    (r !! 3%nat)%stdpp as [b3|],
+    (r !! 4%nat)%stdpp as [b4|],
+    (r !! 5%nat)%stdpp as [b5|];
+  try reflexivity;
+  destruct b0, b1, b2, b3, b4, b5;
+  reflexivity.
+
+Ltac bsolve_concrete :=
+  (apply cpred_dec_correct; vm_compute; done).
+  (* || tryif bsolve_slow then match goal with |- ?G => gfail 1000 "DIDN'T SOLVE" G end else fail. *)
+
 Ltac steane7_true cpred :=
 cpred_iff cpred;
 [triple
-| intros r; simpl;
-destruct 
-  (r !! 0%nat)%stdpp as [b0|], 
-  (r !! 1%nat)%stdpp as [b1|],
-  (r !! 2%nat)%stdpp as [b2|],
-  (r !! 3%nat)%stdpp as [b3|],
-  (r !! 4%nat)%stdpp as [b4|],
-  (r !! 5%nat)%stdpp as [b5|];
-try reflexivity;
-destruct b0, b1, b2, b3, b4, b5;
-reflexivity].
+| bsolve_concrete].
 
 Ltac steane7_false cpred :=
 cpred_iff (AND cpred FALSE);
-[kill 
-| intros r; simpl;
-destruct 
-  (r !! 0%nat)%stdpp as [b0|], 
-  (r !! 1%nat)%stdpp as [b1|],
-  (r !! 2%nat)%stdpp as [b2|],
-  (r !! 3%nat)%stdpp as [b3|],
-  (r !! 4%nat)%stdpp as [b4|],
-  (r !! 5%nat)%stdpp as [b5|];
-try reflexivity;
-destruct b0, b1, b2, b3, b4, b5;
-reflexivity].
+[kill
+| bsolve_concrete].
 
 Ltac steane7_correction_step cpred := simplify; branch; try (ite; first [steane7_true cpred | steane7_false cpred]).
 
 Ltac steane7_correction cpred :=
-  mseq; 
-  [ do 7 (mseq; [steane7_correction_step cpred; kill | idtac]); 
+  mseq;
+  [ do 7 (mseq; [steane7_correction_step cpred; kill | idtac]);
     steane7_correction_step cpred; kill
   | idtac];
-  do 7 (mseq; [steane7_correction_step cpred; kill | idtac]); 
+  do 7 (mseq; [steane7_correction_step cpred; kill | idtac]);
   steane7_correction_step cpred; kill_f.
 
 
@@ -2296,56 +3241,74 @@ Definition Zanc : TType 8 := (C1, [gI; gI; gI; gI; gI; gI; gI; gZ]).
 Definition ZL : list (TType 8) := [g1; g2; g3; g4; g5; g6; Zbar; Zanc].
 Definition XL : list (TType 8) := [g1; g2; g3; g4; g5; g6; Xbar; Zanc].
 
-Definition Steane7 q0 q1 q2 q3 q4 q5 q6 : prog := 
-(H q4 ;; H q5 ;; H q6 ;; 
-CNOT q0 q1 ;; CNOT q0 q2 ;; 
-CNOT q6 q0 ;; CNOT q6 q1 ;; CNOT q6 q3 ;; 
-CNOT q5 q0 ;; CNOT q5 q2 ;; CNOT q5 q3 ;; 
-CNOT q4 q1 ;; CNOT q4 q2 ;; CNOT q4 q3)%pg. 
+Definition Steane7 q0 q1 q2 q3 q4 q5 q6 : prog :=
+(H q4 ;; H q5 ;; H q6 ;;
+CNOT q0 q1 ;; CNOT q0 q2 ;;
+CNOT q6 q0 ;; CNOT q6 q1 ;; CNOT q6 q3 ;;
+CNOT q5 q0 ;; CNOT q5 q2 ;; CNOT q5 q3 ;;
+CNOT q4 q1 ;; CNOT q4 q2 ;; CNOT q4 q3)%pg.
 
-Definition synd_s1z_0 : mprog := 
-U (CNOT 0 7 ;; CNOT 2 7 ;; CNOT 4 7 ;; CNOT 6 7)%pg ;;; MEAS 7 0 ;;; ITE (REG 0) (Id 7) (X 7).
+Definition synd_s1z_0 : mprog :=
+U (CNOT 0 7 ;; CNOT 2 7 ;; CNOT 4 7 ;; CNOT 6 7)%pg ;;; MEAS 7 0 ;;; ITE (REG 0 true) (Id 7) (X 7).
 
-Definition synd_s2z_1 : mprog := 
-U (CNOT 1 7 ;; CNOT 2 7 ;; CNOT 5 7 ;; CNOT 6 7)%pg ;;; MEAS 7 1 ;;; ITE (REG 1) (Id 7) (X 7).
+Definition synd_s2z_1 : mprog :=
+U (CNOT 1 7 ;; CNOT 2 7 ;; CNOT 5 7 ;; CNOT 6 7)%pg ;;; MEAS 7 1 ;;; ITE (REG 1 true) (Id 7) (X 7).
 
-Definition synd_s3z_2 : mprog := 
-U (CNOT 3 7 ;; CNOT 4 7 ;; CNOT 5 7 ;; CNOT 6 7)%pg ;;; MEAS 7 2 ;;; ITE (REG 2) (Id 7) (X 7).
+Definition synd_s3z_2 : mprog :=
+U (CNOT 3 7 ;; CNOT 4 7 ;; CNOT 5 7 ;; CNOT 6 7)%pg ;;; MEAS 7 2 ;;; ITE (REG 2 true) (Id 7) (X 7).
 
-Definition synd_s1x_3 : mprog := 
-U (H 7 ;; CNOT 7 0 ;; CNOT 7 2 ;; CNOT 7 4 ;; CNOT 7 6 ;; H 7)%pg ;;; MEAS 7 3 ;;; ITE (REG 3) (Id 7) (X 7).
+Definition synd_s1x_3 : mprog :=
+U (H 7 ;; CNOT 7 0 ;; CNOT 7 2 ;; CNOT 7 4 ;; CNOT 7 6 ;; H 7)%pg ;;; MEAS 7 3 ;;; ITE (REG 3 true) (Id 7) (X 7).
 
-Definition synd_s2x_4 : mprog := 
-U (H 7 ;; CNOT 7 1 ;; CNOT 7 2 ;; CNOT 7 5 ;; CNOT 7 6 ;; H 7)%pg ;;; MEAS 7 4 ;;; ITE (REG 4) (Id 7) (X 7).
+Definition synd_s2x_4 : mprog :=
+U (H 7 ;; CNOT 7 1 ;; CNOT 7 2 ;; CNOT 7 5 ;; CNOT 7 6 ;; H 7)%pg ;;; MEAS 7 4 ;;; ITE (REG 4 true) (Id 7) (X 7).
 
-Definition synd_s3x_5 : mprog := 
-U (H 7 ;; CNOT 7 3 ;; CNOT 7 4 ;; CNOT 7 5 ;; CNOT 7 6 ;; H 7)%pg ;;; MEAS 7 5 ;;; ITE (REG 5) (Id 7) (X 7).
+Definition synd_s3x_5 : mprog :=
+U (H 7 ;; CNOT 7 3 ;; CNOT 7 4 ;; CNOT 7 5 ;; CNOT 7 6 ;; H 7)%pg ;;; MEAS 7 5 ;;; ITE (REG 5 true) (Id 7) (X 7).
 
 Definition correctX : mprog :=
-ITE (AND (AND (REG 2) (REG 1)) (REG 0)) (Id 7) (Id 7) ;;;
-ITE (AND (AND (REG 2) (REG 1)) (NOT (REG 0))) (X 0) (Id 7) ;;;
-ITE (AND (AND (REG 2) (NOT (REG 1))) (REG 0)) (X 1) (Id 7) ;;;
-ITE (AND (AND (REG 2) (NOT (REG 1))) (NOT (REG 0))) (X 2) (Id 7) ;;;
-ITE (AND (AND (NOT (REG 2)) (REG 1)) (REG 0)) (X 3) (Id 7) ;;;
-ITE (AND (AND (NOT (REG 2)) (REG 1)) (NOT (REG 0))) (X 4) (Id 7) ;;;
-ITE (AND (AND (NOT (REG 2)) (NOT (REG 1))) (REG 0)) (X 5) (Id 7) ;;;
-ITE (AND (AND (NOT (REG 2)) (NOT (REG 1))) (NOT (REG 0))) (X 6) (Id 7).
+ITE (AND (AND (REG 2 true) (REG 1 true)) (REG 0 true)) (Id 7) (Id 7) ;;;
+ITE (AND (AND (REG 2 true) (REG 1 true)) (REG 0 false)) (X 0) (Id 7) ;;;
+ITE (AND (AND (REG 2 true) (REG 1 false)) (REG 0 true)) (X 1) (Id 7) ;;;
+ITE (AND (AND (REG 2 true) (REG 1 false)) (REG 0 false)) (X 2) (Id 7) ;;;
+ITE (AND (AND (REG 2 false) (REG 1 true)) (REG 0 true)) (X 3) (Id 7) ;;;
+ITE (AND (AND (REG 2 false) (REG 1 true)) (REG 0 false)) (X 4) (Id 7) ;;;
+ITE (AND (AND (REG 2 false) (REG 1 false)) (REG 0 true)) (X 5) (Id 7) ;;;
+ITE (AND (AND (REG 2 false) (REG 1 false)) (REG 0 false)) (X 6) (Id 7).
 
 Definition correctZ : mprog :=
-ITE (AND (AND (REG 5) (REG 4)) (REG 3)) (Id 7) (Id 7) ;;;
-ITE (AND (AND (REG 5) (REG 4)) (NOT (REG 3))) (Z 0) (Id 7) ;;;
-ITE (AND (AND (REG 5) (NOT (REG 4))) (REG 3)) (Z 1) (Id 7) ;;;
-ITE (AND (AND (REG 5) (NOT (REG 4))) (NOT (REG 3))) (Z 2) (Id 7) ;;;
-ITE (AND (AND (NOT (REG 5)) (REG 4)) (REG 3)) (Z 3) (Id 7) ;;;
-ITE (AND (AND (NOT (REG 5)) (REG 4)) (NOT (REG 3))) (Z 4) (Id 7) ;;;
-ITE (AND (AND (NOT (REG 5)) (NOT (REG 4))) (REG 3)) (Z 5) (Id 7) ;;;
-ITE (AND (AND (NOT (REG 5)) (NOT (REG 4))) (NOT (REG 3))) (Z 6) (Id 7).
+ITE (AND (AND (REG 5 true) (REG 4 true)) (REG 3 true)) (Id 7) (Id 7) ;;;
+ITE (AND (AND (REG 5 true) (REG 4 true)) (REG 3 false)) (Z 0) (Id 7) ;;;
+ITE (AND (AND (REG 5 true) (REG 4 false)) (REG 3 true)) (Z 1) (Id 7) ;;;
+ITE (AND (AND (REG 5 true) (REG 4 false)) (REG 3 false)) (Z 2) (Id 7) ;;;
+ITE (AND (AND (REG 5 false) (REG 4 true)) (REG 3 true)) (Z 3) (Id 7) ;;;
+ITE (AND (AND (REG 5 false) (REG 4 true)) (REG 3 false)) (Z 4) (Id 7) ;;;
+ITE (AND (AND (REG 5 false) (REG 4 false)) (REG 3 true)) (Z 5) (Id 7) ;;;
+ITE (AND (AND (REG 5 false) (REG 4 false)) (REG 3 false)) (Z 6) (Id 7).
 
+Lemma CUP_RULE_FALSE_R {n} (A B A' : MPredicate n) mp :
+  {{{A}}} mp {{{B}}} ->
+  {{{A'}}} mp {{{ [] }}} ->
+  {{{A ++ A'}}} mp {{{B}}}.
+Proof.
+  intros HAB HA'.
+  rewrite <- (app_nil_r B).
+  now apply CUP_RULE.
+Qed.
+
+Lemma CUP_RULE_FALSE_L {n} (A B A' : MPredicate n) mp :
+  {{{A}}} mp {{{ [] }}} ->
+  {{{A'}}} mp {{{ B }}} ->
+  {{{A ++ A'}}} mp {{{B}}}.
+Proof.
+  intros HAB HA'.
+  now apply (CUP_RULE A [] A' B).
+Qed.
 
 Example Steane7QEC_Id :
 {{{
 [
-(TRUE, 
+(TRUE,
 [
 (C1, [gZ; gI; gI; gI; gI; gI; gI; gI]);
 (C1, [gI; gZ; gI; gI; gI; gI; gI; gI]);
@@ -2359,30 +3322,130 @@ Example Steane7QEC_Id :
 )
 ]
 }}}
-(U (Steane7 0 1 2 3 4 5 6)) ;;; (U (Id 7)) ;;; 
+(U (Steane7 0 1 2 3 4 5 6)) ;;; (U (Id 7)) ;;;
 synd_s1z_0 ;;; synd_s2z_1 ;;; synd_s3z_2 ;;; synd_s1x_3 ;;; synd_s2x_4 ;;; synd_s3x_5 ;;;
 correctX ;;; correctZ
 {{{ [(TRUE, normalize 0%nat [g1; g2; g3; g4; g5; g6; Zbar; Zanc])] }}}.
-Proof. 
+Proof.
 finalize.
 do 8 msolve.
+cbn.
+branch.
+
+steane7_correction
+(TRUE && REG 0 true && REG 1 true && REG 2 true &&
+      REG 3 true && REG 4 true && REG 5 true)%cpred.
+
 (*** Copy Paste cpred ***)
-steane7_correction (AND
-         (AND (AND (AND (AND (AND TRUE (REG 0)) (REG 1)) (REG 2)) (REG 3)) (REG 4))
-         (REG 5)).
-simpl.
+(* steane7_correction (AND
+         (AND (AND (AND (AND (AND TRUE (REG 0 true)) (REG 1 true)) (REG 2 true)) (REG 3 true)) (REG 4 true))
+         (REG 5 true)). *)
+
+
+
 Unshelve.
 all: try apply ([(TRUE,normalize 0%nat [g1; g2; g3; g4; g5; g6; Zbar; Zanc])]).
+1,2,3,4,5,6:kill.
 f_equal.
 solveNormalize; reflexivity.
 solveNormalize; reflexivity.
 all: try (intro; discriminate).
 Qed.
 
+
+Ltac eval_meas :=
+  match goal with
+  | |- context G [@apply_MEAS ?n ?i ?b ?lt] =>
+
+    let x := fresh "x" in
+    evar (x : list (TType n));
+    replace (@apply_MEAS n i b lt) with x by (validate_red; Csimpl; unfold x; reflexivity);
+    subst x
+  | |- context G [@apply_MEAS' ?n ?i ?b ?lt] =>
+
+    let x := fresh "x" in
+    evar (x : list (TType n));
+    replace (@apply_MEAS' n i b lt) with x by (validate_red; Csimpl; unfold x; reflexivity);
+    subst x
+  end.
+
+Lemma translate_prog_id n i :
+  translate_prog n (Id i) = I _.
+Proof.
+  cbn.
+  unfold prog_simpl_app.
+  bdestruct (i <? n).
+  - restore_dims.
+    rewrite 2 kron_mixed_product.
+    rewrite MmultHH.
+    rewrite 2 Mmult_1_r by auto_wf.
+    rewrite 2 id_kron.
+    f_equal; unify_pows_two.
+  - now rewrite Mmult_1_r by auto_wf.
+Qed.
+
+Lemma ID_RULE {n} (P : Predicate n) i :
+  {{ P }} Id i {{ P }}.
+Proof.
+  intros v.
+  rewrite translate_prog_id.
+  intros Hv.
+  apply vecSatisfiesP_implies_WF_Matrix in Hv as Hv'.
+  now rewrite Mmult_1_l by auto_wf.
+Qed.
+
+Fixpoint does_not_appear_bool (i : nat) (c : cpred) : bool :=
+  match c with
+  | TRUE | FALSE => true
+  | REG n _ => negb (Nat.eqb n i)
+  | OR a b | AND a b => does_not_appear_bool i a && does_not_appear_bool i b
+  | NOT a => does_not_appear_bool i a
+  end.
+
+Lemma does_not_appear_bool_correct i c :
+  does_not_appear_bool i c <-> does_not_appear i c.
+Proof.
+  split.
+  - induction c; cbn; [auto using does_not_appear.. | | |auto using dna_NOT].
+    + rewrite negb_True, Is_true_true, Nat.eqb_eq.
+      now intros; apply dna_REG.
+    + rewrite andb_True.
+      intros []; auto using dna_AND.
+    + rewrite andb_True.
+      intros []; auto using dna_OR.
+  - intros Hic.
+    induction Hic; cbn; try easy.
+    + now rewrite negb_True, Is_true_true, Nat.eqb_eq.
+    + now apply andb_True.
+    + now apply andb_True.
+Qed.
+
+#[export] Instance does_not_appear_dec i c : Decision (does_not_appear i c).
+  refine (match does_not_appear_bool i c as b return 
+    (b <-> _) -> _ with
+  | true => fun Hiff => left _
+  | false => fun Hiff => right _
+  end (does_not_appear_bool_correct i c));
+  abstract (now rewrite <- Hiff).
+Defined.
+(* 
+Fixpoint obind_list {A B} (f : A -> option (list B)) : option (list B) :=
+  match l with 
+  | [] => Some l
+  | a :: l => intersection_with (λ a b, Some (a ++ b)) (f a) (obind_list f )
+
+Fixpoint compute_MPC {n} (p : mprog) (P : MPredicate n) : option (MPredicate n) :=
+  match p with
+  | U p => Some (prod_map Datatypes.id (prog_A p) <$> P)
+  | MEAS q i => b
+  | ITE c pq p2 =>[]
+  | mseq mp1 mp2 => compute_MPC mp2 (compute_MPC mp1 P)
+  end. *)
+
 Example Steane7QEC_Z0 :
 {{{
 [
-(TRUE, 
+(TRUE,
 [
 (C1, [gZ; gI; gI; gI; gI; gI; gI; gI]);
 (C1, [gI; gZ; gI; gI; gI; gI; gI; gI]);
@@ -2396,17 +3459,131 @@ Example Steane7QEC_Z0 :
 )
 ]
 }}}
-(U (Steane7 0 1 2 3 4 5 6)) ;;; (U (Z 0)) ;;; 
+(U (Steane7 0 1 2 3 4 5 6)) ;;; (U (Z 0)) ;;;
 synd_s1z_0 ;;; synd_s2z_1 ;;; synd_s3z_2 ;;; synd_s1x_3 ;;; synd_s2x_4 ;;; synd_s3x_5 ;;;
 correctX ;;; correctZ
 {{{ [(TRUE, normalize 0%nat [g1; g2; g3; g4; g5; g6; Zbar; Zanc])] }}}.
-Proof. 
+Proof.
 finalize.
+msolve.
+msolve.
+
+mseq.
+mseq.
+triple.
+mseq.
+meas.
+eval_meas.
+eval_meas.
+branch.
+(* apply JOIN_RULE. *)
+apply ITE_TRUE_RULE; [bsolve|].
+triple.
+apply ITE_FALSE_RULE; [bsolve|].
+triple.
+
+
+mseq.
+mseq.
+cbn.
+branch; triple.
+cbn.
+mseq.
+branch; meas.
+repeat eval_meas.
+cbn; branch;
+first [apply ITE_TRUE_RULE; [bsolve|]|
+  apply ITE_FALSE_RULE; [bsolve|]].
+eapply TRIPLE_RULE.
+apply ID_RULE.
+reflexivity.
+done.
+done.
+
+solvePlaceholder_refl_internal.
+eval_meas.
+eval_meas.
+branch.
+(* apply JOIN_RULE. *)
+apply ITE_TRUE_RULE; [bsolve|].
+triple.
+apply ITE_FALSE_RULE; [bsolve|].
+triple.
+eapply TRIPLE_RULE.
+triple.
+
+unfold Id.
+eapply TRIPLE_RULE.
+
+Measurement.triple.
+
+ite.
+
+msolve.
+msolve.
+msolve.
+msolve.
+evar (c : list (TType 8));
+replace (apply_MEAS _ _ _) with c by (validate_red; unfold c; reflexivity);
+subst c.
+evar (c : list (TType 8));
+replace (apply_MEAS _ _ _) with c by (validate_red; unfold c; reflexivity);
+subst c.
+
+cbn.
+(* TODO: IDEA: Test equality by using NOT for normalization *)
+
+branch; try (eapply KILL_FALSE_RULE; shelve).
+apply ITE_TRUE_RULE.
+bsolve.
+triple.
+apply ITE_FALSE_RULE.
+bsolve.
+triple.
+msolve.
+branch.
+triple.
+Time bsolve_slow.
+
+(* apply cpred_impl'_correct. *)
+(* vm_compute. *)
+(* bsolve_concrete. *)
+apply IFF_correct, AND_TRUE, conj.
+apply cpred_impl'_correct.
+vm_compute.
+done.
+apply cpred_impl'_correct.
+unfold cpred_impl'.
+remember (norm_dnf _) as x.
+vm_compute in Heqx.
+subst x.
+remember (norm_dnf _) as x.
+remember (Forall _) as f.
+
+vm_compute.
+
+bsolve_concrete.
+apply cpred_impl_correct.
+unfold cpred_impl.
+remember (norm_dnf _) as x.
+vm_compute in Heqx.
+bsolve_concrete.
+ite.
+Id
+
+Set Ltac Debug.
+msolve.
+validate_red.
+Timeout 10 lazy-[Cplus Cminus Cmult Cdiv Cinv RtoC sqrt Q2R IZR QC2C Cexp PI sin cos
+	   atype_eq Copp triple pred_eq] in Heqx.
+
+cbn [apply_MEAS].
+msolve.
 do 8 msolve.
 (*** Copy Paste cpred ***)
 steane7_correction (AND
-         (AND (AND (AND (AND (AND TRUE (REG 0)) (REG 1)) (REG 2)) (NOT (REG 3)))
-            (REG 4)) (REG 5)).
+         (AND (AND (AND (AND (AND TRUE (REG 0 true)) (REG 1 true)) (REG 2 true)) (REG 3 false))
+            (REG 4 true)) (REG 5 true)).
 simpl.
 Unshelve.
 all: try apply ([(TRUE,normalize 0%nat [g1; g2; g3; g4; g5; g6; Zbar; Zanc])]).
@@ -2420,7 +3597,7 @@ Qed.
 Example Steane7QEC_X1 :
 {{{
 [
-(TRUE, 
+(TRUE,
 [
 (C1, [gZ; gI; gI; gI; gI; gI; gI; gI]);
 (C1, [gI; gZ; gI; gI; gI; gI; gI; gI]);
@@ -2434,17 +3611,17 @@ Example Steane7QEC_X1 :
 )
 ]
 }}}
-(U (Steane7 0 1 2 3 4 5 6)) ;;; (U (X 1)) ;;; 
+(U (Steane7 0 1 2 3 4 5 6)) ;;; (U (X 1)) ;;;
 synd_s1z_0 ;;; synd_s2z_1 ;;; synd_s3z_2 ;;; synd_s1x_3 ;;; synd_s2x_4 ;;; synd_s3x_5 ;;;
 correctX ;;; correctZ
 {{{ [(TRUE, normalize 0%nat [g1; g2; g3; g4; g5; g6; Zbar; Zanc])] }}}.
-Proof. 
+Proof.
 finalize.
 do 8 msolve.
 (*** Copy Paste cpred ***)
 steane7_correction (AND
-         (AND (AND (AND (AND (AND TRUE (REG 0)) (NOT (REG 1))) (REG 2)) (REG 3))
-            (REG 4)) (REG 5)).
+         (AND (AND (AND (AND (AND TRUE (REG 0 true)) (REG 1 false)) (REG 2 true)) (REG 3 true))
+            (REG 4 true)) (REG 5 true)).
 simpl.
 Unshelve.
 all: try apply ([(TRUE,normalize 0%nat [g1; g2; g3; g4; g5; g6; Zbar; Zanc])]).
@@ -2458,7 +3635,7 @@ Qed.
 Example Steane7QEC_Y2 :
 {{{
 [
-(TRUE, 
+(TRUE,
 [
 (C1, [gZ; gI; gI; gI; gI; gI; gI; gI]);
 (C1, [gI; gZ; gI; gI; gI; gI; gI; gI]);
@@ -2472,18 +3649,18 @@ Example Steane7QEC_Y2 :
 )
 ]
 }}}
-(U (Steane7 0 1 2 3 4 5 6)) ;;; (U (Y 2)) ;;; 
+(U (Steane7 0 1 2 3 4 5 6)) ;;; (U (Y 2)) ;;;
 synd_s1z_0 ;;; synd_s2z_1 ;;; synd_s3z_2 ;;; synd_s1x_3 ;;; synd_s2x_4 ;;; synd_s3x_5 ;;;
 correctX ;;; correctZ
 {{{ [(TRUE, normalize 0%nat [g1; g2; g3; g4; g5; g6; Zbar; Zanc])] }}}.
-Proof. 
+Proof.
 finalize.
 do 8 msolve.
 (*** Copy Paste cpred ***)
 steane7_correction (AND
          (AND
-            (AND (AND (AND (AND TRUE (NOT (REG 0))) (NOT (REG 1))) (REG 2))
-               (NOT (REG 3))) (NOT (REG 4))) (REG 5)).
+            (AND (AND (AND (AND TRUE (REG 0 false)) (REG 1 false)) (REG 2 true))
+               (REG 3 false)) (REG 4 false)) (REG 5 true)).
 simpl.
 Unshelve.
 all: try apply ([(TRUE,normalize 0%nat [g1; g2; g3; g4; g5; g6; Zbar; Zanc])]).
