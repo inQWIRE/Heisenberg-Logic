@@ -2342,7 +2342,7 @@ ITE (AND (AND (NOT (REG 5)) (NOT (REG 4))) (REG 3)) (Z 5) (Id 7) ;;;
 ITE (AND (AND (NOT (REG 5)) (NOT (REG 4))) (NOT (REG 3))) (Z 6) (Id 7).
 
 
-Example Steane7QEC_Id :
+Example Steane7QEC_Z_Id :
 {{{
 [
 (TRUE, 
@@ -2379,7 +2379,7 @@ solveNormalize; reflexivity.
 all: try (intro; discriminate).
 Qed.
 
-Example Steane7QEC_Z0 :
+Example Steane7QEC_Z_Z0 :
 {{{
 [
 (TRUE, 
@@ -2417,7 +2417,7 @@ all: try (intro; discriminate).
 Qed.
 
 
-Example Steane7QEC_X1 :
+Example Steane7QEC_Z_X1 :
 {{{
 [
 (TRUE, 
@@ -2455,7 +2455,7 @@ all: try (intro; discriminate).
 Qed.
 
 
-Example Steane7QEC_Y2 :
+Example Steane7QEC_Z_Y2 :
 {{{
 [
 (TRUE, 
@@ -2493,4 +2493,39 @@ solveNormalize; reflexivity.
 all: try (intro; discriminate).
 Qed.
 
-
+Example Steane7QEC_X_Y3 :
+{{{
+[
+(TRUE, 
+[
+(C1, [gX; gI; gI; gI; gI; gI; gI; gI]);
+(C1, [gI; gZ; gI; gI; gI; gI; gI; gI]);
+(C1, [gI; gI; gZ; gI; gI; gI; gI; gI]);
+(C1, [gI; gI; gI; gZ; gI; gI; gI; gI]);
+(C1, [gI; gI; gI; gI; gZ; gI; gI; gI]);
+(C1, [gI; gI; gI; gI; gI; gZ; gI; gI]);
+(C1, [gI; gI; gI; gI; gI; gI; gZ; gI]);
+(C1, [gI; gI; gI; gI; gI; gI; gI; gZ])
+]
+)
+]
+}}}
+(U (Steane7 0 1 2 3 4 5 6)) ;;; (U (Y 3)) ;;; 
+synd_s1z_0 ;;; synd_s2z_1 ;;; synd_s3z_2 ;;; synd_s1x_3 ;;; synd_s2x_4 ;;; synd_s3x_5 ;;;
+correctX ;;; correctZ
+{{{ [(TRUE, normalize 0%nat [g1; g2; g3; g4; g5; g6; Xbar; Zanc])] }}}.
+Proof. 
+finalize.
+do 8 msolve.
+(*** Copy Paste cpred ***)
+steane7_correction (AND
+         (AND (AND (AND (AND (AND TRUE (REG 0)) (REG 1)) (NOT (REG 2))) (REG 3))
+            (REG 4)) (NOT (REG 5))).
+simpl.
+Unshelve.
+all: try apply ([(TRUE,normalize 0%nat [g1; g2; g3; g4; g5; g6; Xbar; Zanc])]).
+f_equal.
+solveNormalize; reflexivity.
+solveNormalize; reflexivity.
+all: try (intro; discriminate).
+Qed.
