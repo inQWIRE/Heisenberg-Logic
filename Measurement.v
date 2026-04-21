@@ -1809,8 +1809,1145 @@ Proof.
   intros c m; cbn; Btauto.btauto.
 Qed.
 
+Ltac bsolve_setup :=
+  (repeat intros ?);
+  cbn.
+
+Ltac bsolve_case :=
+  (repeat destruct (_ !! _));
+  cbn;
+  unfold eqb.
+
+Ltac bsolve_solve :=
+  Btauto.btauto.
+
+Ltac bsolve :=
+  bsolve_setup; bsolve_case; bsolve_solve.
 
 
+Lemma ORS_fmap_AND_l {A} (f : A -> cpred) (c : cpred) (l : list A) :
+  ORS ((λ a, c && f a) <$> l) ≡ c && ORS (f <$> l).
+Proof.
+  induction l; [bsolve|].
+  cbn.
+  rewrite IHl.
+  bsolve.
+Qed.
+
+Definition IMPL (c d : cpred) :=
+  NOT c || d.
+
+Definition IFF (c d : cpred) :=
+  IMPL c d && IMPL d c.
+
+#[export] Instance IMPL_proper : Proper ((≡) ==> (≡) ==> (≡)) IMPL.
+Proof.
+  unfold IMPL.
+  solve_proper.
+Qed.
+
+#[export] Instance IFF_proper : Proper ((≡) ==> (≡) ==> (≡)) IFF.
+Proof.
+  unfold IFF.
+  solve_proper.
+Qed.
+
+Lemma IMPL_correct' c d r : translate_cpred (IMPL c d) r <->
+  (translate_cpred c r -> translate_cpred d r).
+Proof.
+  cbn.
+  rewrite 3 Is_true_true.
+  split.
+  - intros Hcd Hc.
+    rewrite Hc in Hcd.
+    rewrite <- Hcd.
+    Btauto.btauto.
+  - intros Hcd.
+    destruct (translate_cpred c r); [|done].
+    cbn.
+    auto.
+Qed.
+
+Lemma IFF_correct' c d r : translate_cpred (IFF c d) r ->
+  translate_cpred c r <-> translate_cpred d r.
+Proof.
+  cbn.
+  rewrite andb_True.
+  intros []; split; now apply IMPL_correct'.
+Qed.
+
+Lemma IFF_correct c d : IFF c d ≡ TRUE <-> c ≡ d.
+Proof.
+  split; [|intros ->; bsolve].
+  intros Hcd m.
+  apply Bool.eq_iff_eq_true.
+  rewrite <- 2 Is_true_true.
+  apply IFF_correct'.
+  rewrite Hcd.
+  done.
+Qed.
+
+Lemma ORS_permutation cs ds : cs ≡ₚ ds -> ORS cs ≡ ORS ds.
+Proof.
+  intros Hcd.
+  induction Hcd; cbn; repeat_on_hyps ltac:(fun H => rewrite H); done || bsolve.
+Qed.
+
+Lemma ORS_correct' cs r : translate_cpred (ORS cs) r <-> Exists (λ c, translate_cpred c r) cs.
+Proof.
+  induction cs.
+  - easy.
+  - cbn.
+    rewrite orb_True.
+    rewrite Exists_cons.
+    now f_equiv.
+Qed.
+
+
+Lemma ORS_seteq cs ds : (forall c, c ∈ cs <-> c ∈ ds) -> ORS cs ≡ ORS ds.
+Proof.
+  intros Hcd r.
+  apply Bool.eq_iff_eq_true.
+  rewrite <- 2 Is_true_true.
+  rewrite 2 ORS_correct'.
+  rewrite 2 list.Exists_exists.
+  naive_solver.
+Qed.
+
+Lemma ORS_subset cs ds : cs ⊆ ds -> IMPL (ORS cs) (ORS ds) ≡ TRUE.
+Proof.
+  intros Hcd r.
+  apply Bool.eq_iff_eq_true.
+  rewrite <- 2 Is_true_true.
+  rewrite IMPL_correct', 2 ORS_correct'.
+  split; [done|].
+  intros _.
+  rewrite 2 list.Exists_exists.
+  naive_solver.
+Qed.
+
+Lemma AND_TRUE c d : c && d ≡ TRUE <-> c ≡ TRUE /\ d ≡ TRUE.
+Proof.
+  split; [|intros [-> ->]; bsolve].
+  intros Hcd.
+  split; intros m;
+  specialize (Hcd m); cbn in *;
+  rewrite andb_true_iff in Hcd;
+  easy.
+Qed.
+
+Section btauto.
+
+Import btauto.Algebra btauto.Reflect.
+
+Definition bcons (b : bool) (p : positive) :=
+  if b then xI p else xO p.
+
+Declare Scope formula_scope.
+Delimit Scope formula_scope with formula.
+Bind Scope formula_scope with formula.
+
+Notation "a && b" := (formula_cnj a%formula b%formula) : formula_scope.
+Notation "a || b" := (formula_dsj a%formula b%formula) : formula_scope.
+Notation "a ⊗ b" := (formula_xor a%formula b%formula) : formula_scope.
+Notation "a ? b : c" := (formula_ifb a%formula b%formula c%formula)
+  (at level 60) : formula_scope.
+Notation "¬ a" := (formula_neg a%formula) : formula_scope.
+Notation "# a" := (formula_var a%positive) (at level 20) : formula_scope.
+
+Definition formula_impl (a b : formula) : formula :=
+  (¬ a) || b.
+
+Notation "a -> b" := (formula_impl a%formula b%formula) : formula_scope.
+Notation "⊤" := (formula_top) : formula_scope.
+Notation "⊥" := (formula_btm) : formula_scope.
+
+Definition list_index `{EqDecision A} (a : A) (l : list A) : option nat :=
+  fst <$> list_find (.= a) l.
+
+Lemma list_index_spec `{EqDecision A} (a : A) l i :
+  list_index a l = Some i <->
+  l !! i = Some a /\ a ∉ take i l.
+Proof.
+  unfold list_index.
+  revert i; induction l as [|a' l IHl]; intros i; [easy|].
+  cbn.
+  case_decide as Ha'.
+  - subst.
+    cbn.
+    destruct i; [easy|].
+    split; [easy|].
+    cbn.
+    intros [_ HF]; exfalso; apply HF; constructor.
+  - rewrite <- option_fmap_compose.
+    unfold compose; simpl.
+    setoid_rewrite (option_fmap_compose fst s).
+    rewrite fmap_Some.
+    setoid_rewrite IHl.
+    clear IHl.
+    split.
+    + intros (i' & (Hli' & Ha) & ->).
+      cbn.
+      rewrite not_elem_of_cons.
+      easy.
+    + destruct i as [|i']; [cbn; intros []; congruence|].
+      cbn.
+      rewrite not_elem_of_cons.
+      intros [? [? ?]].
+      eauto.
+Qed.
+
+Lemma list_index_is_Some `{EqDecision A} (a : A) l : a ∈ l ->
+  is_Some (list_index a l).
+Proof.
+  unfold list_index.
+  rewrite fmap_is_Some.
+  intros Ha.
+  now apply (list_find_elem_of _ _ _ Ha).
+Qed.
+
+Fixpoint cpred_formula (vars : list nat) (c : cpred) : formula :=
+  match c with
+  | TRUE => ⊤
+  | FALSE => ⊥
+  | REG n b => # (bcons b (default xH (Pos.of_succ_nat <$> list_index n vars)))
+  | AND a b => cpred_formula vars a && cpred_formula vars b
+  | OR a b => cpred_formula vars a || cpred_formula vars b
+  | NOT a => ¬ cpred_formula vars a
+  end.
+
+Definition cpred_vars_facts (vars : list nat) : formula :=
+  foldr formula_cnj formula_top (imap (λ i _,
+    ¬ (# (xI (Pos.of_succ_nat i)) && # xO (Pos.of_succ_nat i)))%formula vars).
+
+Definition cpred_sat_formula (vars : list nat) (c : cpred) : formula :=
+  cpred_vars_facts vars -> cpred_formula vars c.
+
+
+Definition cpred_vars_state (vars : list nat) (m : creg) : list bool :=
+  (false ::.) $
+  concat ((λ n,
+    [bool_decide (m !! n = Some false);bool_decide (m !! n = Some true)])
+    <$> vars).
+
+Lemma nat_mod_2_eq_oddb n :
+  n mod 2 = Nat.b2n (Nat.odd n).
+Proof.
+  unfold Nat.odd.
+  rewrite Modulus.even_eqb.
+  pose proof (Nat.mod_upper_bound n 2 ltac:(lia)) as Hnmod.
+  destruct (n mod 2) as [|[|]]; [done..|lia].
+Qed.
+
+Lemma lookup_cpred_vars_state_aux vars m i b :
+  cpred_vars_state vars m !! (s (2 * i + Nat.b2n b)) =
+  n ← vars !! i;
+  Some (bool_decide (m !! n = Some b)).
+Proof.
+  revert i b.
+  induction vars as [|v vars IHvars]; [easy|].
+  intros i b.
+  destruct i as [|i]; [now destruct b|].
+  cbn.
+  setoid_rewrite lookup_cons_ne_0; [|lia].
+  replace (pred _) with (2 * i + Nat.b2n b)%nat by lia.
+  apply IHvars.
+Qed.
+
+Lemma list_nth_lookup {A} (p : positive) (l : list A) (d : A) :
+  list_nth p l d = default d (l !! (pred (Pos.to_nat p))).
+Proof.
+  unfold list_nth.
+  revert l;
+  induction p using Pos.peano_rect; intros l.
+  - destruct l; done.
+  - rewrite Pos.peano_rect_succ.
+    destruct l.
+    + done.
+    + rewrite IHp.
+      rewrite lookup_cons_ne_0 by lia.
+      do 2 f_equal; lia.
+Qed.
+
+
+Lemma list_nth_cpred_vars_state_aux vars m p d :
+  list_nth p (cpred_vars_state vars m) d =
+  default d (match p with
+    | xH => Some false
+    | xI p => n ← vars !! (pred (Pos.to_nat p));
+      Some (bool_decide ((m !! n) = Some true))
+    | xO p => n ← vars !! (pred (Pos.to_nat p));
+      Some (bool_decide ((m !! n) = Some false))
+    end).
+Proof.
+  rewrite list_nth_lookup.
+  destruct p.
+  - replace (pred (Pos.to_nat p~1)) with (s (2 * pred (Pos.to_nat p) + Nat.b2n true)) by (cbn; lia).
+    rewrite lookup_cpred_vars_state_aux.
+    done.
+  - replace (pred (Pos.to_nat p~0)) with (s (2 * pred (Pos.to_nat p) + Nat.b2n false)) by (cbn; lia).
+    rewrite lookup_cpred_vars_state_aux.
+    done.
+  - done.
+Qed.
+
+Fixpoint cpred_supp (c : cpred) : gset nat :=
+  match c with
+  | TRUE | FALSE => ∅
+  | REG n _ => {[n]}
+  | AND c d => cpred_supp c ∪ cpred_supp d
+  | OR c d => cpred_supp c ∪ cpred_supp d
+  | NOT c => cpred_supp c
+  end.
+
+Lemma formula_eval_cpred vars m c :
+  set_Forall (.∈ vars) (cpred_supp c) ->
+  formula_eval (cpred_vars_state vars m) (cpred_formula vars c) =
+  translate_cpred c m.
+Proof.
+  induction c as [| | n b | a IHa b IHb | a IHa b IHb | a IHa ].
+  - done.
+  - done.
+  - cbn.
+    rewrite set_Forall_singleton.
+    intros Hn.
+    apply list_index_is_Some in Hn as (i & Hi).
+    apply list_index_spec in Hi as Hi'.
+    destruct Hi' as [Hi' _].
+    rewrite Hi.
+    cbn.
+    rewrite list_nth_lookup.
+    replace (pred _) with (s (2 * i + Nat.b2n b))%nat by (destruct b; cbn; lia).
+    rewrite lookup_cpred_vars_state_aux.
+    rewrite Hi'.
+    cbn.
+    destruct (m !! n) as [[]|]; destruct b; reflexivity.
+  - cbn.
+    intros Hsupp.
+    now rewrite IHa, IHb by set_solver + Hsupp.
+  - cbn.
+    intros Hsupp.
+    now rewrite IHa, IHb by set_solver + Hsupp.
+  - cbn.
+    now intros ->%IHa.
+Qed.
+
+Lemma cpred_btauto_helper_lemma (c d : cpred) :
+  let vars := elements (cpred_supp c ∪ cpred_supp d) in
+  reduce (poly_add (poly_of_formula (cpred_formula vars c))
+    (poly_of_formula (cpred_formula vars d))) = Cst false ->
+  c ≡ d.
+Proof.
+  intros vars Heq m.
+  apply (reduce_poly_of_formula_sound_alt (cpred_vars_state vars m)) in Heq.
+  now rewrite 2 formula_eval_cpred in Heq by set_solver +.
+Qed.
+
+
+Lemma formula_eval_cpred_vars_facts vars' vars m :
+  formula_eval (cpred_vars_state vars' m) (cpred_vars_facts vars) =
+  true.
+Proof.
+  unfold cpred_vars_facts.
+  change (imap ?f) with (imap (f ∘ Nat.add 0)).
+  generalize O as n.
+  induction vars as [|v vars IHvars]; [done|].
+  intros n.
+  cbn [imap foldr formula_eval cpred_vars_state compose].
+  rewrite (imap_ext _ ((λ i _ : nat,
+             (¬ # (Pos.of_succ_nat i)~1 &&
+                # (Pos.of_succ_nat i)~0)%formula) ∘ Nat.add (s n))) by
+    (intros; cbn; do 3 f_equal; lia).
+  rewrite IHvars.
+  rewrite 2 list_nth_cpred_vars_state_aux.
+  destruct (vars' !! _); [|done].
+  cbn.
+  destruct (m !! _) as [[]|]; done.
+Qed.
+
+
+Definition cpred_is_tauto (c : cpred) : bool :=
+  let vars := elements (cpred_supp c) in
+  match reduce (poly_add (poly_of_formula (formula_impl (cpred_vars_facts vars) (cpred_formula vars c)))
+    (poly_of_formula formula_top)) with
+  | Cst false => true
+  | _ => false
+  end.
+
+Lemma cpred_is_tauto_correct c :
+  cpred_is_tauto c ->
+  c ≡ TRUE.
+Proof.
+  unfold cpred_is_tauto.
+  case_match eqn:Hred; [|easy].
+  case_match; [done|].
+  intros _.
+  intros m.
+  apply (reduce_poly_of_formula_sound_alt (cpred_vars_state (elements (cpred_supp c)) m)) in Hred.
+  cbn in Hred.
+  rewrite formula_eval_cpred in Hred by set_solver +.
+  rewrite formula_eval_cpred_vars_facts in Hred.
+  done.
+Qed.
+
+Definition cpred_is_equiv (c d : cpred) : bool :=
+  cpred_is_tauto (IFF c d).
+
+Lemma cpred_is_equiv_correct c d :
+  cpred_is_equiv c d ->
+  c ≡ d.
+Proof.
+  intros Hcd.
+  apply IFF_correct.
+  now apply cpred_is_tauto_correct.
+Qed.
+
+
+
+End btauto.
+
+Ltac bsolve_btauto :=
+  intros; match goal with
+    | |- ?R ?c TRUE =>
+      refine (cpred_is_tauto_correct c _);
+      vm_compute;
+      exact Logic.I
+    | |- ?R ?c ?d =>
+      refine (cpred_is_equiv_correct c d _);
+      vm_compute;
+      exact Logic.I
+    end.
+
+
+
+
+
+
+(*
+
+Inductive Forall2' {A B} (P : A -> B -> Prop) (Q : A -> Prop) (R : B -> Prop) :
+  list A -> list B -> Prop :=
+  (* | Forall2'_nil : Forall2' P Q R [] [] *)
+  | Forall2'_left l : Forall Q l -> Forall2' P Q R l []
+  | Forall2'_right l' : Forall R l' -> Forall2' P Q R [] l'
+  | Forall2'_conj a b l l' : P a b -> Forall2' P Q R l l' -> Forall2' P Q R (a :: l) (b :: l').
+
+Fixpoint forall2'_fun {A B} (P : A -> B -> Prop) (Q : A -> Prop) (R : B -> Prop)
+  (l : list A) (l' : list B) : Prop :=
+  match l with
+  | [] => Forall R l'
+  | a :: l =>
+    match l' with
+    | [] => Forall Q (a :: l)
+    | b :: l' => P a b /\ forall2'_fun P Q R l l'
+    end
+  end.
+
+Lemma forall2'_fun_correct {A B} (P : A -> B -> Prop) (Q : A -> Prop) (R : B -> Prop)
+  (l : list A) (l' : list B) :
+  forall2'_fun P Q R l l' <-> Forall2' P Q R l l'.
+Proof.
+  split.
+  - revert l'; induction l as [|a l IHl]; intros l'; [now constructor|].
+    destruct l' as [|b l']; [now constructor|].
+    cbn.
+    intros []; constructor; auto.
+  - intros Hll'.
+    induction Hll'.
+    + destruct l; [constructor|].
+      done.
+    + done.
+    + done.
+Qed.
+
+#[export] Instance forall2'_fun_dec {A B} (P : A -> B -> Prop) (Q : A -> Prop) (R : B -> Prop)
+ `{HP : forall a b, Decision (P a b), HQ : forall a, Decision (Q a),
+  HR : forall b, Decision (R b)} :
+  forall l l', Decision (forall2'_fun P Q R l l') :=
+  fix go l l' :=
+  match l with
+  | [] => decide (Forall R l')
+  | a :: l =>
+    match l' with
+    | [] => decide (Forall Q (a :: l))
+    | b :: l' =>
+      and_dec (HP a b) (go l l')
+    end
+  end.
+
+#[export] Instance Forall2'_dec {A B} (P : A -> B -> Prop) (Q : A -> Prop) (R : B -> Prop)
+ `{HP : forall a b, Decision (P a b), HQ : forall a, Decision (Q a),
+  HR : forall b, Decision (R b)} :
+  forall l l', Decision (Forall2' P Q R l l').
+  refine (fun l l' => cast_if (forall2'_fun_dec P Q R l l'));
+  abstract (now rewrite <- forall2'_fun_correct).
+Defined.
+
+#[export] Instance Forall2'_symm {A} (R : relation A) (P : A -> Prop)
+  {HR : Symmetric R} : Symmetric (Forall2' R P P).
+Proof.
+  intros a b Hab.
+  induction Hab.
+  - now constructor.
+  - now constructor.
+  - constructor; [now symmetry|].
+    easy.
+Qed.
+
+(*
+Lemma Forall2'_trans {A} (R : relation A) (P : A -> Prop)
+  {HR : Transitive R} : (forall a b, P a -> P b -> R a b) ->
+    Transitive (Forall2' R P P).
+Proof.
+  intros HP a b c Hab Hbc.
+  induction Hab as [l Hl| |].
+  - rewrite <- forall2'_fun_correct in Hbc.
+    cbn in Hbc.
+    revert c Hbc.
+    induction Hl; [now constructor|].
+    intros c Hc.
+    destruct Hc.
+    + now do 2 constructor.
+    + constructor; auto.
+  - induction Hbc.
+    + now do 2 constructor.
+    + now constructor.
+    +
+
+  - constructor; [now symmetry|].
+    easy.
+Qed. *)
+
+
+(* TODO: Type of regpred specifying info one can have about a reg *)
+
+Inductive regpred :=
+  | RPtop
+  | RPtrue
+  | RPfalse
+  | RPnone
+  | RPNtrue
+  | RPNfalse
+  | RPNnone
+  | RPbot.
+
+
+Definition rp_cpred n (r : regpred) : cpred :=
+  match r with
+  | RPtop => TRUE
+  | RPtrue => REG n true
+  | RPfalse => REG n false
+  | RPnone => ¬ (REG n true || REG n false)
+  | RPNtrue => ¬ (n ↦ true)
+  | RPNfalse => ¬ (n ↦ false)
+  | RPNnone => REG n true || REG n false
+  | RPbot => FALSE
+  end.
+
+Definition rp_neg (r : regpred) : regpred :=
+  match r with
+  | RPtop => RPbot
+  | RPtrue => RPNtrue
+  | RPfalse => RPNfalse
+  | RPnone => RPNnone
+  | RPNtrue => RPtrue
+  | RPNfalse => RPfalse
+  | RPNnone => RPnone
+  | RPbot => RPtop
+  end.
+
+Lemma rp_neg_correct r n :
+  rp_cpred n (rp_neg r) ≡ ¬ rp_cpred n r.
+Proof.
+  destruct r; cbn; bsolve.
+Qed.
+
+Definition rp_or (r r' : regpred) : regpred :=
+  match r, r' with
+  | RPtop, _ => RPtop
+  | RPbot, r' => r'
+  | _, RPtop => RPtop
+  | r, RPbot => r
+  | RPtrue, RPtrue => RPtrue
+  | RPNtrue, RPNtrue => RPNtrue
+  | RPtrue, RPNtrue => RPtop
+  | RPNtrue, RPtrue => RPtop
+
+  | RPfalse, RPfalse => RPfalse
+  | RPNfalse, RPNfalse => RPNfalse
+  | RPfalse, RPNfalse => RPtop
+  | RPNfalse, RPfalse => RPtop
+
+  | RPnone, RPnone => RPnone
+  | RPNnone, RPNnone => RPNnone
+  | RPnone, RPNnone => RPtop
+  | RPNnone, RPnone => RPtop
+
+  | RPtrue, RPfalse => RPNnone
+  | RPtrue, RPnone => RPNfalse
+  | RPtrue, RPNfalse => RPNfalse
+  | RPtrue, RPNnone => RPNnone
+
+  | RPfalse, RPtrue => RPNnone
+  | RPfalse, RPnone => RPNtrue
+  | RPfalse, RPNtrue => RPNtrue
+  | RPfalse, RPNnone => RPNnone
+
+  | RPnone, RPtrue => RPNfalse
+  | RPnone, RPfalse => RPNtrue
+  | RPnone, RPNtrue => RPNtrue
+  | RPnone, RPNfalse => RPNfalse
+
+  | RPNtrue, RPfalse => RPNtrue
+  | RPNtrue, RPnone => RPNtrue
+  | RPNtrue, RPNfalse => RPtop
+  | RPNtrue, RPNnone => RPtop
+
+  | RPNfalse, RPtrue => RPNfalse
+  | RPNfalse, RPnone => RPNfalse
+  | RPNfalse, RPNtrue => RPtop
+  | RPNfalse, RPNnone => RPtop
+
+  | RPNnone, RPtrue => RPNnone
+  | RPNnone, RPfalse => RPNnone
+  | RPNnone, RPNtrue => RPtop
+  | RPNnone, RPNfalse => RPtop
+  end.
+
+Lemma rp_or_correct r r' n :
+  rp_cpred n (rp_or r r') ≡
+  rp_cpred n r || rp_cpred n r'.
+Proof.
+  destruct r, r'; cbn; bsolve.
+Qed.
+
+Definition rp_and (r r' : regpred) : regpred :=
+  match r, r' with
+  | RPtop, r' => r'
+  | RPbot, _ => RPbot
+  | r, RPtop => r
+  | _, RPbot => RPbot
+  | RPtrue, RPtrue => RPtrue
+  | RPNtrue, RPNtrue => RPNtrue
+  | RPtrue, RPNtrue => RPbot
+  | RPNtrue, RPtrue => RPbot
+
+  | RPfalse, RPfalse => RPfalse
+  | RPNfalse, RPNfalse => RPNfalse
+  | RPfalse, RPNfalse => RPbot
+  | RPNfalse, RPfalse => RPbot
+
+  | RPnone, RPnone => RPnone
+  | RPNnone, RPNnone => RPNnone
+  | RPnone, RPNnone => RPbot
+  | RPNnone, RPnone => RPbot
+
+  | RPtrue, RPfalse => RPbot
+  | RPtrue, RPnone => RPbot
+  | RPtrue, RPNfalse => RPtrue
+  | RPtrue, RPNnone => RPtrue
+
+  | RPfalse, RPtrue => RPbot
+  | RPfalse, RPnone => RPbot
+  | RPfalse, RPNtrue => RPfalse
+  | RPfalse, RPNnone => RPfalse
+
+  | RPnone, RPtrue => RPbot
+  | RPnone, RPfalse => RPbot
+  | RPnone, RPNtrue => RPnone
+  | RPnone, RPNfalse => RPnone
+
+  | RPNtrue, RPfalse => RPfalse
+  | RPNtrue, RPnone => RPnone
+  | RPNtrue, RPNfalse => RPnone
+  | RPNtrue, RPNnone => RPfalse
+
+  | RPNfalse, RPtrue => RPtrue
+  | RPNfalse, RPnone => RPnone
+  | RPNfalse, RPNtrue => RPnone
+  | RPNfalse, RPNnone => RPtrue
+
+  | RPNnone, RPtrue => RPtrue
+  | RPNnone, RPfalse => RPfalse
+  | RPNnone, RPNtrue => RPfalse
+  | RPNnone, RPNfalse => RPtrue
+  end.
+
+Lemma rp_and_correct r r' n :
+  rp_cpred n (rp_and r r') ≡
+  rp_cpred n r && rp_cpred n r'.
+Proof.
+  destruct r, r'; cbn; bsolve.
+Qed.
+
+
+Definition rp_impl (r r' : regpred) : bool :=
+  match r, r' with
+  | _, RPtop => true
+  | RPtop, _ => false
+  | RPbot, _ => true
+  | _, RPbot => false
+  | RPtrue, RPtrue => true
+  | RPtrue, RPNfalse => true
+  | RPtrue, RPNnone => true
+  | RPtrue, _ => false
+
+  | RPfalse, RPfalse => true
+  | RPfalse, RPNtrue => true
+  | RPfalse, RPNnone => true
+  | RPfalse, _ => false
+
+  | RPnone, RPnone => true
+  | RPnone, RPNtrue => true
+  | RPnone, RPNfalse => true
+  | RPnone, _ => false
+
+  | RPNtrue, RPNtrue => true
+  | RPNtrue, _ => false
+
+  | RPNfalse, RPNfalse => true
+  | RPNfalse, _ => false
+
+  | RPNnone, RPNnone => true
+  | RPNnone, _ => false
+  end.
+
+Lemma rp_impl_correct n r r' :
+  rp_impl r r' <-> IMPL (rp_cpred n r) (rp_cpred n r') ≡ TRUE.
+Proof.
+  Local Ltac contra_with c :=
+    intros Heq;
+    specialize (Heq c);
+    cbn in Heq;
+    unfold creg in Heq;
+    rewrite ?(lookup_singleton), ?lookup_empty in Heq;
+    easy.
+
+  destruct r, r'; cbn;
+  try first [split; [|intros _; exact Logic.I]; bsolve|split; [intros []|]];
+  first [contra_with ({[n := false]} : creg)|
+  contra_with ({[n := true]} : creg)| contra_with (∅ : creg)].
+Qed.
+
+
+
+#[export] Instance regpred_dec : EqDecision regpred.
+Proof.
+  intros ? ?.
+  hnf.
+  decide equality.
+Defined.
+
+Notation regcnj := (list regpred).
+
+#[export] Instance cpred_Top : Top cpred := TRUE.
+#[export] Instance cpred_Bot : Bottom cpred := FALSE.
+
+Fixpoint rc_cpred_aux (k : nat) (rc : regcnj) : cpred :=
+  match rc with
+  | [] => ⊤
+  | r :: rc => rp_cpred k r && rc_cpred_aux (s k) rc
+  end.
+
+Lemma rc_cpred_aux_alt k rc : rc_cpred_aux k rc =
+  ANDS (imap (rp_cpred ∘ Nat.add k) rc).
+Proof.
+  revert k; induction rc; intros k; [easy|].
+  cbn.
+  rewrite Nat.add_0_r.
+  f_equal.
+  rewrite IHrc.
+  f_equal.
+  apply imap_ext; intros; cbn; f_equal; lia.
+Qed.
+
+Definition rc_cpred rc :=
+  rc_cpred_aux 0 rc.
+
+Definition rc_equiv rc rc' :=
+  Forall2' eq (.= RPtop) (.= RPtop) rc rc'.
+
+Lemma rc_cpred_aux_all_top k rc : Forall (.= RPtop) rc ->
+  rc_cpred_aux k rc ≡ TRUE.
+Proof.
+  intros Hrc.
+  revert k; induction Hrc as [|_ rc -> _ IHrc]; [easy|]; intros k.
+  cbn.
+  now rewrite IHrc, AND_TRUE_l.
+Qed.
+
+Lemma rc_equiv_correct_aux k rc rc' :
+  rc_equiv rc rc' -> rc_cpred_aux k rc ≡ rc_cpred_aux k rc'.
+Proof.
+  intros Heq.
+  revert k; induction Heq; intros k.
+  - cbn.
+    now rewrite rc_cpred_aux_all_top by done.
+  - cbn.
+    now rewrite rc_cpred_aux_all_top by done.
+  - cbn.
+    subst.
+    f_equiv; apply IHHeq.
+Qed.
+
+#[export] Instance rp_or_comm : Comm eq rp_or.
+Proof.
+  intros [] []; reflexivity.
+Qed.
+
+#[export] Instance rp_and_comm : Comm eq rp_and.
+Proof.
+  intros [] []; reflexivity.
+Qed.
+
+#[export] Instance rp_or_assoc : Assoc eq rp_or.
+Proof.
+  intros [] [] []; reflexivity.
+Qed.
+
+#[export] Instance rp_and_assoc : Assoc eq rp_and.
+Proof.
+  intros [] [] []; reflexivity.
+Qed.
+
+Fixpoint rc_and (rc rc' : regcnj) : regcnj :=
+  match rc with
+  | [] => rc'
+  | r :: rc =>
+    match rc' with
+    | [] => r :: rc
+    | r' :: rc' => rp_and r r' :: rc_and rc rc'
+    end
+  end.
+
+Lemma rc_and_nil_r rc : rc_and rc [] = rc.
+Proof.
+  now destruct rc.
+Qed.
+
+#[export] Instance rc_and_comm : Comm eq rc_and.
+Proof.
+  intros rc.
+  induction rc; intros rc'.
+  - cbn.
+    now rewrite rc_and_nil_r.
+  - destruct rc'; [done|].
+    cbn.
+    f_equal.
+    + apply (comm _).
+    + auto.
+Qed.
+
+Lemma rc_and_correct_aux k rc rc' : rc_cpred_aux k (rc_and rc rc') ≡
+  rc_cpred_aux k rc && rc_cpred_aux k rc'.
+Proof.
+  revert k rc'; induction rc as [|r rc IHrc]; [intros k rc'|intros k [|r' rc']].
+  - cbn.
+    now rewrite AND_TRUE_l.
+  - cbn.
+    now rewrite AND_TRUE_r.
+  - cbn.
+    rewrite IHrc.
+    rewrite rp_and_correct.
+    bsolve.
+Qed.
+
+
+Lemma rc_and_correct rc rc' : rc_cpred (rc_and rc rc') ≡
+  rc_cpred rc && rc_cpred rc'.
+Proof.
+  apply rc_and_correct_aux.
+Qed.
+
+
+
+
+Fixpoint rc_or (rc rc' : regcnj) : option regcnj :=
+  match rc with
+  | [] => if decide (Forall (.= RPtop) rc') then Some [] else None
+  | r :: rc =>
+    match rc' with
+    | [] => if decide (Forall (.= RPtop) (r :: rc)) then Some [] else None
+    | r' :: rc' =>
+      if decide (r = r') then
+        (r::.) <$> rc_or rc rc'
+      else
+        if decide (rc_equiv rc rc') then
+          Some (rp_or r r' :: rc)
+        else
+          None
+    end
+  end.
+
+Lemma rc_or_correct_aux k rc rc' rco :
+  rc_or rc rc' = Some rco ->
+  rc_cpred_aux k rco ≡ rc_cpred_aux k rc || rc_cpred_aux k rc'.
+Proof.
+  revert k rc' rco; induction rc as [|r rc IHrc]; intros k rc' rco;
+    [|destruct rc' as [|r' rc']].
+  - cbn.
+    case_decide; [|easy].
+    intros [= <-].
+    cbn.
+    now rewrite rc_cpred_aux_all_top by done.
+  - cbn -[rc_cpred_aux].
+    case_decide; [|easy].
+    intros [= <-].
+    now rewrite (rc_cpred_aux_all_top _ (_::_)) by done.
+  - cbn.
+    case_decide as Hrr'; [|case_decide as Hrcrc'].
+    + subst.
+      rewrite <- AND_OR_r.
+      rewrite fmap_Some.
+      intros (rco' & Hrco' & ->).
+      cbn.
+      f_equiv.
+      now apply IHrc.
+    + intros [= <-].
+      rewrite <- (rc_equiv_correct_aux _ _ _ Hrcrc').
+      rewrite <- AND_OR_l.
+      cbn.
+      rewrite rp_or_correct.
+      done.
+    + easy.
+Qed.
+
+Notation regdc := (list regcnj).
+
+Fixpoint rdc_cpred_aux k (rcs : regdc) : cpred :=
+  match rcs with
+  | [] => ⊥
+  | rc :: rcs => rc_cpred_aux k rc || rdc_cpred_aux k rcs
+  end.
+
+Definition rdc_cpred rcs := rdc_cpred_aux 0 rcs.
+
+Lemma rdc_cpred_aux_alt k rcs :
+  rdc_cpred_aux k rcs = ORS (rc_cpred_aux k <$> rcs).
+Proof.
+  induction rcs; cbn; [done| congruence].
+Qed.
+
+Lemma rdc_cpred_aux_app k rcs rcs' :
+  rdc_cpred_aux k (rcs ++ rcs') ≡ rdc_cpred_aux k rcs || rdc_cpred_aux k rcs'.
+Proof.
+  now rewrite 3 rdc_cpred_aux_alt, fmap_app, ORS_app.
+Qed.
+
+Fixpoint rc_or_into (rc : regcnj) (rcs : regdc) : regdc :=
+  match rcs with
+  | [] => [rc]
+  | rc' :: rcs =>
+    match rc_or rc rc' with
+    | Some rco => rco :: rcs
+    | None => rc' :: rc_or_into rc rcs
+    end
+  end.
+
+Lemma rc_or_into_correct_aux k rc rcs :
+  rdc_cpred_aux k (rc_or_into rc rcs) ≡ rdc_cpred_aux k (rc :: rcs).
+Proof.
+  induction rcs as [|rc' rcs IHrcs]; [done|].
+  cbn.
+  destruct (rc_or _ _) as [rco|] eqn:Hrco.
+  - apply (rc_or_correct_aux k) in Hrco.
+    cbn.
+    rewrite Hrco.
+    bsolve.
+  - cbn.
+    rewrite IHrcs.
+    bsolve.
+Qed.
+
+Definition rdc_or (rcs rcs' : regdc) : regdc :=
+  foldr rc_or_into rcs' rcs.
+
+Lemma rdc_or_correct_aux k rcs rcs' :
+  rdc_cpred_aux k (rdc_or rcs rcs') ≡ rdc_cpred_aux k rcs || rdc_cpred_aux k rcs'.
+Proof.
+  unfold rdc_or.
+  induction rcs; cbn; [easy|].
+  rewrite rc_or_into_correct_aux.
+  cbn; rewrite IHrcs.
+  bsolve.
+Qed.
+
+Lemma rc_cpred_aux_exists_bot k rc : Exists (.= RPbot) rc ->
+  rc_cpred_aux k rc ≡ FALSE.
+Proof.
+  intros Hex.
+  revert k; induction Hex; intros k.
+  - cbn.
+    subst.
+    easy.
+  - cbn.
+    rewrite IHHex.
+    bsolve.
+Qed.
+
+Definition rdc_clean (rcs : regdc) : regdc :=
+  base.filter (λ rc, ~ Exists (.= RPbot) rc) rcs.
+
+Lemma rdc_clean_correct_aux k rcs : rdc_cpred_aux k (rdc_clean rcs) ≡ rdc_cpred_aux k rcs.
+Proof.
+  induction rcs; [done|].
+  cbn.
+  case_decide as Hex.
+  - cbn.
+    f_equiv.
+    apply IHrcs.
+  - rewrite (rc_cpred_aux_exists_bot _ _ Hex).
+    apply IHrcs.
+Qed.
+
+Fixpoint rdc_and (rcs rcs' : regdc) : regdc :=
+  match rcs with
+  | [] => []
+  | rc :: rcs =>
+    rdc_or (rdc_clean (rc_and rc <$> rcs'))
+    (rdc_and rcs rcs')
+  end.
+
+Lemma rdc_and_correct_aux k rcs rcs' :
+  rdc_cpred_aux k (rdc_and rcs rcs') ≡
+  rdc_cpred_aux k rcs && rdc_cpred_aux k rcs'.
+Proof.
+  revert rcs'; induction rcs as [|rc rcs IHrcs]; intros rcs'; [easy|].
+  cbn.
+  rewrite rdc_or_correct_aux, rdc_clean_correct_aux.
+  rewrite IHrcs.
+  rewrite AND_OR_l.
+  f_equiv.
+  clear.
+  induction rcs' as [|rc' rcs' IHrcs']; [bsolve|].
+  cbn.
+  rewrite IHrcs'.
+  rewrite rc_and_correct_aux.
+  bsolve.
+Qed.
+
+Definition rdc_ands (rdcs : list regdc) : regdc :=
+  foldr rdc_and [[]] rdcs.
+
+Lemma rdc_ands_correct_aux k rdcs :
+  rdc_cpred_aux k (rdc_ands rdcs) ≡
+  ANDS (rdc_cpred_aux k <$> rdcs).
+Proof.
+  unfold rdc_ands.
+  induction rdcs; [easy|].
+  cbn.
+  rewrite rdc_and_correct_aux, IHrdcs.
+  done.
+Qed.
+
+Lemma rdc_cpred_aux_cons_top k rdc :
+  rdc_cpred_aux k (cons RPtop <$> rdc) ≡ rdc_cpred_aux (s k) rdc.
+Proof.
+  induction rdc; [done|].
+  cbn.
+  rewrite IHrdc.
+  bsolve.
+Qed.
+
+Fixpoint rc_not (rc : regcnj) : regdc :=
+  match rc with
+  | [] => []
+  | r :: rc =>
+    rc_or_into ([rp_neg r])
+      ((RPtop ::.) <$> rc_not rc)
+  end.
+
+Lemma rc_not_correct_aux k rc :
+  rdc_cpred_aux k (rc_not rc) ≡ ¬ rc_cpred_aux k rc.
+Proof.
+  revert k; induction rc as [|r rc IHrc]; intros k; [easy|].
+  cbn.
+  rewrite rc_or_into_correct_aux.
+  cbn.
+  rewrite rdc_cpred_aux_cons_top.
+  rewrite IHrc.
+  rewrite rp_neg_correct.
+  bsolve.
+Qed.
+
+
+Definition rdc_not (rcs : regdc) : regdc :=
+  rdc_ands (rc_not <$> rcs).
+
+Lemma rdc_not_correct_aux k rcs :
+  rdc_cpred_aux k (rdc_not rcs) ≡ ¬ rdc_cpred_aux k rcs.
+Proof.
+  unfold rdc_not.
+  rewrite rdc_ands_correct_aux.
+  rewrite rdc_cpred_aux_alt.
+  rewrite NOT_ORS.
+  apply ANDS_proper.
+  apply Forall2_fmap, Forall2_fmap, Forall_Forall2_diag.
+  rewrite Forall_forall.
+  intros rc _.
+  now rewrite rc_not_correct_aux.
+Qed.
+
+Fixpoint cpred_rdc (c : cpred) : regdc :=
+  match c with
+  | TRUE => [[]]
+  | FALSE => []
+  | REG n b => [replicate n RPtop ++ [if b then RPtrue else RPfalse]]
+  | AND a b => rdc_and (cpred_rdc a) (cpred_rdc b)
+  | OR a b => rdc_or (cpred_rdc a) (cpred_rdc b)
+  | NOT a => rdc_not (cpred_rdc a)
+  end.
+
+Lemma rc_cpred_aux_replicate k n rc :
+  rc_cpred_aux k (replicate n RPtop ++ rc) ≡
+  rc_cpred_aux (k + n) rc.
+Proof.
+  revert k; induction n; intros k.
+  - cbn.
+    now rewrite Nat.add_0_r.
+  - cbn.
+    rewrite AND_TRUE_l.
+    rewrite IHn.
+    f_equiv; lia.
+Qed.
+
+Lemma cpred_rdc_correct c : rdc_cpred (cpred_rdc c) ≡ c.
+Proof.
+  induction c.
+  - done.
+  - done.
+  - cbn.
+    rewrite rc_cpred_aux_replicate.
+    cbn.
+    destruct b; cbn; bsolve.
+  - cbn.
+    rewrite rdc_and_correct_aux.
+    f_equiv; easy.
+  - cbn.
+    rewrite rdc_or_correct_aux.
+    f_equiv; easy.
+  - cbn.
+    rewrite rdc_not_correct_aux.
+    f_equiv.
+    apply IHc.
+Qed.
+
+Lemma rp_impl_defn r r' : rp_impl r r' =
+  bool_decide (rp_or (rp_neg r) r' = RPtop).
+Proof.
+  destruct r, r'; reflexivity.
+Qed.
+
+
+
+
+
+Definition cpred_vars_facts' (vars : list nat) : formula :=
+  ANDS (imap (λ i _,
+    ¬ (# (xI (Pos.of_succ_nat i)) && # xO (Pos.of_succ_nat i)))%formula vars).
+*)
+
+(*
 Definition dnf_cpred0 n (c : option (option bool)) : cpred :=
   match c with
   | None => TRUE
@@ -2010,29 +3147,6 @@ Proof.
   intros m; cbn; Btauto.btauto.
 Qed.
 
-Ltac bsolve_setup :=
-  (repeat intros ?);
-  cbn.
-
-Ltac bsolve_case :=
-  (repeat destruct (_ !! _));
-  cbn;
-  unfold eqb.
-
-Ltac bsolve_solve :=
-  Btauto.btauto.
-
-Ltac bsolve :=
-  bsolve_setup; bsolve_case; bsolve_solve.
-
-Lemma ORS_fmap_AND_l {A} (f : A -> cpred) (c : cpred) (l : list A) :
-  ORS ((λ a, c && f a) <$> l) ≡ c && ORS (f <$> l).
-Proof.
-  induction l; [bsolve|].
-  cbn.
-  rewrite IHl.
-  bsolve.
-Qed.
 
 Lemma dnf_cpred1_aux_S k c : dnf_cpred1_aux (s k) c =
   ANDS (imap (dnf_cpred0 ∘ Nat.add k ∘ s)%prg c).
@@ -2127,97 +3241,6 @@ Proof.
     now f_equiv.
 Qed.
 
-Definition IMPL (c d : cpred) :=
-  NOT c || d.
-
-Definition IFF (c d : cpred) :=
-  IMPL c d && IMPL d c.
-
-#[export] Instance IMPL_proper : Proper ((≡) ==> (≡) ==> (≡)) IMPL.
-Proof.
-  unfold IMPL.
-  solve_proper.
-Qed.
-
-#[export] Instance IFF_proper : Proper ((≡) ==> (≡) ==> (≡)) IFF.
-Proof.
-  unfold IFF.
-  solve_proper.
-Qed.
-
-Lemma IMPL_correct' c d r : translate_cpred (IMPL c d) r <->
-  (translate_cpred c r -> translate_cpred d r).
-Proof.
-  cbn.
-  rewrite 3 Is_true_true.
-  split.
-  - intros Hcd Hc.
-    rewrite Hc in Hcd.
-    rewrite <- Hcd.
-    Btauto.btauto.
-  - intros Hcd.
-    destruct (translate_cpred c r); [|done].
-    cbn.
-    auto.
-Qed.
-
-Lemma IFF_correct' c d r : translate_cpred (IFF c d) r ->
-  translate_cpred c r <-> translate_cpred d r.
-Proof.
-  cbn.
-  rewrite andb_True.
-  intros []; split; now apply IMPL_correct'.
-Qed.
-
-Lemma IFF_correct c d : IFF c d ≡ TRUE <-> c ≡ d.
-Proof.
-  split; [|intros ->; bsolve].
-  intros Hcd m.
-  apply Bool.eq_iff_eq_true.
-  rewrite <- 2 Is_true_true.
-  apply IFF_correct'.
-  rewrite Hcd.
-  done.
-Qed.
-
-Lemma ORS_permutation cs ds : cs ≡ₚ ds -> ORS cs ≡ ORS ds.
-Proof.
-  intros Hcd.
-  induction Hcd; cbn; repeat_on_hyps ltac:(fun H => rewrite H); done || bsolve.
-Qed.
-
-Lemma ORS_correct' cs r : translate_cpred (ORS cs) r <-> Exists (λ c, translate_cpred c r) cs.
-Proof.
-  induction cs.
-  - easy.
-  - cbn.
-    rewrite orb_True.
-    rewrite Exists_cons.
-    now f_equiv.
-Qed.
-
-
-Lemma ORS_seteq cs ds : (forall c, c ∈ cs <-> c ∈ ds) -> ORS cs ≡ ORS ds.
-Proof.
-  intros Hcd r.
-  apply Bool.eq_iff_eq_true.
-  rewrite <- 2 Is_true_true.
-  rewrite 2 ORS_correct'.
-  rewrite 2 list.Exists_exists.
-  naive_solver.
-Qed.
-
-Lemma ORS_subset cs ds : cs ⊆ ds -> IMPL (ORS cs) (ORS ds) ≡ TRUE.
-Proof.
-  intros Hcd r.
-  apply Bool.eq_iff_eq_true.
-  rewrite <- 2 Is_true_true.
-  rewrite IMPL_correct', 2 ORS_correct'.
-  split; [done|].
-  intros _.
-  rewrite 2 list.Exists_exists.
-  naive_solver.
-Qed.
 
 Fixpoint norm_dnf1 (cs : list (option (option bool))) : option (list (option (option bool))) :=
   match cs with
@@ -2291,15 +3314,6 @@ Proof.
   now intros [].
 Qed.
 
-Lemma AND_TRUE c d : c && d ≡ TRUE <-> c ≡ TRUE /\ d ≡ TRUE.
-Proof.
-  split; [|intros [-> ->]; bsolve].
-  intros Hcd.
-  split; intros m;
-  specialize (Hcd m); cbn in *;
-  rewrite andb_true_iff in Hcd;
-  easy.
-Qed.
 
 Lemma dnf_cpred1_aux_TRUE_iff k ds :
   dnf_cpred1_aux k ds ≡ TRUE <-> Forall (not ∘ is_Some) ds.
@@ -2345,14 +3359,6 @@ Proof.
   destruct (r !! n) as [[]|]; done.
 Qed.
 
-Fixpoint cpred_supp (c : cpred) : gset nat :=
-  match c with
-  | TRUE | FALSE => ∅
-  | REG n _ => {[n]}
-  | AND c d => cpred_supp c ∪ cpred_supp d
-  | OR c d => cpred_supp c ∪ cpred_supp d
-  | NOT c => cpred_supp c
-  end.
 (*
 Lemma cpred_supp_disj_AND_inj c c' d d' :
   cpred_supp c ∪ cpred_supp c' ## cpred_supp d ∪ cpred_supp d' ->
@@ -2420,63 +3426,6 @@ Qed.
   | None, None => _
   end.
 
-Inductive Forall2' {A B} (P : A -> B -> Prop) (Q : A -> Prop) (R : B -> Prop) :
-  list A -> list B -> Prop :=
-  (* | Forall2'_nil : Forall2' P Q R [] [] *)
-  | Forall2'_left l : Forall Q l -> Forall2' P Q R l []
-  | Forall2'_right l' : Forall R l' -> Forall2' P Q R [] l'
-  | Forall2'_conj a b l l' : P a b -> Forall2' P Q R l l' -> Forall2' P Q R (a :: l) (b :: l').
-
-Fixpoint forall2'_fun {A B} (P : A -> B -> Prop) (Q : A -> Prop) (R : B -> Prop)
-  (l : list A) (l' : list B) : Prop :=
-  match l with
-  | [] => Forall R l'
-  | a :: l =>
-    match l' with
-    | [] => Forall Q (a :: l)
-    | b :: l' => P a b /\ forall2'_fun P Q R l l'
-    end
-  end.
-
-Lemma forall2'_fun_correct {A B} (P : A -> B -> Prop) (Q : A -> Prop) (R : B -> Prop)
-  (l : list A) (l' : list B) :
-  forall2'_fun P Q R l l' <-> Forall2' P Q R l l'.
-Proof.
-  split.
-  - revert l'; induction l as [|a l IHl]; intros l'; [now constructor|].
-    destruct l' as [|b l']; [now constructor|].
-    cbn.
-    intros []; constructor; auto.
-  - intros Hll'.
-    induction Hll'.
-    + destruct l; [constructor|].
-      done.
-    + done.
-    + done.
-Qed.
-
-#[export] Instance forall2'_fun_dec {A B} (P : A -> B -> Prop) (Q : A -> Prop) (R : B -> Prop)
- `{HP : forall a b, Decision (P a b), HQ : forall a, Decision (Q a),
-  HR : forall b, Decision (R b)} :
-  forall l l', Decision (forall2'_fun P Q R l l') :=
-  fix go l l' :=
-  match l with
-  | [] => decide (Forall R l')
-  | a :: l =>
-    match l' with
-    | [] => decide (Forall Q (a :: l))
-    | b :: l' =>
-      and_dec (HP a b) (go l l')
-    end
-  end.
-
-#[export] Instance Forall2'_dec {A B} (P : A -> B -> Prop) (Q : A -> Prop) (R : B -> Prop)
- `{HP : forall a b, Decision (P a b), HQ : forall a, Decision (Q a),
-  HR : forall b, Decision (R b)} :
-  forall l l', Decision (Forall2' P Q R l l').
-  refine (fun l l' => cast_if (forall2'_fun_dec P Q R l l'));
-  abstract (now rewrite <- forall2'_fun_correct).
-Defined.
 
 
 Lemma dnf_cpred0_impl k c c' :
@@ -2561,7 +3510,7 @@ Proof.
   apply IFF_correct, AND_TRUE.
   split; now apply cpred_impl'_correct.
 Qed.
-
+*)
 
 
 
@@ -3205,7 +4154,8 @@ Ltac bsolve_slow :=
   reflexivity.
 
 Ltac bsolve_concrete :=
-  (apply cpred_dec_correct; vm_compute; done).
+  bsolve_btauto.
+  (* (apply cpred_dec_correct; vm_compute; done). *)
   (* || tryif bsolve_slow then match goal with |- ?G => gfail 1000 "DIDN'T SOLVE" G end else fail. *)
 
 Ltac steane7_true cpred :=
@@ -3421,26 +4371,402 @@ Proof.
 Qed.
 
 #[export] Instance does_not_appear_dec i c : Decision (does_not_appear i c).
-  refine (match does_not_appear_bool i c as b return 
+  refine (match does_not_appear_bool i c as b return
     (b <-> _) -> _ with
   | true => fun Hiff => left _
   | false => fun Hiff => right _
   end (does_not_appear_bool_correct i c));
   abstract (now rewrite <- Hiff).
 Defined.
-(* 
-Fixpoint obind_list {A B} (f : A -> option (list B)) : option (list B) :=
-  match l with 
-  | [] => Some l
-  | a :: l => intersection_with (λ a b, Some (a ++ b)) (f a) (obind_list f )
 
-Fixpoint compute_MPC {n} (p : mprog) (P : MPredicate n) : option (MPredicate n) :=
+Fixpoint obind_list {A B} (f : A -> option (list B)) (l : list A) : option (list B) :=
+  match l with
+  | [] => Some []
+  | a :: l => intersection_with (λ a b, Some (a ++ b)) (f a) (obind_list f l)
+  end.
+
+Definition compute_meas_MPC {n} q i (b : Mbranch n) : option (MPredicate n) :=
+  if does_not_appear_bool i b.1 then
+    Some ([ (b.1 && i ↦ true, apply_MEAS' q true b.2);
+      (b.1 && i ↦ false, apply_MEAS' q false b.2)])%cpred
+  else None.
+
+Lemma compute_meas_MPC_correct {n} q i (b : Mbranch n) P :
+  (q < n)%nat -> WF_L b.2 ->
+  compute_meas_MPC q i b = Some P ->
+  {{{ [b] }}} MEAS q i {{{ P }}}.
+Proof.
+  intros Hq Hb2.
+  pose proof (does_not_appear_bool_correct i b.1) as Hb%proj1.
+  unfold compute_meas_MPC.
+  case_match; [|done].
+  intros [= <-].
+  destruct b.
+  cbn.
+  apply MEAS_RULE; auto.
+Qed.
+
+
+(* Lemma triple_RULE' {n : nat} (lt lt' : AType n) (cp : cpred) (g : prog) :
+  {{ lt }} g {{ lt' }} ->
+  {{{ [ (cp, lt) ] }}} U g {{{ [ (cp, lt')] }}}.
+Proof. intros Hg.
+  unfold triple, Mtriple in *.
+  intros _ [<- |[]].
+  intros cq HcqWF Hcq.
+  intros _ [<- |[]].
+  eexists.
+  split; [left; reflexivity|].
+  cbn.
+  unshelve eexists; [auto_wf|].
+  unfold cqSatisfiesMbranch in *.
+  destruct (Mat_eq_dec _ _ _ _ _ _) as [Hcq0|Htrans] in Hcq.
+  - destruct (Mat_eq_dec _ _ _ _ _ _) as [|HF]; [easy|].
+    cbn in HF.
+    rewrite Hcq0 in HF.
+    rewrite Mmult_0_r in HF.
+    easy.
+  - destruct (Mat_eq_dec _ _ _ _ _ _) as [|HF]; [easy|].
+    cbn in *.
+    case_match; [|easy].
+    vecSatisfies translateA
+    rewrite Forall_forall in *.
+    naive_solver
+
+
+  exists ltac:(auto_wf).
+
+  intros a H0 cq H1 H2 cq' H3.
+  inversion H0.
+  2: { inversion H4. }
+  symmetry in H4. subst.
+  clear H0.
+  simpl in *.
+  rewrite kill_false in H3.
+  symmetry in H3.
+  subst.
+  exists (cp, lt').
+  split. left; auto.
+  simpl in *.
+  assert (WF_Matrix (translate_prog n g × cq.2)).
+  { auto with wf_db. }
+  exists H0.
+  unfold cqSatisfiesMbranch in *.
+  simpl in *.
+  specialize (H cq.2).
+  destruct (Mat_eq_dec (2 ^ n) 1 cq.2 Zero H1 (WF_Zero (2 ^ n) 1)) eqn:E;
+    destruct (Mat_eq_dec (2 ^ n) 1 (translate_prog n g × cq.2) Zero H0 (WF_Zero (2 ^ n) 1));
+    auto.
+  rewrite e, Mmult_0_r in n0; contradiction.
+  destruct (translate_cpred cp cq.1) eqn:E'; auto.
+  assert (WF_Matrix cq.2
+          ∧ Forall (λ a0 : AType n, vecSatisfies cq.2 (translateA a0)) (map TtoA lt)).
+  { split; auto.
+    rewrite Forall_forall in *.
+    intros a H3.
+    unfold translateA.
+    rewrite in_map_iff in H3.
+    destruct H3 as [t [H3 H4]].
+    symmetry in H3. subst.
+    specialize (H2 t H4).
+    simpl. rewrite Mplus_0_l. auto. }
+  destruct (H H3).
+  unfold translateA in H5.
+  rewrite Forall_map in H5.
+  unfold TtoA in H5.
+  simpl in H5.
+  setoid_rewrite Mplus_0_l in H5.
+  auto.
+Qed. *)
+(*
+Lemma triple_RULE' {n : nat} (lt : list (TType n)) (lt' : list (AType n)) (cp : cpred) (g : prog) :
+  lt' <> [] ->
+  {{ Cap (map TtoA lt) }} g {{ Cap ( lt'(*  ≫= flat_map TtoA *)) }} ->
+  {{{ [ (cp, lt) ] }}} U g {{{  pair cp <$> lt' }}}.
+Proof.
+  intros Hlt' Hg.
+  unfold triple, Mtriple in *.
+  intros _ [<- |[]] cq HcqWF Hcq _ [<- |[]].
+  destruct lt' as [|lb lt']; [easy|]; clear Hlt'.
+  cbn.
+  eexists.
+  split; [left; reflexivity|].
+  unshelve eexists; [auto_wf|].
+  unfold cqSatisfiesMbranch in *.
+  destruct (Mat_eq_dec _ _ _ _ _ _) as [Hcq0|Htrans] in Hcq.
+  - destruct (Mat_eq_dec _ _ _ _ _ _) as [|HF]; [easy|].
+    cbn in HF.
+    rewrite Hcq0 in HF.
+    rewrite Mmult_0_r in HF.
+    easy.
+  - destruct (Mat_eq_dec _ _ _ _ _ _) as [|HF]; [easy|].
+    cbn in *.
+    case_match; [|easy].
+    specialize (Hg cq.2).
+    unshelve epose proof (Hg _) as Hg.
+    1:{
+      split; [auto_wf|].
+      rewrite Forall_map.
+      cbn.
+      revert Hcq.
+      apply Forall_impl.
+      intros a.
+      now rewrite Mplus_0_l.
+    }
+    rewrite Forall_fmap in Hg.
+    destruct Hg as [_ [Hall _]%Forall_app].
+    rewrite Forall_flat_map in Hall.
+    revert Hall.
+    apply Forall_impl.
+    intros a.
+    unfold TtoA.
+    rewrite Forall_singleton.
+    cbn.
+    now rewrite Mplus_0_l.
+Qed. *)
+
+Lemma triple_RULE' {n : nat} (lt : list (TType n)) (lt' : list (AType n)) (cp : cpred) (g : prog) :
+  lt' <> [] ->
+  {{ Cap (map TtoA lt) }} g {{ Cap (TtoA <$> mbind (M:=list) (flat_map TtoA) lt'(*  ≫= flat_map TtoA *)) }} ->
+  {{{ [ (cp, lt) ] }}} U g {{{  pair cp <$> lt' }}}.
+Proof.
+  intros Hlt' Hg.
+  unfold triple, Mtriple in *.
+  intros _ [<- |[]] cq HcqWF Hcq _ [<- |[]].
+  destruct lt' as [|lb lt']; [easy|]; clear Hlt'.
+  cbn.
+  eexists.
+  split; [left; reflexivity|].
+  unshelve eexists; [auto_wf|].
+  unfold cqSatisfiesMbranch in *.
+  destruct (Mat_eq_dec _ _ _ _ _ _) as [Hcq0|Htrans] in Hcq.
+  - destruct (Mat_eq_dec _ _ _ _ _ _) as [|HF]; [easy|].
+    cbn in HF.
+    rewrite Hcq0 in HF.
+    rewrite Mmult_0_r in HF.
+    easy.
+  - destruct (Mat_eq_dec _ _ _ _ _ _) as [|HF]; [easy|].
+    cbn in *.
+    case_match; [|easy].
+    specialize (Hg cq.2).
+    unshelve epose proof (Hg _) as Hg.
+    1:{
+      split; [auto_wf|].
+      rewrite Forall_map.
+      cbn.
+      revert Hcq.
+      apply Forall_impl.
+      intros a.
+      now rewrite Mplus_0_l.
+    }
+    rewrite Forall_fmap in Hg.
+    destruct Hg as [_ [Hall _]%Forall_app].
+    rewrite Forall_flat_map in Hall.
+    revert Hall.
+    apply Forall_impl.
+    intros a.
+    unfold TtoA.
+    rewrite Forall_singleton.
+    cbn.
+    now rewrite Mplus_0_l.
+Qed.
+
+Definition oAtoT {n} (A : AType n) : option (TType n) :=
+  match A with
+  | [t] => Some t
+  | _ => None
+  end.
+(*
+Definition compute_U_MPC {n} (p : prog) (P : MPredicate n) : option (MPredicate n) :=
+  obind_list (λ '(c, a),
+    fmap (M:=option) (λ t, [(c, TtoA t)]) $ oAtoT (prog_A p a))%prg P.
+
+Lemma intersection_with_Some {A} (f : A -> A -> option A) (ma mb : option A) c :
+  intersection_with f ma mb = Some c <->
+  exists a b, ma = Some a /\ mb = Some b /\ f a b = Some c.
+Proof.
+  destruct ma, mb; cbn; naive_solver.
+Qed.
+
+Lemma oAtoT_Some {n} (a : AType n) t :
+  oAtoT a = Some t <-> a = [t].
+Proof.
+  destruct a as [|? []]; naive_solver.
+Qed.
+
+Lemma compute_U_MPC_correct {n} (p : prog) (P : MPredicate n) :
+  prog_bound n p -> Forall WF_AType' P.*2 ->
+  forall Q,
+  compute_U_MPC p P = Some Q ->
+  {{{ P }}} p {{{ Q }}}.
+Proof.
+  intros Hp HP.
+  rewrite Forall_fmap in HP.
+  unfold compute_U_MPC.
+  induction HP as [|[c A] P HA HP IHP]; [easy|].
+  intros Q.
+  cbn.
+  rewrite intersection_with_Some.
+  intros (Qa & QP & (t & Ht%oAtoT_Some & ->)%fmap_Some & HQP & [= <-]).
+
+  eapply (CUP_CONS_RULE _ [_]), IHP.
+  - apply triple_RULE.
+    apply CAP
+  WF_AType'
+  easy.
+  apply triple_RULE.
+  cbn in HA.
+
+  prog_A
+  apply prog_A_correct.
+    hnf. naive_solver.
+
+Definition compute_U_MPC {n} (p : prog) (P : MPredicate n) : MPredicate n :=
+  mbind (M:=list) (λ b, (b.1,.) <$> (
+    (prog_A p) <$> (TtoA <$> b.2))) P.
+
+Lemma compute_U_MPC_correct {n} (p : prog) (P : MPredicate n) :
+  prog_bound n p -> Forall WF_AType' P.*2 ->
+  {{{ P }}} p {{{ compute_U_MPC p P }}}.
+Proof.
+  intros Hp HP.
+  rewrite Forall_fmap in HP.
+  unfold compute_U_MPC.
+  induction HP as [|[c A] P HA HP IHP]; [easy|].
+  cbn.
+  eapply CUP_CONS_RULE, IHP.
+  apply triple_RULE'.
+  WF_AType'
+  easy.
+  apply triple_RULE.
+  cbn in HA.
+
+  prog_A
+  apply prog_A_correct.
+    hnf. naive_solver.
+
+Fixpoint compute_MPC {n} (p : mprog) (P : MPredicate n) {struct p} : option (MPredicate n) :=
   match p with
-  | U p => Some (prod_map Datatypes.id (prog_A p) <$> P)
-  | MEAS q i => b
-  | ITE c pq p2 =>[]
-  | mseq mp1 mp2 => compute_MPC mp2 (compute_MPC mp1 P)
+  | U p' => Some (compute_U_MPC p' P)
+  | MEAS q i => obind_list (compute_meas_MPC q i) P
+  | ITE c p1 p2 =>
+    Some ((compute_U_MPC p1 (prod_map (λ a, AND a c) Datatypes.id <$> P)) ++
+      (compute_U_MPC p2 (prod_map (λ a, AND a (NOT c)) Datatypes.id <$> P)))
+  | mseq mp1 mp2 => compute_MPC mp1 P ≫= compute_MPC mp2
   end. *)
+
+Lemma filter_nil_iff {A} {P : A -> Prop} {HP : forall a, Decision (P a)} l :
+  base.filter P l = nil <-> Forall (λ a, ~ P a) l.
+Proof.
+  induction l; [easy|].
+  cbn.
+  rewrite list.Forall_cons.
+  case_decide; [naive_solver|].
+  naive_solver.
+Qed.
+
+Lemma filter_nil_neg_iff {A} {P : A -> Prop} {HP : forall a, Decision (P a)} l :
+  base.filter (λ a, ~ P a) l = nil <-> Forall (λ a, P a) l.
+Proof.
+  induction l; [easy|].
+  cbn.
+  rewrite list.Forall_cons.
+  case_decide; [naive_solver|].
+  naive_solver.
+Qed.
+
+Lemma KILL_FALSES_PRE_RULE {n} (P Q : MPredicate n) (p : mprog) l :
+  base.filter (λ c_a, ~ (cpred_is_equiv c_a.1 FALSE)) P = l ->
+  {{{from_option (λ _, l) [(FALSE, [])] (hd_error l)}}} p {{{Q}}} ->
+  {{{P}}} p {{{Q}}}.
+Proof.
+  intros Hl HPQ.
+  intros b Hb cq HcqWF Hcq cq' Hcq'.
+  apply elem_of_list_In in Hb as Hb_elem.
+  apply elem_of_list_In in Hcq' as Hcq'_elem.
+  unfold cqSatisfiesMbranch in Hcq.
+  specialize (fun a Ha => HPQ a Ha cq HcqWF).
+  unfold cqSatisfiesMbranch at 1 in HPQ.
+
+  destruct (Mat_eq_dec _ _ _ _ _ _) as [Hcq0|Hcqn0].
+  1:{
+    destruct l as [|a l].
+    - cbn in *.
+      specialize (HPQ _ ltac:(now left)).
+      specialize (HPQ Logic.I cq' Hcq').
+      easy.
+    - cbn in *.
+      specialize (HPQ _ ltac:(now left)).
+      specialize (HPQ Logic.I cq' Hcq').
+      easy.
+  }
+  destruct_decide (decide (l = [])) as Hlnil.
+  1:{
+    induction (eq_sym Hlnil).
+    cbn in *.
+    clear HPQ.
+    apply filter_nil_neg_iff in Hl.
+    rewrite list.Forall_forall in Hl.
+    apply Hl in Hb_elem.
+    apply cpred_is_equiv_correct in Hb_elem.
+    specialize (Hb_elem cq.1).
+    rewrite Hb_elem in Hcq.
+    easy.
+  }
+  replace (from_option _ _ _) with l in HPQ by now destruct l.
+
+  subst l.
+  specialize (HPQ b).
+  rewrite <- elem_of_list_In in HPQ.
+  rewrite elem_of_list_filter in HPQ.
+  destruct (translate_cpred b.1 cq.1) eqn:Hbcq; [|easy].
+
+  assert (HnF : ¬ cpred_is_equiv b.1 FALSE). 1:{
+    intros Himpl%cpred_is_equiv_correct.
+    specialize (Himpl cq.1).
+    now rewrite Hbcq in Himpl.
+  }
+  specialize (HPQ (conj HnF Hb_elem)).
+  specialize (HPQ Hcq _ Hcq').
+  easy.
+Qed.
+
+
+Lemma KILL_FALSES_PRE_RULE' {n} (P Q : MPredicate n) (p : mprog) l :
+  filter (λ c_a, negb (cpred_is_equiv c_a.1 FALSE)) P = l ->
+  {{{from_option (λ _, l) [(FALSE, [])] (hd_error l)}}} p {{{Q}}} ->
+  {{{P}}} p {{{Q}}}.
+Proof.
+  intros Hl.
+  apply KILL_FALSES_PRE_RULE.
+  subst l.
+  induction P; [done|].
+  cbn.
+  rewrite decide_bool_decide.
+  destruct (cpred_is_equiv a.1 FALSE); cbn; f_equal; easy.
+Qed.
+
+
+Tactic Notation "vm_eval" uconstr(pat) :=
+  let x := fresh "x" in
+  let Hx := fresh "Hx" in
+  remember pat as x eqn:Hx in *;
+  vm_compute in Hx;
+  subst x.
+
+Ltac elim_falses :=
+  cbn;
+  eapply KILL_FALSES_PRE_RULE';
+  [cbn [filter];
+  repeat vm_eval (¬ (cpred_is_equiv _ _)); reflexivity|cbn].
+
+Ltac ite ::=
+  first [
+    apply ITE_TRUE_RULE; [bsolve_btauto|]|
+    apply ITE_FALSE_RULE; [bsolve_btauto|] |
+    eapply ITE_RULE
+  ].
+
 
 Example Steane7QEC_Z0 :
 {{{
@@ -3465,134 +4791,9 @@ correctX ;;; correctZ
 {{{ [(TRUE, normalize 0%nat [g1; g2; g3; g4; g5; g6; Zbar; Zanc])] }}}.
 Proof.
 finalize.
-msolve.
-msolve.
-
-mseq.
-mseq.
-triple.
-mseq.
-meas.
-eval_meas.
-eval_meas.
-branch.
-(* apply JOIN_RULE. *)
-apply ITE_TRUE_RULE; [bsolve|].
-triple.
-apply ITE_FALSE_RULE; [bsolve|].
-triple.
-
-
-mseq.
-mseq.
-cbn.
-branch; triple.
-cbn.
-mseq.
-branch; meas.
-repeat eval_meas.
-cbn; branch;
-first [apply ITE_TRUE_RULE; [bsolve|]|
-  apply ITE_FALSE_RULE; [bsolve|]].
-eapply TRIPLE_RULE.
-apply ID_RULE.
-reflexivity.
-done.
-done.
-
-solvePlaceholder_refl_internal.
-eval_meas.
-eval_meas.
-branch.
-(* apply JOIN_RULE. *)
-apply ITE_TRUE_RULE; [bsolve|].
-triple.
-apply ITE_FALSE_RULE; [bsolve|].
-triple.
-eapply TRIPLE_RULE.
-triple.
-
-unfold Id.
-eapply TRIPLE_RULE.
-
-Measurement.triple.
-
-ite.
-
-msolve.
-msolve.
-msolve.
-msolve.
-evar (c : list (TType 8));
-replace (apply_MEAS _ _ _) with c by (validate_red; unfold c; reflexivity);
-subst c.
-evar (c : list (TType 8));
-replace (apply_MEAS _ _ _) with c by (validate_red; unfold c; reflexivity);
-subst c.
-
-cbn.
-(* TODO: IDEA: Test equality by using NOT for normalization *)
-
-branch; try (eapply KILL_FALSE_RULE; shelve).
-apply ITE_TRUE_RULE.
-bsolve.
-triple.
-apply ITE_FALSE_RULE.
-bsolve.
-triple.
-msolve.
-branch.
-triple.
-Time bsolve_slow.
-
-(* apply cpred_impl'_correct. *)
-(* vm_compute. *)
-(* bsolve_concrete. *)
-apply IFF_correct, AND_TRUE, conj.
-apply cpred_impl'_correct.
-vm_compute.
-done.
-apply cpred_impl'_correct.
-unfold cpred_impl'.
-remember (norm_dnf _) as x.
-vm_compute in Heqx.
-subst x.
-remember (norm_dnf _) as x.
-remember (Forall _) as f.
-
-vm_compute.
-
-bsolve_concrete.
-apply cpred_impl_correct.
-unfold cpred_impl.
-remember (norm_dnf _) as x.
-vm_compute in Heqx.
-bsolve_concrete.
-ite.
-Id
-
-Set Ltac Debug.
-msolve.
-validate_red.
-Timeout 10 lazy-[Cplus Cminus Cmult Cdiv Cinv RtoC sqrt Q2R IZR QC2C Cexp PI sin cos
-	   atype_eq Copp triple pred_eq] in Heqx.
-
-cbn [apply_MEAS].
-msolve.
-do 8 msolve.
-(*** Copy Paste cpred ***)
-steane7_correction (AND
-         (AND (AND (AND (AND (AND TRUE (REG 0 true)) (REG 1 true)) (REG 2 true)) (REG 3 false))
-            (REG 4 true)) (REG 5 true)).
-simpl.
-Unshelve.
-all: try apply ([(TRUE,normalize 0%nat [g1; g2; g3; g4; g5; g6; Zbar; Zanc])]).
-f_equal.
-solveNormalize; reflexivity.
-solveNormalize; reflexivity.
-all: try (intro; discriminate).
+repeat (msolve; elim_falses).
+all: solveNormalize; reflexivity.
 Qed.
-
 
 Example Steane7QEC_X1 :
 {{{
@@ -3616,19 +4817,10 @@ synd_s1z_0 ;;; synd_s2z_1 ;;; synd_s3z_2 ;;; synd_s1x_3 ;;; synd_s2x_4 ;;; synd_
 correctX ;;; correctZ
 {{{ [(TRUE, normalize 0%nat [g1; g2; g3; g4; g5; g6; Zbar; Zanc])] }}}.
 Proof.
+
 finalize.
-do 8 msolve.
-(*** Copy Paste cpred ***)
-steane7_correction (AND
-         (AND (AND (AND (AND (AND TRUE (REG 0 true)) (REG 1 false)) (REG 2 true)) (REG 3 true))
-            (REG 4 true)) (REG 5 true)).
-simpl.
-Unshelve.
-all: try apply ([(TRUE,normalize 0%nat [g1; g2; g3; g4; g5; g6; Zbar; Zanc])]).
-f_equal.
-solveNormalize; reflexivity.
-solveNormalize; reflexivity.
-all: try (intro; discriminate).
+repeat (msolve; elim_falses).
+all: solveNormalize; reflexivity.
 Qed.
 
 
@@ -3654,20 +4846,10 @@ synd_s1z_0 ;;; synd_s2z_1 ;;; synd_s3z_2 ;;; synd_s1x_3 ;;; synd_s2x_4 ;;; synd_
 correctX ;;; correctZ
 {{{ [(TRUE, normalize 0%nat [g1; g2; g3; g4; g5; g6; Zbar; Zanc])] }}}.
 Proof.
+  
 finalize.
-do 8 msolve.
-(*** Copy Paste cpred ***)
-steane7_correction (AND
-         (AND
-            (AND (AND (AND (AND TRUE (REG 0 false)) (REG 1 false)) (REG 2 true))
-               (REG 3 false)) (REG 4 false)) (REG 5 true)).
-simpl.
-Unshelve.
-all: try apply ([(TRUE,normalize 0%nat [g1; g2; g3; g4; g5; g6; Zbar; Zanc])]).
-f_equal.
-solveNormalize; reflexivity.
-solveNormalize; reflexivity.
-all: try (intro; discriminate).
+repeat (msolve; elim_falses).
+all: solveNormalize; reflexivity.
 Qed.
 
 
