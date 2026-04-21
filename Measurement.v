@@ -3914,6 +3914,108 @@ Proof.
   naive_solver.
 Qed.
 
+
+Lemma filter_nil_iff {A} {P : A -> Prop} {HP : forall a, Decision (P a)} l :
+  base.filter P l = nil <-> Forall (λ a, ~ P a) l.
+Proof.
+  induction l; [easy|].
+  cbn.
+  rewrite list.Forall_cons.
+  case_decide; [naive_solver|].
+  naive_solver.
+Qed.
+
+Lemma filter_nil_neg_iff {A} {P : A -> Prop} {HP : forall a, Decision (P a)} l :
+  base.filter (λ a, ~ P a) l = nil <-> Forall (λ a, P a) l.
+Proof.
+  induction l; [easy|].
+  cbn.
+  rewrite list.Forall_cons.
+  case_decide; [naive_solver|].
+  naive_solver.
+Qed.
+
+Lemma KILL_FALSES_PRE_RULE {n} (P Q : MPredicate n) (p : mprog) l :
+  base.filter (λ c_a, ~ (cpred_is_equiv c_a.1 FALSE)) P = l ->
+  {{{from_option (λ _, l) [(FALSE, [])] (hd_error l)}}} p {{{Q}}} ->
+  {{{P}}} p {{{Q}}}.
+Proof.
+  intros Hl HPQ.
+  intros b Hb cq HcqWF Hcq cq' Hcq'.
+  apply elem_of_list_In in Hb as Hb_elem.
+  apply elem_of_list_In in Hcq' as Hcq'_elem.
+  unfold cqSatisfiesMbranch in Hcq.
+  specialize (fun a Ha => HPQ a Ha cq HcqWF).
+  unfold cqSatisfiesMbranch at 1 in HPQ.
+
+  destruct (Mat_eq_dec _ _ _ _ _ _) as [Hcq0|Hcqn0].
+  1:{
+    destruct l as [|a l].
+    - cbn in *.
+      specialize (HPQ _ ltac:(now left)).
+      specialize (HPQ Logic.I cq' Hcq').
+      easy.
+    - cbn in *.
+      specialize (HPQ _ ltac:(now left)).
+      specialize (HPQ Logic.I cq' Hcq').
+      easy.
+  }
+  destruct_decide (decide (l = [])) as Hlnil.
+  1:{
+    induction (eq_sym Hlnil).
+    cbn in *.
+    clear HPQ.
+    apply filter_nil_neg_iff in Hl.
+    rewrite list.Forall_forall in Hl.
+    apply Hl in Hb_elem.
+    apply cpred_is_equiv_correct in Hb_elem.
+    specialize (Hb_elem cq.1).
+    rewrite Hb_elem in Hcq.
+    easy.
+  }
+  replace (from_option _ _ _) with l in HPQ by now destruct l.
+
+  subst l.
+  specialize (HPQ b).
+  rewrite <- elem_of_list_In in HPQ.
+  rewrite elem_of_list_filter in HPQ.
+  destruct (translate_cpred b.1 cq.1) eqn:Hbcq; [|easy].
+
+  assert (HnF : ¬ cpred_is_equiv b.1 FALSE). 1:{
+    intros Himpl%cpred_is_equiv_correct.
+    specialize (Himpl cq.1).
+    now rewrite Hbcq in Himpl.
+  }
+  specialize (HPQ (conj HnF Hb_elem)).
+  specialize (HPQ Hcq _ Hcq').
+  easy.
+Qed.
+
+
+Lemma KILL_FALSES_PRE_RULE' {n} (P Q : MPredicate n) (p : mprog) l :
+  filter (λ c_a, negb (cpred_is_equiv c_a.1 FALSE)) P = l ->
+  {{{from_option (λ _, l) [(FALSE, [])] (hd_error l)}}} p {{{Q}}} ->
+  {{{P}}} p {{{Q}}}.
+Proof.
+  intros Hl.
+  apply KILL_FALSES_PRE_RULE.
+  subst l.
+  induction P; [done|].
+  cbn.
+  rewrite decide_bool_decide.
+  destruct (cpred_is_equiv a.1 FALSE); cbn; f_equal; easy.
+Qed.
+
+Lemma KILL_FALSE_RULE_EQUIV {n : nat} 
+  (lt : list (TType n)) (mp : mprog) c (Q : MPredicate n) :
+  c ≡ FALSE ->
+  Q ≠ [] → {{{ [(c, lt)] }}} mp {{{Q}}}.
+Proof.
+  intros Hc HQ.
+  eapply SIMPLIFY_CPRED_PRE_RULE; [apply Hc|].
+  now apply KILL_FALSE_RULE.
+Qed.
+
 (* Lemma ITE_JOIN_RULE {n} (lt : list (TType n)) (C : cpred)
   (Q : MPredicate n) (p1 p2 : prog) (A : cpred) :
   {{{ [ (A && C, lt) ] }}} p1 {{{ Q }}} ->
@@ -4066,10 +4168,11 @@ Ltac branch :=
   | |- {{{ _ :: _ }}} _ {{{ _ }}} =>
       eapply CUP_CONS_RULE;
       [idtac | try branch]
+  | |- {{{_ ++ _}}} _ {{{ _ }}} => cbn [app]; branch
   end.
 
 Ltac simplify :=
-  unfold apply_MEAS, AtoT;
+  unfold apply_MEAS', apply_MEAS, AtoT;
   repeat match goal with
     | |- context [ pivots_normalize _ ?a ] =>
         rewrite ! (parse_norm_eq _ a _);
@@ -4082,22 +4185,32 @@ Ltac simplify :=
            Q2R IZR QC2C Cexp PI sin cos atype_eq Copp
            triple pred_eq Mtriple].
 
+
+Tactic Notation "vm_eval" uconstr(pat) :=
+  let x := fresh "x" in
+  let Hx := fresh "Hx" in
+  remember pat as x eqn:Hx in *;
+  vm_compute in Hx;
+  subst x.
+
+Ltac elim_falses :=
+  cbn;
+  eapply KILL_FALSES_PRE_RULE';
+  [cbn [filter];
+  repeat vm_eval (¬ (cpred_is_equiv _ _)); reflexivity|cbn].
+
 Ltac ite :=
-  eapply ITE_RULE.
+  first [
+    apply ITE_TRUE_RULE; [bsolve_btauto|]|
+    apply ITE_FALSE_RULE; [bsolve_btauto|] |
+    eapply ITE_RULE
+  ].
 
 Ltac kill_rep :=
   repeat erewrite KILL_AND_REPEAT_R_RULE.
 
 Ltac kill_f :=
-  repeat
-    first [eapply KILL_FALSE_RULE;
-           first [intro; discriminate | shelve]
-          | eapply KILL_AND_FALSE_R_RULE;
-           first [intro; discriminate | shelve]
-          | eapply KILL_AND_TF_R_RULE;
-            first [intro; discriminate | shelve]
-          | eapply KILL_AND_FT_R_RULE;
-            first [intro; discriminate | shelve]].
+  try (eapply KILL_FALSE_RULE_EQUIV; [bsolve_btauto|first [intro; discriminate|shelve]]).
 
 Ltac kill_f_r :=
   try apply KILL_AND_FALSE_R_RULE'.
@@ -4111,7 +4224,7 @@ Ltac kill_i :=
              | intro; discriminate
              | reflexivity])).
 
-Ltac kill := repeat (try apply KILL_FALSE_RULE'; kill_rep; kill_i; kill_f).
+Ltac kill := repeat (try apply KILL_FALSE_RULE'; kill_i; kill_f).
 
 Ltac mseqs :=
   repeat tryif mseq then [> mseqs; idtac | idtac] else idtac.
@@ -4131,7 +4244,9 @@ Ltac mstep :=
   | |- {{{ _ }}} U _ {{{ _ }}} => triple
   end.
 
-Ltac msolve := tryif mseq then [> repeat msolve | idtac] else mstep.
+Ltac msolve := (tryif mseq then [> repeat msolve | idtac] else mstep).
+
+Ltac msolves := repeat (msolve; elim_falses).
 
 
 
@@ -4278,494 +4393,14 @@ correctX ;;; correctZ
 {{{ [(TRUE, normalize 0%nat [g1; g2; g3; g4; g5; g6; Zbar; Zanc])] }}}.
 Proof.
 finalize.
-do 8 msolve.
-cbn.
-branch.
-
-steane7_correction
-(TRUE && REG 0 true && REG 1 true && REG 2 true &&
-      REG 3 true && REG 4 true && REG 5 true)%cpred.
-
-(*** Copy Paste cpred ***)
-(* steane7_correction (AND
-         (AND (AND (AND (AND (AND TRUE (REG 0 true)) (REG 1 true)) (REG 2 true)) (REG 3 true)) (REG 4 true))
-         (REG 5 true)). *)
-
-
-
-Unshelve.
-all: try apply ([(TRUE,normalize 0%nat [g1; g2; g3; g4; g5; g6; Zbar; Zanc])]).
-1,2,3,4,5,6:kill.
-f_equal.
-solveNormalize; reflexivity.
-solveNormalize; reflexivity.
-all: try (intro; discriminate).
+msolves.
+all: solveNormalize; reflexivity.
 Qed.
 
 
-Ltac eval_meas :=
-  match goal with
-  | |- context G [@apply_MEAS ?n ?i ?b ?lt] =>
-
-    let x := fresh "x" in
-    evar (x : list (TType n));
-    replace (@apply_MEAS n i b lt) with x by (validate_red; Csimpl; unfold x; reflexivity);
-    subst x
-  | |- context G [@apply_MEAS' ?n ?i ?b ?lt] =>
-
-    let x := fresh "x" in
-    evar (x : list (TType n));
-    replace (@apply_MEAS' n i b lt) with x by (validate_red; Csimpl; unfold x; reflexivity);
-    subst x
-  end.
-
-Lemma translate_prog_id n i :
-  translate_prog n (Id i) = I _.
-Proof.
-  cbn.
-  unfold prog_simpl_app.
-  bdestruct (i <? n).
-  - restore_dims.
-    rewrite 2 kron_mixed_product.
-    rewrite MmultHH.
-    rewrite 2 Mmult_1_r by auto_wf.
-    rewrite 2 id_kron.
-    f_equal; unify_pows_two.
-  - now rewrite Mmult_1_r by auto_wf.
-Qed.
-
-Lemma ID_RULE {n} (P : Predicate n) i :
-  {{ P }} Id i {{ P }}.
-Proof.
-  intros v.
-  rewrite translate_prog_id.
-  intros Hv.
-  apply vecSatisfiesP_implies_WF_Matrix in Hv as Hv'.
-  now rewrite Mmult_1_l by auto_wf.
-Qed.
-
-Fixpoint does_not_appear_bool (i : nat) (c : cpred) : bool :=
-  match c with
-  | TRUE | FALSE => true
-  | REG n _ => negb (Nat.eqb n i)
-  | OR a b | AND a b => does_not_appear_bool i a && does_not_appear_bool i b
-  | NOT a => does_not_appear_bool i a
-  end.
-
-Lemma does_not_appear_bool_correct i c :
-  does_not_appear_bool i c <-> does_not_appear i c.
-Proof.
-  split.
-  - induction c; cbn; [auto using does_not_appear.. | | |auto using dna_NOT].
-    + rewrite negb_True, Is_true_true, Nat.eqb_eq.
-      now intros; apply dna_REG.
-    + rewrite andb_True.
-      intros []; auto using dna_AND.
-    + rewrite andb_True.
-      intros []; auto using dna_OR.
-  - intros Hic.
-    induction Hic; cbn; try easy.
-    + now rewrite negb_True, Is_true_true, Nat.eqb_eq.
-    + now apply andb_True.
-    + now apply andb_True.
-Qed.
-
-#[export] Instance does_not_appear_dec i c : Decision (does_not_appear i c).
-  refine (match does_not_appear_bool i c as b return
-    (b <-> _) -> _ with
-  | true => fun Hiff => left _
-  | false => fun Hiff => right _
-  end (does_not_appear_bool_correct i c));
-  abstract (now rewrite <- Hiff).
-Defined.
-
-Fixpoint obind_list {A B} (f : A -> option (list B)) (l : list A) : option (list B) :=
-  match l with
-  | [] => Some []
-  | a :: l => intersection_with (λ a b, Some (a ++ b)) (f a) (obind_list f l)
-  end.
-
-Definition compute_meas_MPC {n} q i (b : Mbranch n) : option (MPredicate n) :=
-  if does_not_appear_bool i b.1 then
-    Some ([ (b.1 && i ↦ true, apply_MEAS' q true b.2);
-      (b.1 && i ↦ false, apply_MEAS' q false b.2)])%cpred
-  else None.
-
-Lemma compute_meas_MPC_correct {n} q i (b : Mbranch n) P :
-  (q < n)%nat -> WF_L b.2 ->
-  compute_meas_MPC q i b = Some P ->
-  {{{ [b] }}} MEAS q i {{{ P }}}.
-Proof.
-  intros Hq Hb2.
-  pose proof (does_not_appear_bool_correct i b.1) as Hb%proj1.
-  unfold compute_meas_MPC.
-  case_match; [|done].
-  intros [= <-].
-  destruct b.
-  cbn.
-  apply MEAS_RULE; auto.
-Qed.
 
 
-(* Lemma triple_RULE' {n : nat} (lt lt' : AType n) (cp : cpred) (g : prog) :
-  {{ lt }} g {{ lt' }} ->
-  {{{ [ (cp, lt) ] }}} U g {{{ [ (cp, lt')] }}}.
-Proof. intros Hg.
-  unfold triple, Mtriple in *.
-  intros _ [<- |[]].
-  intros cq HcqWF Hcq.
-  intros _ [<- |[]].
-  eexists.
-  split; [left; reflexivity|].
-  cbn.
-  unshelve eexists; [auto_wf|].
-  unfold cqSatisfiesMbranch in *.
-  destruct (Mat_eq_dec _ _ _ _ _ _) as [Hcq0|Htrans] in Hcq.
-  - destruct (Mat_eq_dec _ _ _ _ _ _) as [|HF]; [easy|].
-    cbn in HF.
-    rewrite Hcq0 in HF.
-    rewrite Mmult_0_r in HF.
-    easy.
-  - destruct (Mat_eq_dec _ _ _ _ _ _) as [|HF]; [easy|].
-    cbn in *.
-    case_match; [|easy].
-    vecSatisfies translateA
-    rewrite Forall_forall in *.
-    naive_solver
 
-
-  exists ltac:(auto_wf).
-
-  intros a H0 cq H1 H2 cq' H3.
-  inversion H0.
-  2: { inversion H4. }
-  symmetry in H4. subst.
-  clear H0.
-  simpl in *.
-  rewrite kill_false in H3.
-  symmetry in H3.
-  subst.
-  exists (cp, lt').
-  split. left; auto.
-  simpl in *.
-  assert (WF_Matrix (translate_prog n g × cq.2)).
-  { auto with wf_db. }
-  exists H0.
-  unfold cqSatisfiesMbranch in *.
-  simpl in *.
-  specialize (H cq.2).
-  destruct (Mat_eq_dec (2 ^ n) 1 cq.2 Zero H1 (WF_Zero (2 ^ n) 1)) eqn:E;
-    destruct (Mat_eq_dec (2 ^ n) 1 (translate_prog n g × cq.2) Zero H0 (WF_Zero (2 ^ n) 1));
-    auto.
-  rewrite e, Mmult_0_r in n0; contradiction.
-  destruct (translate_cpred cp cq.1) eqn:E'; auto.
-  assert (WF_Matrix cq.2
-          ∧ Forall (λ a0 : AType n, vecSatisfies cq.2 (translateA a0)) (map TtoA lt)).
-  { split; auto.
-    rewrite Forall_forall in *.
-    intros a H3.
-    unfold translateA.
-    rewrite in_map_iff in H3.
-    destruct H3 as [t [H3 H4]].
-    symmetry in H3. subst.
-    specialize (H2 t H4).
-    simpl. rewrite Mplus_0_l. auto. }
-  destruct (H H3).
-  unfold translateA in H5.
-  rewrite Forall_map in H5.
-  unfold TtoA in H5.
-  simpl in H5.
-  setoid_rewrite Mplus_0_l in H5.
-  auto.
-Qed. *)
-(*
-Lemma triple_RULE' {n : nat} (lt : list (TType n)) (lt' : list (AType n)) (cp : cpred) (g : prog) :
-  lt' <> [] ->
-  {{ Cap (map TtoA lt) }} g {{ Cap ( lt'(*  ≫= flat_map TtoA *)) }} ->
-  {{{ [ (cp, lt) ] }}} U g {{{  pair cp <$> lt' }}}.
-Proof.
-  intros Hlt' Hg.
-  unfold triple, Mtriple in *.
-  intros _ [<- |[]] cq HcqWF Hcq _ [<- |[]].
-  destruct lt' as [|lb lt']; [easy|]; clear Hlt'.
-  cbn.
-  eexists.
-  split; [left; reflexivity|].
-  unshelve eexists; [auto_wf|].
-  unfold cqSatisfiesMbranch in *.
-  destruct (Mat_eq_dec _ _ _ _ _ _) as [Hcq0|Htrans] in Hcq.
-  - destruct (Mat_eq_dec _ _ _ _ _ _) as [|HF]; [easy|].
-    cbn in HF.
-    rewrite Hcq0 in HF.
-    rewrite Mmult_0_r in HF.
-    easy.
-  - destruct (Mat_eq_dec _ _ _ _ _ _) as [|HF]; [easy|].
-    cbn in *.
-    case_match; [|easy].
-    specialize (Hg cq.2).
-    unshelve epose proof (Hg _) as Hg.
-    1:{
-      split; [auto_wf|].
-      rewrite Forall_map.
-      cbn.
-      revert Hcq.
-      apply Forall_impl.
-      intros a.
-      now rewrite Mplus_0_l.
-    }
-    rewrite Forall_fmap in Hg.
-    destruct Hg as [_ [Hall _]%Forall_app].
-    rewrite Forall_flat_map in Hall.
-    revert Hall.
-    apply Forall_impl.
-    intros a.
-    unfold TtoA.
-    rewrite Forall_singleton.
-    cbn.
-    now rewrite Mplus_0_l.
-Qed. *)
-
-Lemma triple_RULE' {n : nat} (lt : list (TType n)) (lt' : list (AType n)) (cp : cpred) (g : prog) :
-  lt' <> [] ->
-  {{ Cap (map TtoA lt) }} g {{ Cap (TtoA <$> mbind (M:=list) (flat_map TtoA) lt'(*  ≫= flat_map TtoA *)) }} ->
-  {{{ [ (cp, lt) ] }}} U g {{{  pair cp <$> lt' }}}.
-Proof.
-  intros Hlt' Hg.
-  unfold triple, Mtriple in *.
-  intros _ [<- |[]] cq HcqWF Hcq _ [<- |[]].
-  destruct lt' as [|lb lt']; [easy|]; clear Hlt'.
-  cbn.
-  eexists.
-  split; [left; reflexivity|].
-  unshelve eexists; [auto_wf|].
-  unfold cqSatisfiesMbranch in *.
-  destruct (Mat_eq_dec _ _ _ _ _ _) as [Hcq0|Htrans] in Hcq.
-  - destruct (Mat_eq_dec _ _ _ _ _ _) as [|HF]; [easy|].
-    cbn in HF.
-    rewrite Hcq0 in HF.
-    rewrite Mmult_0_r in HF.
-    easy.
-  - destruct (Mat_eq_dec _ _ _ _ _ _) as [|HF]; [easy|].
-    cbn in *.
-    case_match; [|easy].
-    specialize (Hg cq.2).
-    unshelve epose proof (Hg _) as Hg.
-    1:{
-      split; [auto_wf|].
-      rewrite Forall_map.
-      cbn.
-      revert Hcq.
-      apply Forall_impl.
-      intros a.
-      now rewrite Mplus_0_l.
-    }
-    rewrite Forall_fmap in Hg.
-    destruct Hg as [_ [Hall _]%Forall_app].
-    rewrite Forall_flat_map in Hall.
-    revert Hall.
-    apply Forall_impl.
-    intros a.
-    unfold TtoA.
-    rewrite Forall_singleton.
-    cbn.
-    now rewrite Mplus_0_l.
-Qed.
-
-Definition oAtoT {n} (A : AType n) : option (TType n) :=
-  match A with
-  | [t] => Some t
-  | _ => None
-  end.
-(*
-Definition compute_U_MPC {n} (p : prog) (P : MPredicate n) : option (MPredicate n) :=
-  obind_list (λ '(c, a),
-    fmap (M:=option) (λ t, [(c, TtoA t)]) $ oAtoT (prog_A p a))%prg P.
-
-Lemma intersection_with_Some {A} (f : A -> A -> option A) (ma mb : option A) c :
-  intersection_with f ma mb = Some c <->
-  exists a b, ma = Some a /\ mb = Some b /\ f a b = Some c.
-Proof.
-  destruct ma, mb; cbn; naive_solver.
-Qed.
-
-Lemma oAtoT_Some {n} (a : AType n) t :
-  oAtoT a = Some t <-> a = [t].
-Proof.
-  destruct a as [|? []]; naive_solver.
-Qed.
-
-Lemma compute_U_MPC_correct {n} (p : prog) (P : MPredicate n) :
-  prog_bound n p -> Forall WF_AType' P.*2 ->
-  forall Q,
-  compute_U_MPC p P = Some Q ->
-  {{{ P }}} p {{{ Q }}}.
-Proof.
-  intros Hp HP.
-  rewrite Forall_fmap in HP.
-  unfold compute_U_MPC.
-  induction HP as [|[c A] P HA HP IHP]; [easy|].
-  intros Q.
-  cbn.
-  rewrite intersection_with_Some.
-  intros (Qa & QP & (t & Ht%oAtoT_Some & ->)%fmap_Some & HQP & [= <-]).
-
-  eapply (CUP_CONS_RULE _ [_]), IHP.
-  - apply triple_RULE.
-    apply CAP
-  WF_AType'
-  easy.
-  apply triple_RULE.
-  cbn in HA.
-
-  prog_A
-  apply prog_A_correct.
-    hnf. naive_solver.
-
-Definition compute_U_MPC {n} (p : prog) (P : MPredicate n) : MPredicate n :=
-  mbind (M:=list) (λ b, (b.1,.) <$> (
-    (prog_A p) <$> (TtoA <$> b.2))) P.
-
-Lemma compute_U_MPC_correct {n} (p : prog) (P : MPredicate n) :
-  prog_bound n p -> Forall WF_AType' P.*2 ->
-  {{{ P }}} p {{{ compute_U_MPC p P }}}.
-Proof.
-  intros Hp HP.
-  rewrite Forall_fmap in HP.
-  unfold compute_U_MPC.
-  induction HP as [|[c A] P HA HP IHP]; [easy|].
-  cbn.
-  eapply CUP_CONS_RULE, IHP.
-  apply triple_RULE'.
-  WF_AType'
-  easy.
-  apply triple_RULE.
-  cbn in HA.
-
-  prog_A
-  apply prog_A_correct.
-    hnf. naive_solver.
-
-Fixpoint compute_MPC {n} (p : mprog) (P : MPredicate n) {struct p} : option (MPredicate n) :=
-  match p with
-  | U p' => Some (compute_U_MPC p' P)
-  | MEAS q i => obind_list (compute_meas_MPC q i) P
-  | ITE c p1 p2 =>
-    Some ((compute_U_MPC p1 (prod_map (λ a, AND a c) Datatypes.id <$> P)) ++
-      (compute_U_MPC p2 (prod_map (λ a, AND a (NOT c)) Datatypes.id <$> P)))
-  | mseq mp1 mp2 => compute_MPC mp1 P ≫= compute_MPC mp2
-  end. *)
-
-Lemma filter_nil_iff {A} {P : A -> Prop} {HP : forall a, Decision (P a)} l :
-  base.filter P l = nil <-> Forall (λ a, ~ P a) l.
-Proof.
-  induction l; [easy|].
-  cbn.
-  rewrite list.Forall_cons.
-  case_decide; [naive_solver|].
-  naive_solver.
-Qed.
-
-Lemma filter_nil_neg_iff {A} {P : A -> Prop} {HP : forall a, Decision (P a)} l :
-  base.filter (λ a, ~ P a) l = nil <-> Forall (λ a, P a) l.
-Proof.
-  induction l; [easy|].
-  cbn.
-  rewrite list.Forall_cons.
-  case_decide; [naive_solver|].
-  naive_solver.
-Qed.
-
-Lemma KILL_FALSES_PRE_RULE {n} (P Q : MPredicate n) (p : mprog) l :
-  base.filter (λ c_a, ~ (cpred_is_equiv c_a.1 FALSE)) P = l ->
-  {{{from_option (λ _, l) [(FALSE, [])] (hd_error l)}}} p {{{Q}}} ->
-  {{{P}}} p {{{Q}}}.
-Proof.
-  intros Hl HPQ.
-  intros b Hb cq HcqWF Hcq cq' Hcq'.
-  apply elem_of_list_In in Hb as Hb_elem.
-  apply elem_of_list_In in Hcq' as Hcq'_elem.
-  unfold cqSatisfiesMbranch in Hcq.
-  specialize (fun a Ha => HPQ a Ha cq HcqWF).
-  unfold cqSatisfiesMbranch at 1 in HPQ.
-
-  destruct (Mat_eq_dec _ _ _ _ _ _) as [Hcq0|Hcqn0].
-  1:{
-    destruct l as [|a l].
-    - cbn in *.
-      specialize (HPQ _ ltac:(now left)).
-      specialize (HPQ Logic.I cq' Hcq').
-      easy.
-    - cbn in *.
-      specialize (HPQ _ ltac:(now left)).
-      specialize (HPQ Logic.I cq' Hcq').
-      easy.
-  }
-  destruct_decide (decide (l = [])) as Hlnil.
-  1:{
-    induction (eq_sym Hlnil).
-    cbn in *.
-    clear HPQ.
-    apply filter_nil_neg_iff in Hl.
-    rewrite list.Forall_forall in Hl.
-    apply Hl in Hb_elem.
-    apply cpred_is_equiv_correct in Hb_elem.
-    specialize (Hb_elem cq.1).
-    rewrite Hb_elem in Hcq.
-    easy.
-  }
-  replace (from_option _ _ _) with l in HPQ by now destruct l.
-
-  subst l.
-  specialize (HPQ b).
-  rewrite <- elem_of_list_In in HPQ.
-  rewrite elem_of_list_filter in HPQ.
-  destruct (translate_cpred b.1 cq.1) eqn:Hbcq; [|easy].
-
-  assert (HnF : ¬ cpred_is_equiv b.1 FALSE). 1:{
-    intros Himpl%cpred_is_equiv_correct.
-    specialize (Himpl cq.1).
-    now rewrite Hbcq in Himpl.
-  }
-  specialize (HPQ (conj HnF Hb_elem)).
-  specialize (HPQ Hcq _ Hcq').
-  easy.
-Qed.
-
-
-Lemma KILL_FALSES_PRE_RULE' {n} (P Q : MPredicate n) (p : mprog) l :
-  filter (λ c_a, negb (cpred_is_equiv c_a.1 FALSE)) P = l ->
-  {{{from_option (λ _, l) [(FALSE, [])] (hd_error l)}}} p {{{Q}}} ->
-  {{{P}}} p {{{Q}}}.
-Proof.
-  intros Hl.
-  apply KILL_FALSES_PRE_RULE.
-  subst l.
-  induction P; [done|].
-  cbn.
-  rewrite decide_bool_decide.
-  destruct (cpred_is_equiv a.1 FALSE); cbn; f_equal; easy.
-Qed.
-
-
-Tactic Notation "vm_eval" uconstr(pat) :=
-  let x := fresh "x" in
-  let Hx := fresh "Hx" in
-  remember pat as x eqn:Hx in *;
-  vm_compute in Hx;
-  subst x.
-
-Ltac elim_falses :=
-  cbn;
-  eapply KILL_FALSES_PRE_RULE';
-  [cbn [filter];
-  repeat vm_eval (¬ (cpred_is_equiv _ _)); reflexivity|cbn].
-
-Ltac ite ::=
-  first [
-    apply ITE_TRUE_RULE; [bsolve_btauto|]|
-    apply ITE_FALSE_RULE; [bsolve_btauto|] |
-    eapply ITE_RULE
-  ].
 
 
 Example Steane7QEC_Z0 :
@@ -4791,7 +4426,7 @@ correctX ;;; correctZ
 {{{ [(TRUE, normalize 0%nat [g1; g2; g3; g4; g5; g6; Zbar; Zanc])] }}}.
 Proof.
 finalize.
-repeat (msolve; elim_falses).
+msolves.
 all: solveNormalize; reflexivity.
 Qed.
 
@@ -4817,9 +4452,8 @@ synd_s1z_0 ;;; synd_s2z_1 ;;; synd_s3z_2 ;;; synd_s1x_3 ;;; synd_s2x_4 ;;; synd_
 correctX ;;; correctZ
 {{{ [(TRUE, normalize 0%nat [g1; g2; g3; g4; g5; g6; Zbar; Zanc])] }}}.
 Proof.
-
 finalize.
-repeat (msolve; elim_falses).
+msolves.
 all: solveNormalize; reflexivity.
 Qed.
 
@@ -4846,9 +4480,8 @@ synd_s1z_0 ;;; synd_s2z_1 ;;; synd_s3z_2 ;;; synd_s1x_3 ;;; synd_s2x_4 ;;; synd_
 correctX ;;; correctZ
 {{{ [(TRUE, normalize 0%nat [g1; g2; g3; g4; g5; g6; Zbar; Zanc])] }}}.
 Proof.
-  
 finalize.
-repeat (msolve; elim_falses).
+msolves.
 all: solveNormalize; reflexivity.
 Qed.
 
