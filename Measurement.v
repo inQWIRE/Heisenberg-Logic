@@ -4006,7 +4006,7 @@ Proof.
   destruct (cpred_is_equiv a.1 FALSE); cbn; f_equal; easy.
 Qed.
 
-Lemma KILL_FALSE_RULE_EQUIV {n : nat} 
+Lemma KILL_FALSE_RULE_EQUIV {n : nat}
   (lt : list (TType n)) (mp : mprog) c (Q : MPredicate n) :
   c ≡ FALSE ->
   Q ≠ [] → {{{ [(c, lt)] }}} mp {{{Q}}}.
@@ -4171,7 +4171,7 @@ Ltac branch :=
   | |- {{{_ ++ _}}} _ {{{ _ }}} => cbn [app]; branch
   end.
 
-Ltac simplify :=
+Ltac simplify_old :=
   unfold apply_MEAS', apply_MEAS, AtoT;
   repeat match goal with
     | |- context [ pivots_normalize _ ?a ] =>
@@ -4180,6 +4180,22 @@ Ltac simplify :=
     | |- context [ normalize _ ?a ] =>
         rewrite ! (parse_norm_eq _ a _);
         rewrite <- !TTypeBtoTType_respects_normalize
+    end;
+  lazy -[Cplus Cminus Cmult Cdiv Cinv RtoC sqrt
+           Q2R IZR QC2C Cexp PI sin cos atype_eq Copp
+           triple pred_eq Mtriple].
+
+
+
+Ltac simplify :=
+  unfold apply_MEAS', apply_MEAS, AtoT;
+  repeat match goal with
+    | |- context [ pivots_normalize _ ?a ] =>
+        rewrite (parse_norm_eq _ a _);
+        rewrite <- TTypeBtoTType_respects_pivots_normalizeB
+    | |- context [ normalize _ ?a ] =>
+        rewrite (parse_norm_eq _ a _);
+        rewrite <- TTypeBtoTType_respects_normalize
     end;
   lazy -[Cplus Cminus Cmult Cdiv Cinv RtoC sqrt
            Q2R IZR QC2C Cexp PI sin cos atype_eq Copp
@@ -4215,30 +4231,113 @@ Ltac kill_f :=
 Ltac kill_f_r :=
   try apply KILL_AND_FALSE_R_RULE'.
 
-Ltac kill_i :=
-  repeat
-    (repeat (erewrite REMOVE_LAST_pI_RULE;
-             [simpl | intro; discriminate | reflexivity]);
+Ltac all_I ts :=
+  lazymatch ts with
+  | [] => idtac
+  | gI :: ?ts => all_I ts
+  | _ => fail
+  end.
+
+Ltac ends_pI P :=
+  lazymatch P with
+  | [] => fail
+  | [(C1, ?ts)] => all_I ts
+  | _ :: ?P => ends_pI P
+  end.
+
+Ltac ends_mI P :=
+  lazymatch P with
+  | [] => fail
+  | [(- C1, ?ts)] => all_I ts
+  | _ :: ?P => ends_mI P
+  end.
+Ltac print_goal :=
+  lazymatch goal with
+  |- ?G => idtac G
+  end.
+Ltac kill_i_old :=
+  (repeat (erewrite REMOVE_LAST_pI_RULE;
+             [ | intro; discriminate | reflexivity];
+          idtac "REMOVED"; print_goal);
      repeat (eapply REMOVE_LAST_mI_RULE';
              [ lia
              | intro; discriminate
              | reflexivity])).
+
+Ltac kill_i :=
+  repeat
+    lazymatch goal with
+    |- {{{ [(?A, ?lt)] }}} _ {{{ _ }}} =>
+      (* idtac "TRYING" A lt; *)
+      first [
+        (* (tryif ends_pI lt then idtac "pI:" lt else (idtac "not pI:" lt; fail)); *)
+        ends_pI lt;
+        
+        refine (proj2 (REMOVE_LAST_pI_RULE _ _ _ _ _ _) _);
+             [intro; discriminate | reflexivity|simpl]
+      |
+        (* (tryif ends_mI lt then idtac "mI:" lt else (idtac "not mI:" lt; fail)); *)
+        ends_mI lt;
+        eapply REMOVE_LAST_mI_RULE';
+              [ lia
+              | intro; discriminate
+              | reflexivity]
+             ]
+    end.
+
+
+Ltac kill_i_debug :=
+  repeat
+    lazymatch goal with
+    |- {{{ [(?A, ?lt)] }}} _ {{{ _ }}} =>
+      idtac "TRYING" A lt;
+      first [
+        (tryif ends_pI lt then idtac "pI:" lt else (idtac "not pI:" lt; fail));
+        ends_pI lt;
+        rewrite REMOVE_LAST_pI_RULE;
+             [simpl | intro; discriminate | reflexivity]
+      |
+        (tryif ends_mI lt then idtac "mI:" lt else (idtac "not mI:" lt; fail));
+        ends_mI lt;
+        eapply REMOVE_LAST_mI_RULE';
+              [ lia
+              | intro; discriminate
+              | reflexivity]
+             ]
+    end.
 
 Ltac kill := repeat (try apply KILL_FALSE_RULE'; kill_i; kill_f).
 
 Ltac mseqs :=
   repeat tryif mseq then [> mseqs; idtac | idtac] else idtac.
 
-Ltac normal i :=
+Ltac normal_old i :=
   eapply (NORMALIZE_RULE i);
   [ repeat constructor; simpl; lia | simplify ].
+
+Lemma WF_L_compute {n} (l : list (TType n))
+  : forallb (Nat.eqb n ∘ length)%prg l.*2 = true -> WF_L l.
+Proof.
+  rewrite forallb_forall, <- Forall_forall.
+  rewrite Forall_fmap.
+  apply Forall_impl.
+  intros a.
+  cbn.
+  rewrite Nat.eqb_eq; easy.
+Qed.
+
+Ltac normal i :=
+  eapply (NORMALIZE_RULE i);
+  [ refine (WF_L_compute _ _); vm_compute; reflexivity | simplify ].
+
+
 
 Ltac cpred_iff cpred :=
   erewrite (SIMPLIFY_CPRED_PRE_RULE cpred).
 
 Ltac mstep :=
   simplify; branch; kill; try (normal 0%nat);
-  match goal with
+  lazymatch goal with
   | |- {{{ _ }}} ITE _ _ _ {{{ _ }}} => ite; mstep
   | |- {{{ _ }}} MEAS _ _ {{{ _ }}} => meas
   | |- {{{ _ }}} U _ {{{ _ }}} => triple
