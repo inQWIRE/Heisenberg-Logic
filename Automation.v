@@ -58,7 +58,7 @@ Fixpoint computeHT (g : prog) {n : nat} (a : AType n) : list (AType n) :=
                                 | gZ => [(C1, l)] :: (computeHT g a')
                                 | gY => [((C1/√2)%C, l); (((- C1) * (C1/√2))%C, switch l gX n)] :: (computeHT g a')
                                 end
-                        | _ ;; _ => []
+                        | (_ ;; _)%pg => []
                         end
              end
   end.
@@ -209,7 +209,7 @@ Ltac validateLC :=
   repeat (simpl; Csimpl; repeat rewrite Cmult_assoc; repeat rewrite Cmult_neg1_mult; repeat rewrite Copp_involutive);
   unfold lincombCA; simpl;
   match goal with
-  | |- @triple ?n _ (_ ;; _) _ => idtac
+  | |- @triple ?n _ (_ ;; _)%pg _ => idtac
   | |- @triple ?n (AtoPred ?a) (?g) (?B) => 
       let listC := fresh "listC" in
       pose (@extractC n a) as listC; simpl in listC;
@@ -479,7 +479,7 @@ Ltac validate :=
       [ simpl; apply ID_implies
       | validateCapImpliesSep
       | unfold compose, to_fun, collect_fun; simpl; Csimpl;
-        eapply CONS; [ apply ID_implies | idtac  | validate_sequence ] ];
+        eapply CONS; [ apply ID_implies | try apply CapIntro | validate_sequence ] ];
       validateCapImpliesCap
   | |- {{ Cap _ }} _ {{ _ }} => 
       eapply CONS; 
@@ -511,7 +511,7 @@ Inductive nonadditive_prog : prog -> Prop :=
 | S_nonadditive : forall (bit : nat), nonadditive_prog (S bit)
 | CNOT_nonadditive : forall (ctrl targ : nat), nonadditive_prog (CNOT ctrl targ)
 | seq_nonadditive : forall (g1 g2 : prog), nonadditive_prog g1 -> nonadditive_prog g2 ->
-                                      nonadditive_prog (g1 ;; g2).
+                                      nonadditive_prog (g1 ;; g2)%pg.
 
 Inductive prog_bound (n : nat) : prog -> Prop :=
 | H_bound : forall (bit : nat), bit < n -> prog_bound n (H bit)
@@ -520,7 +520,7 @@ Inductive prog_bound (n : nat) : prog -> Prop :=
 | CNOT_bound : forall (ctrl targ : nat), ctrl < n -> targ < n -> ctrl <> targ -> 
                                   prog_bound n (CNOT ctrl targ)
 | seq_bound : forall (g1 g2 : prog), prog_bound n g1 -> prog_bound n g2 ->
-                                prog_bound n (g1 ;; g2).
+                                prog_bound n (g1 ;; g2)%pg.
 
 
 
@@ -580,7 +580,7 @@ Definition gate_on_TType {n : nat} (g : prog) (t : TType n) : TType n :=
                                 end
                          end
                      end
-  | _ ;; _ => t
+  | (_ ;; _)%pg => t
   end.
 
 Lemma gate_on_TType_gScaleT_comm : forall {n : nat} (g : prog) (t : TType n) (c : Coef),
@@ -623,7 +623,7 @@ Qed.
 
 Fixpoint prog_on_TType {n : nat} (g : prog) (t : TType n) : TType n :=
   match g with
-  | g1 ;; g2 => prog_on_TType g2 (prog_on_TType g1 t)
+  | (g1 ;; g2)%pg => prog_on_TType g2 (prog_on_TType g1 t)
   | _ => gate_on_TType g t
   end.
 
