@@ -15,3 +15,16 @@ Automation.v
 ReflexiveAutomation.v
 PivotRule.v
 Measurement.v
+
+examples_and_benchmarks/Benchmark_vary_gates.v
+examples_and_benchmarks/Benchmark_vary_qubits.v
+examples_and_benchmarks/Benchmark_GHZ.v
+examples_and_benchmarks/Benchmark_parallel_T_gates.v
+examples_and_benchmarks/Benchmark_T_gate_repeat.v
+examples_and_benchmarks/Examples.v
+examples_and_benchmarks/Example_Toffoli.v
+examples_and_benchmarks/Example_normalization_tests.v
+examples_and_benchmarks/Example_separability.v
+examples_and_benchmarks/Example_graph_states.v
+examples_and_benchmarks/Example_error_correction_Steane7.v
+examples_and_benchmarks/Example_error_correction_Shor9.v

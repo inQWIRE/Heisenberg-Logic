@@ -4469,7 +4469,8 @@ Proof.
   now apply (CUP_RULE A [] A' B).
 Qed.
 
-Example Steane7QEC_Id :
+
+Example Steane7QEC_Z_Id :
 {{{
 [
 (TRUE,
@@ -4496,13 +4497,7 @@ msolves.
 all: solveNormalize; reflexivity.
 Qed.
 
-
-
-
-
-
-
-Example Steane7QEC_Z0 :
+Example Steane7QEC_Z_Z0 :
 {{{
 [
 (TRUE,
@@ -4529,7 +4524,7 @@ msolves.
 all: solveNormalize; reflexivity.
 Qed.
 
-Example Steane7QEC_X1 :
+Example Steane7QEC_Z_X1 :
 {{{
 [
 (TRUE,
@@ -4556,8 +4551,7 @@ msolves.
 all: solveNormalize; reflexivity.
 Qed.
 
-
-Example Steane7QEC_Y2 :
+Example Steane7QEC_Z_Y2 :
 {{{
 [
 (TRUE,
@@ -4584,4 +4578,110 @@ msolves.
 all: solveNormalize; reflexivity.
 Qed.
 
+Example Steane7QEC_X_Z3 :
+{{{
+[
+(TRUE,
+[
+(C1, [gX; gI; gI; gI; gI; gI; gI; gI]);
+(C1, [gI; gZ; gI; gI; gI; gI; gI; gI]);
+(C1, [gI; gI; gZ; gI; gI; gI; gI; gI]);
+(C1, [gI; gI; gI; gZ; gI; gI; gI; gI]);
+(C1, [gI; gI; gI; gI; gZ; gI; gI; gI]);
+(C1, [gI; gI; gI; gI; gI; gZ; gI; gI]);
+(C1, [gI; gI; gI; gI; gI; gI; gZ; gI]);
+(C1, [gI; gI; gI; gI; gI; gI; gI; gZ])
+]
+)
+]
+}}}
+(U (Steane7 0 1 2 3 4 5 6)) ;;; (U (Z 3)) ;;;
+synd_s1z_0 ;;; synd_s2z_1 ;;; synd_s3z_2 ;;; synd_s1x_3 ;;; synd_s2x_4 ;;; synd_s3x_5 ;;;
+correctX ;;; correctZ
+{{{ [(TRUE, normalize 0%nat [g1; g2; g3; g4; g5; g6; Xbar; Zanc])] }}}.
+Proof.
+finalize.
+msolves.
+all: solveNormalize; reflexivity.
+Qed.
 
+Example Steane7QEC_X_X4 :
+{{{
+[
+(TRUE,
+[
+(C1, [gX; gI; gI; gI; gI; gI; gI; gI]);
+(C1, [gI; gZ; gI; gI; gI; gI; gI; gI]);
+(C1, [gI; gI; gZ; gI; gI; gI; gI; gI]);
+(C1, [gI; gI; gI; gZ; gI; gI; gI; gI]);
+(C1, [gI; gI; gI; gI; gZ; gI; gI; gI]);
+(C1, [gI; gI; gI; gI; gI; gZ; gI; gI]);
+(C1, [gI; gI; gI; gI; gI; gI; gZ; gI]);
+(C1, [gI; gI; gI; gI; gI; gI; gI; gZ])
+]
+)
+]
+}}}
+(U (Steane7 0 1 2 3 4 5 6)) ;;; (U (X 4)) ;;;
+synd_s1z_0 ;;; synd_s2z_1 ;;; synd_s3z_2 ;;; synd_s1x_3 ;;; synd_s2x_4 ;;; synd_s3x_5 ;;;
+correctX ;;; correctZ
+{{{ [(TRUE, normalize 0%nat [g1; g2; g3; g4; g5; g6; Xbar; Zanc])] }}}.
+Proof.
+finalize.
+msolves.
+all: solveNormalize; reflexivity.
+Qed.
+
+Example Steane7QEC_X_Y5 :
+{{{
+[
+(TRUE,
+[
+(C1, [gX; gI; gI; gI; gI; gI; gI; gI]);
+(C1, [gI; gZ; gI; gI; gI; gI; gI; gI]);
+(C1, [gI; gI; gZ; gI; gI; gI; gI; gI]);
+(C1, [gI; gI; gI; gZ; gI; gI; gI; gI]);
+(C1, [gI; gI; gI; gI; gZ; gI; gI; gI]);
+(C1, [gI; gI; gI; gI; gI; gZ; gI; gI]);
+(C1, [gI; gI; gI; gI; gI; gI; gZ; gI]);
+(C1, [gI; gI; gI; gI; gI; gI; gI; gZ])
+]
+)
+]
+}}}
+(U (Steane7 0 1 2 3 4 5 6)) ;;; (U (Y 5)) ;;;
+synd_s1z_0 ;;; synd_s2z_1 ;;; synd_s3z_2 ;;; synd_s1x_3 ;;; synd_s2x_4 ;;; synd_s3x_5 ;;;
+correctX ;;; correctZ
+{{{ [(TRUE, normalize 0%nat [g1; g2; g3; g4; g5; g6; Xbar; Zanc])] }}}.
+Proof.
+finalize.
+msolves.
+all: solveNormalize; reflexivity.
+Qed.
+
+Example Steane7QEC_X_Y6 :
+{{{
+[
+(TRUE,
+[
+(C1, [gX; gI; gI; gI; gI; gI; gI; gI]);
+(C1, [gI; gZ; gI; gI; gI; gI; gI; gI]);
+(C1, [gI; gI; gZ; gI; gI; gI; gI; gI]);
+(C1, [gI; gI; gI; gZ; gI; gI; gI; gI]);
+(C1, [gI; gI; gI; gI; gZ; gI; gI; gI]);
+(C1, [gI; gI; gI; gI; gI; gZ; gI; gI]);
+(C1, [gI; gI; gI; gI; gI; gI; gZ; gI]);
+(C1, [gI; gI; gI; gI; gI; gI; gI; gZ])
+]
+)
+]
+}}}
+(U (Steane7 0 1 2 3 4 5 6)) ;;; (U (Y 6)) ;;;
+synd_s1z_0 ;;; synd_s2z_1 ;;; synd_s3z_2 ;;; synd_s1x_3 ;;; synd_s2x_4 ;;; synd_s3x_5 ;;;
+correctX ;;; correctZ
+{{{ [(TRUE, normalize 0%nat [g1; g2; g3; g4; g5; g6; Xbar; Zanc])] }}}.
+Proof.
+finalize.
+msolves.
+all: solveNormalize; reflexivity.
+Qed.
